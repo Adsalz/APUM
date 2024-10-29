@@ -6,8 +6,9 @@ import DashboardMedecin from './components/DashboardMedecin';
 import DashboardAdmin from './components/DashboardAdmin';
 import FormulaireDesirata from './components/FormulaireDesirata';
 import GestionUtilisateurs from './components/GestionUtilisateurs';
-import GestionPlanning from './components/GestionPlanning';
+import GestionPlanning from './components/planning/GestionPlanning';
 import GestionPeriodeSaisie from './components/GestionPeriodeSaisie';
+import PlanningVisualisation from './components/PlanningVisualisation'; // Ajout de l'import
 
 function App() {
   return (
@@ -20,7 +21,7 @@ function App() {
           <Route path="/formulaire-desirata" component={FormulaireDesirata} />
           <Route path="/gestion-utilisateurs" component={GestionUtilisateurs} />
           <Route path="/gestion-planning-admin" render={() => <GestionPlanning isAdmin={true} />} />
-          <Route path="/visualisation-planning" render={() => <GestionPlanning isAdmin={false} />} />
+          <Route path="/planning-visualisation" component={PlanningVisualisation} />
           <Route path="/gestion-periode-saisie" component={GestionPeriodeSaisie} />
         </Switch>
       </div>

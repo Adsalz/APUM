@@ -251,6 +251,13 @@ object-assign
  * limitations under the License.
  */
 
+/**
+ * @license lucide-react v0.439.0 - ISC
+ *
+ * This source code is licensed under the ISC license.
+ * See the LICENSE file in the root directory of this source tree.
+ */
+
 /** @license
          Copyright The Closure Library Authors.
          SPDX-License-Identifier: Apache-2.0
