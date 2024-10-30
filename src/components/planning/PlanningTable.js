@@ -129,13 +129,23 @@ const PlanningTable = ({
       backgroundColor: 'white',
       borderRadius: '0.5rem',
       boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-      overflowX: 'auto'
+      overflowX: 'auto',
+      width: '100%',        // Ajout de width 100%
+      maxWidth: '100vw',    // Utilisation de la largeur de la vue
+      margin: '0 auto'      // Centrage
     }}>
       <table style={{
         width: '100%',
         borderCollapse: 'collapse',
-        fontSize: '0.875rem'
+        fontSize: '0.875rem',
+        tableLayout: 'fixed'    // Ajout de table-layout fixed
       }}>
+        <colgroup>
+          <col style={{ width: '120px' }} />  {/* Largeur fixe pour la colonne date */}
+          {getFilteredCreneaux().map((creneau, index) => (
+            <col key={index} style={{ width: `${100 / getFilteredCreneaux().length}%` }} />
+          ))}
+        </colgroup>
         <thead>
           <tr>
             <th style={{

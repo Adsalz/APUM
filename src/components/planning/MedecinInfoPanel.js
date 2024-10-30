@@ -1,4 +1,4 @@
-// src/components/MedecinInfoPanel.js
+// src/components/planning/MedecinInfoPanel.js
 import React from 'react';
 import { User, Calendar } from 'lucide-react';
 import { compterGardesParMedecin, getNombreGardesSouhaitees } from '../../utils/planningUtils';
@@ -8,6 +8,16 @@ const MedecinInfoPanel = ({ medecin, planning, desiderata }) => {
 
   const gardesAttribuees = compterGardesParMedecin(planning, medecin.id);
   const gardesSouhaitees = getNombreGardesSouhaitees(desiderata, medecin.id);
+  
+  // Rechercher les desiderata les plus récents pour ce médecin
+  const medecinDesiderata = desiderata
+    .filter(d => d.userId === medecin.id)
+    .sort((a, b) => new Date(b.startDate) - new Date(a.startDate))[0];
+
+  // Si aucun desiderata n'est trouvé, on affiche "Non défini"
+  const gardesMaxParSemaine = medecinDesiderata?.nombreGardesMaxParSemaine !== undefined 
+    ? medecinDesiderata.nombreGardesMaxParSemaine 
+    : 'Non défini';
 
   return (
     <div style={{
@@ -44,7 +54,7 @@ const MedecinInfoPanel = ({ medecin, planning, desiderata }) => {
 
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
         gap: '1rem'
       }}>
         <div style={{
@@ -57,14 +67,35 @@ const MedecinInfoPanel = ({ medecin, planning, desiderata }) => {
             color: '#6B7280',
             marginBottom: '0.5rem'
           }}>
-            Gardes souhaitées
+            Gardes souhaitées / mois
           </div>
           <div style={{
             fontSize: '1.5rem',
             fontWeight: 'bold',
             color: '#2563EB'
           }}>
-            {gardesSouhaitees}
+            {gardesSouhaitees || 'Non défini'}
+          </div>
+        </div>
+
+        <div style={{
+          padding: '1rem',
+          backgroundColor: '#F3F4F6',
+          borderRadius: '8px'
+        }}>
+          <div style={{
+            fontSize: '0.875rem',
+            color: '#6B7280',
+            marginBottom: '0.5rem'
+          }}>
+            Gardes max. / semaine
+          </div>
+          <div style={{
+            fontSize: '1.5rem',
+            fontWeight: 'bold',
+            color: '#059669'
+          }}>
+            {typeof gardesMaxParSemaine === 'number' ? gardesMaxParSemaine : 'Non défini'}
           </div>
         </div>
 

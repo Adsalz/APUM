@@ -199,6 +199,7 @@ export const getDesiderataForPeriod = async (debut, fin) => {
         endDate: convertFromTimestamp(data.endDate),
         desiderata: data.desiderata,
         nombreGardesSouhaitees: data.nombreGardesSouhaitees,
+        nombreGardesMaxParSemaine: data.nombreGardesMaxParSemaine,
         gardesGroupees: data.gardesGroupees,
         renfortsAssocies: data.renfortsAssocies
       };
