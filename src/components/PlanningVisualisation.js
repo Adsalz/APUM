@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useHistory } from 'react-router-dom';
 import { auth } from '../firebase';
-import { getUser } from '../services/userService';
+import { getUser, getMedecins } from '../services/userService';
 import { 
   getPublishedPlanning, 
   getPeriodeSaisie 
@@ -31,6 +31,7 @@ const creneaux = [
 function PlanningVisualisation() {
   // États
   const [planning, setPlanning] = useState(null);
+  const [medecins, setMedecins] = useState([]);
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -41,8 +42,9 @@ function PlanningVisualisation() {
   const [periodeSaisie, setPeriodeSaisie] = useState(null);
 
   const history = useHistory();
+
   // Effets
- useEffect(() => {
+  useEffect(() => {
     const fetchData = async () => {
       try {
         const authUser = auth.currentUser;
@@ -58,6 +60,9 @@ function PlanningVisualisation() {
           return;
         }
  
+        // Charger tous les médecins
+        const allMedecins = await getMedecins();
+        setMedecins(allMedecins);
         setUser(userData);
  
         const periode = await getPeriodeSaisie();
@@ -85,13 +90,13 @@ function PlanningVisualisation() {
  
     fetchData();
   }, [history]);
- 
+
   const exportToICS = () => {
     if (!planning || !planning.planning) return;
- 
+
     const events = [];
     const sortedDates = Object.keys(planning.planning).sort((a, b) => new Date(a) - new Date(b));
- 
+
     sortedDates.forEach(date => {
       creneaux.forEach(creneau => {
         if (planning.planning[date][creneau.id]) {
@@ -100,7 +105,7 @@ function PlanningVisualisation() {
               const startDate = new Date(date);
               const endDate = new Date(date);
               let startHour, endHour;
- 
+
               switch (creneau.id) {
                 case 'QUART_1': startHour = 1; endHour = 7; break;
                 case 'QUART_2': startHour = 7; endHour = 13; break;
@@ -108,17 +113,17 @@ function PlanningVisualisation() {
                 case 'QUART_3': startHour = 13; endHour = 19; break;
                 case 'RENFORT_2': startHour = 20; endHour = 24; break;
                 case 'QUART_4': startHour = 19; endHour = 25; break;
-                default: startHour = 0; endHour = 0; break; // Ajout du case default
+                default: startHour = 0; endHour = 0; break;
               }
- 
+
               startDate.setHours(startHour, 0, 0);
               endDate.setHours(endHour, 0, 0);
- 
+
               if (endHour === 25) {
                 endDate.setDate(endDate.getDate() + 1);
                 endDate.setHours(1, 0, 0);
               }
- 
+
               events.push({
                 start: [startDate.getFullYear(), startDate.getMonth() + 1, startDate.getDate(), startDate.getHours(), startDate.getMinutes()],
                 end: [endDate.getFullYear(), endDate.getMonth() + 1, endDate.getDate(), endDate.getHours(), endDate.getMinutes()],
@@ -131,7 +136,7 @@ function PlanningVisualisation() {
         }
       });
     });
- 
+
     createEvents(events, (error, value) => {
       if (error) {
         console.error(error);
@@ -147,7 +152,7 @@ function PlanningVisualisation() {
       document.body.removeChild(link);
     });
   };
- 
+
   // Fonctions utilitaires
   const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -155,14 +160,22 @@ function PlanningVisualisation() {
     const months = ['jan', 'fév', 'mar', 'avr', 'mai', 'juin', 'juil', 'août', 'sep', 'oct', 'nov', 'déc'];
     return `${days[date.getDay()]} ${date.getDate()} ${months[date.getMonth()]}`;
   };
- 
+
   const isWeekend = (dateString) => {
     const date = new Date(dateString);
     return date.getDay() === 0 || date.getDay() === 6;
   };
 
-   // Rendu conditionnel pour chargement et erreurs
- if (loading) {
+  const getMedecinName = (medecinId) => {
+    if (medecinId === user.id) {
+      return `Dr. ${user.prenom} ${user.nom}`;
+    }
+    const medecin = medecins.find(m => m.id === medecinId);
+    return medecin ? `Dr. ${medecin.prenom} ${medecin.nom}` : 'Médecin non trouvé';
+  };
+
+  // Rendu conditionnel pour chargement et erreurs
+  if (loading) {
     return (
       <div style={{
         minHeight: '100vh',
@@ -175,7 +188,7 @@ function PlanningVisualisation() {
       </div>
     );
   }
- 
+
   if (error) {
     return (
       <div style={{
@@ -219,7 +232,7 @@ function PlanningVisualisation() {
       </div>
     );
   }
- 
+
   if (!planning || !planning.planning) {
     return (
       <div style={{
@@ -233,12 +246,12 @@ function PlanningVisualisation() {
       </div>
     );
   }
- 
+
   // Filtrage des dates en fonction de la période sélectionnée
   const filteredDates = Object.keys(planning.planning)
     .filter(date => date >= startDate && date <= endDate)
     .sort((a, b) => new Date(a) - new Date(b));
- 
+
   return (
     <div style={{ backgroundColor: '#f3f4f6', minHeight: '100vh' }}>
       {/* Menu fixe en haut */}
@@ -250,7 +263,7 @@ function PlanningVisualisation() {
         backgroundColor: 'rgba(255, 255, 255, 0.95)',
         borderBottom: '1px solid #e5e7eb',
         boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-        zIndex: 40
+        zIndex: 40,
       }}>
         <div style={{
           maxWidth: '1280px',
@@ -292,7 +305,7 @@ function PlanningVisualisation() {
               <span>Planning des gardes</span>
             </div>
           </div>
- 
+
           <div style={{
             display: 'flex',
             alignItems: 'center',
@@ -320,261 +333,284 @@ function PlanningVisualisation() {
         </div>
       </nav>
 
-       {/* Contenu principal */}
- <main style={{
-   maxWidth: '1280px',
-   margin: '0 auto',
-   padding: '5rem 1rem 2rem',
- }}>
-   {/* Section des filtres */}
-   <div style={{
-     backgroundColor: 'white',
-     borderRadius: '8px',
-     boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-     marginBottom: '2rem'
-   }}>
-     {/* En-tête des filtres */}
-     <button
-       onClick={() => setShowFilters(!showFilters)}
-       style={{
-         width: '100%',
-         padding: '1rem 1.5rem',
-         display: 'flex',
-         justifyContent: 'space-between',
-         alignItems: 'center',
-         border: 'none',
-         background: 'none',
-         cursor: 'pointer',
-         borderBottom: showFilters ? '1px solid #E5E7EB' : 'none'
-       }}
-     >
-       <div style={{ 
-         display: 'flex', 
-         alignItems: 'center', 
-         gap: '0.5rem',
-         color: '#374151'
-       }}>
-         <Filter size={20} />
-         <span style={{ fontWeight: '500' }}>Filtres</span>
-       </div>
-       {showFilters ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-     </button>
+      {/* Contenu principal */}
+      <main style={{
+        maxWidth: '100%',
+        margin: '0 auto',
+        padding: '2rem',
+        marginTop: '80px', // Espace spécifique après le bandeau
+        height: 'calc(100vh - 80px)', // Ajusté pour la nouvelle marge
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '1.5rem'
+      }}>
 
-     {/* Contenu des filtres */}
-     {showFilters && (
-       <div style={{ padding: '1.5rem' }}>
-         <div style={{
-           display: 'grid',
-           gap: '1.5rem',
-           gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))'
-         }}>
-           {/* Sélection du mode de vue */}
-           <div>
-             <label style={{
-               display: 'block',
-               fontSize: '0.875rem',
-               fontWeight: '500',
-               color: '#374151',
-               marginBottom: '0.5rem'
-             }}>
-               Mode d'affichage
-             </label>
-             <div style={{
-               display: 'flex',
-               gap: '0.5rem'
-             }}>
-               <button
-                 onClick={() => setViewMode('all')}
-                 style={{
-                   flex: 1,
-                   padding: '0.5rem',
-                   display: 'flex',
-                   alignItems: 'center',
-                   justifyContent: 'center',
-                   gap: '0.5rem',
-                   backgroundColor: viewMode === 'all' ? '#2563EB' : '#F3F4F6',
-                   color: viewMode === 'all' ? 'white' : '#374151',
-                   border: '1px solid',
-                   borderColor: viewMode === 'all' ? '#2563EB' : '#D1D5DB',
-                   borderRadius: '0.375rem',
-                   fontSize: '0.875rem',
-                   cursor: 'pointer'
-                 }}
-               >
-                 <Eye size={16} />
-                 Tout voir
-               </button>
-               <button
-                 onClick={() => setViewMode('personal')}
-                 style={{
-                   flex: 1,
-                   padding: '0.5rem',
-                   display: 'flex',
-                   alignItems: 'center',
-                   justifyContent: 'center',
-                   gap: '0.5rem',
-                   backgroundColor: viewMode === 'personal' ? '#2563EB' : '#F3F4F6',
-                   color: viewMode === 'personal' ? 'white' : '#374151',
-                   border: '1px solid',
-                   borderColor: viewMode === 'personal' ? '#2563EB' : '#D1D5DB',
-                   borderRadius: '0.375rem',
-                   fontSize: '0.875rem',
-                   cursor: 'pointer'
-                 }}
-               >
-                 <EyeOff size={16} />
-                 Mes gardes
-               </button>
-             </div>
-           </div>
+{/* Section des filtres */}
+<div style={{
+  backgroundColor: 'white',
+  borderRadius: '12px',
+  boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+  marginBottom: '2rem',
+  border: '1px solid #E5E7EB'
+}}>
+  {/* En-tête des filtres */}
+  <button
+    onClick={() => setShowFilters(!showFilters)}
+    style={{
+      width: '100%',
+      padding: '1rem 1.5rem',
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      border: 'none',
+      background: 'none',
+      cursor: 'pointer',
+      borderBottom: showFilters ? '1px solid #E5E7EB' : 'none'
+    }}
+  >
+    <div style={{ 
+      display: 'flex', 
+      alignItems: 'center', 
+      gap: '0.5rem',
+      color: '#374151'
+    }}>
+      <Filter size={20} />
+      <span style={{ fontWeight: '500' }}>Filtres</span>
+    </div>
+    {showFilters ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+  </button>
 
-           {/* Sélection de la période */}
-           <div>
-             <label style={{
-               display: 'block',
-               fontSize: '0.875rem',
-               fontWeight: '500',
-               color: '#374151',
-               marginBottom: '0.5rem'
-             }}>
-               Période
-             </label>
-             <div style={{
-               display: 'flex',
-               gap: '0.5rem'
-             }}>
-               <input
-                 type="date"
-                 value={startDate}
-                 onChange={(e) => setStartDate(e.target.value)}
-                 style={{
-                   flex: 1,
-                   padding: '0.5rem',
-                   border: '1px solid #D1D5DB',
-                   borderRadius: '0.375rem',
-                   fontSize: '0.875rem'
-                 }}
-               />
-               <input
-                 type="date"
-                 value={endDate}
-                 onChange={(e) => setEndDate(e.target.value)}
-                 style={{
-                   flex: 1,
-                   padding: '0.5rem',
-                   border: '1px solid #D1D5DB',
-                   borderRadius: '0.375rem',
-                   fontSize: '0.875rem'
-                 }}
-               />
-             </div>
-           </div>
-         </div>
-       </div>
-     )}
-   </div>
+  {showFilters && (
+    <div style={{ padding: '1.5rem' }}>
+      <div style={{
+        display: 'grid',
+        gap: '1.5rem'
+      }}>
+        {/* Sélection du mode de vue */}
+        <div>
+          <label style={{
+            display: 'block',
+            fontSize: '0.875rem',
+            fontWeight: '500',
+            color: '#374151',
+            marginBottom: '0.5rem'
+          }}>
+            Mode d'affichage
+          </label>
+          <div style={{
+            display: 'flex',
+            gap: '0.5rem',
+            backgroundColor: '#F3F4F6',
+            padding: '0.25rem',
+            borderRadius: '0.375rem',
+            width: 'fit-content'
+          }}>
+            <button
+  onClick={() => setViewMode('all')}
+  style={{
+    padding: '0.5rem 1rem',
+    borderRadius: '0.25rem',
+    border: 'none',
+    backgroundColor: viewMode === 'all' ? '#2563EB' : '#F3F4F6',
+    color: viewMode === 'all' ? 'white' : '#374151',
+    boxShadow: viewMode === 'all' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    fontSize: '0.875rem',
+    fontWeight: '500'
+  }}
+>
+  <Eye size={16} />
+  Voir tout
+</button>
+<button
+  onClick={() => setViewMode('personal')}
+  style={{
+    padding: '0.5rem 1rem',
+    borderRadius: '0.25rem',
+    border: 'none',
+    backgroundColor: viewMode === 'personal' ? '#2563EB' : '#F3F4F6',
+    color: viewMode === 'personal' ? 'white' : '#374151',
+    boxShadow: viewMode === 'personal' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    fontSize: '0.875rem',
+    fontWeight: '500'
+  }}
+>
+  <EyeOff size={16} />
+  Mes gardes
+</button>
+          </div>
+        </div>
 
-   {/* Tableau du planning */}
-   <div style={{
-     backgroundColor: 'white',
-     borderRadius: '8px',
-     boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-     overflowX: 'auto'
-   }}>
-     <table style={{
-       width: '100%',
-       borderCollapse: 'collapse',
-       fontSize: '0.875rem'
-     }}>
-       <thead>
-         <tr>
-           <th style={{
-             padding: '0.75rem',
-             backgroundColor: '#F3F4F6',
-             borderBottom: '1px solid #E5E7EB',
-             textAlign: 'left',
-             fontWeight: '600',
-             position: 'sticky',
-             left: 0,
-             backgroundColor: 'white',
-             zIndex: 10
-           }}>
-             Date
-           </th>
-           {creneaux.map(creneau => (
-             <th key={creneau.id} style={{
-               padding: '0.75rem',
-               backgroundColor: '#F3F4F6',
-               borderBottom: '1px solid #E5E7EB',
-               textAlign: 'left',
-               fontWeight: '600',
-               minWidth: '150px'
-             }}>
-               <div>{creneau.label}</div>
-               <div style={{ fontSize: '0.75rem', color: '#6B7280' }}>{creneau.hours}</div>
-             </th>
-           ))}
-         </tr>
-       </thead>
-       <tbody>
-         {filteredDates.map(date => (
-           <tr key={date} style={{
-             backgroundColor: isWeekend(date) ? '#F9FAFB' : 'white'
-           }}>
-             <td style={{
-               padding: '0.75rem',
-               borderBottom: '1px solid #E5E7EB',
-               fontWeight: '500',
-               position: 'sticky',
-               left: 0,
-               backgroundColor: isWeekend(date) ? '#F9FAFB' : 'white',
-               zIndex: 10
-             }}>
-               {formatDate(date)}
-             </td>
-             {creneaux.map(creneau => (
-               <td key={`${date}-${creneau.id}`} style={{
-                 padding: '0.75rem',
-                 borderBottom: '1px solid #E5E7EB',
-                 backgroundColor: planning.planning[date][creneau.id]?.includes(user.id) ? creneau.color : 'transparent'
-               }}>
-                 {(!creneau.samediOnly || new Date(date).getDay() === 6) && (
-                   <div style={{
-                     color: planning.planning[date][creneau.id]?.includes(user.id) ? creneau.textColor : '#374151'
-                   }}>
-                     {viewMode === 'all' ? (
-                       planning.planning[date][creneau.id]?.map((medecinId, index) => (
-                         <div key={index} style={{
-                           padding: '0.25rem',
-                           borderRadius: '0.25rem',
-                           fontWeight: medecinId === user.id ? '600' : 'normal'
-                         }}>
-                           Dr. {medecinId === user.id ? 'Vous' : medecinId}
-                         </div>
-                       ))
-                     ) : (
-                       planning.planning[date][creneau.id]?.includes(user.id) && (
-                         <div style={{
-                           padding: '0.25rem',
-                           borderRadius: '0.25rem',
-                           fontWeight: '600'
-                         }}>
-                           Dr. Vous
-                         </div>
-                       )
-                     )}
-                   </div>
-                 )}
-               </td>
-             ))}
-           </tr>
-         ))}
-       </tbody>
-     </table>
-   </div>
- </main>
+        {/* Sélection de la période */}
+        <div>
+          <label style={{
+            display: 'block',
+            fontSize: '0.875rem',
+            fontWeight: '500',
+            color: '#374151',
+            marginBottom: '0.5rem'
+          }}>
+            Période
+          </label>
+          <div style={{
+            display: 'flex',
+            gap: '0.5rem'
+          }}>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              style={{
+                flex: 1,
+                padding: '0.5rem',
+                borderRadius: '0.375rem',
+                border: '1px solid #D1D5DB',
+                fontSize: '0.875rem'
+              }}
+            />
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              style={{
+                flex: 1,
+                padding: '0.5rem',
+                borderRadius: '0.375rem',
+                border: '1px solid #D1D5DB',
+                fontSize: '0.875rem'
+              }}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  )}
 </div>
- );
+
+{/* Tableau du planning */}
+<div style={{
+    backgroundColor: 'white',
+    borderRadius: '12px',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+    overflowX: 'auto',
+    flexGrow: 1, // Pour prendre l'espace disponible
+    display: 'flex',
+    flexDirection: 'column',
+    border: '1px solid #E5E7EB'
+  }}>
+    <table style={{
+      width: '100%',
+      borderCollapse: 'collapse',
+      fontSize: '0.875rem',
+      tableLayout: 'fixed' // Forcer une largeur fixe pour les colonnes
+    }}>
+      <colgroup>
+        <col style={{ width: '120px' }} /> {/* Largeur fixe pour la colonne de date */}
+        {creneaux.map(creneau => (
+          <col key={creneau.id} style={{ width: `${100 / creneaux.length}%` }} />
+        ))}
+      </colgroup>
+      <thead>
+        <tr>
+          <th style={{
+            padding: '0.75rem',
+            backgroundColor: '#F9FAFB',
+            borderBottom: '1px solid #E5E7EB',
+            textAlign: 'left',
+            fontWeight: '600',
+            position: 'sticky',
+            left: 0,
+            top: 0,
+            zIndex: 20,
+            backgroundColor: 'white',
+            width: '120px'
+          }}>
+            Date
+          </th>
+          {creneaux.map(creneau => (
+            <th key={creneau.id} style={{
+              padding: '0.75rem',
+              backgroundColor: '#F9FAFB',
+              borderBottom: '1px solid #E5E7EB',
+              textAlign: 'left',
+              fontWeight: '600',
+              position: 'sticky',
+              top: 0,
+              zIndex: 10
+            }}>
+              <div>{creneau.label}</div>
+              <div style={{
+                fontSize: '0.75rem',
+                color: '#6B7280'
+              }}>
+                {creneau.hours}
+              </div>
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {filteredDates.map(date => (
+          <tr key={date} style={{
+            backgroundColor: isWeekend(date) ? '#F9FAFB' : 'white'
+          }}>
+            <td style={{
+              padding: '0.75rem',
+              borderBottom: '1px solid #E5E7EB',
+              fontWeight: '500',
+              position: 'sticky',
+              left: 0,
+              backgroundColor: isWeekend(date) ? '#F9FAFB' : 'white',
+              zIndex: 10,
+              width: '120px'
+            }}>
+              {formatDate(date)}
+            </td>
+            {creneaux.map(creneau => (
+              <td key={`${date}-${creneau.id}`} style={{
+                padding: '0.75rem',
+                borderBottom: '1px solid #E5E7EB',
+                verticalAlign: 'top'
+              }}>
+                {(!creneau.samediOnly || new Date(date).getDay() === 6) && (
+                  <div style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.25rem'
+                  }}>
+                    {planning.planning[date]?.[creneau.id]?.map((medecinId, index) => (
+                      <div key={index} style={{
+                        padding: '0.5rem',
+                        backgroundColor: medecinId ? creneau.color : '#F3F4F6',
+                        color: medecinId ? creneau.textColor : '#6B7280',
+                        borderRadius: '0.375rem',
+                        fontSize: '0.75rem',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis'
+                      }}>
+                        {medecinId ? getMedecinName(medecinId) : 'Non assigné'}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</main>
+</div>
+);
 }
 
 export default PlanningVisualisation;
