@@ -24,6 +24,7 @@ import MedecinInfoPanel from './MedecinInfoPanel';
 import GeneratePlanningModal from './modals/GeneratePlanningModal';
 import PublishPlanningModal from './modals/PublishPlanningModal';
 import DiscardChangesModal from './modals/DiscardChangesModal';
+import ExportDesiderataModal from '../ExportDesiderataModal';
 
 function GestionPlanning({ isAdmin = true }) {
   // États pour les données
@@ -51,6 +52,7 @@ function GestionPlanning({ isAdmin = true }) {
   const [showGenerateConfirm, setShowGenerateConfirm] = useState(false);
   const [showPublishConfirm, setShowPublishConfirm] = useState(false);
   const [showDiscardChanges, setShowDiscardChanges] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
 
   const history = useHistory();
 
@@ -272,6 +274,7 @@ function GestionPlanning({ isAdmin = true }) {
         onPublishClick={() => setShowPublishConfirm(true)}
         onSaveChanges={handleSaveChanges}
         onBackClick={() => history.push('/dashboard-admin')}
+        onExportClick={() => setShowExportModal(true)}
         planning={planning}
       />
 
@@ -394,6 +397,15 @@ function GestionPlanning({ isAdmin = true }) {
           setModified(false);
           setEditMode(false);
         }}
+      />
+
+      <ExportDesiderataModal
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        medecins={medecins}
+        desiderata={desiderata}
+        periodeSaisie={periodeSaisie}
+        creneaux={creneaux}
       />
     </div>
   );

@@ -1,5 +1,15 @@
 import { db, auth } from '../firebase';
-import { doc, getDoc, setDoc, updateDoc, deleteDoc, getDocs, collection, query, where } from 'firebase/firestore';
+import { 
+  doc, 
+  getDoc, 
+  setDoc, 
+  updateDoc, 
+  deleteDoc, 
+  getDocs, 
+  collection, 
+  query, 
+  where 
+} from 'firebase/firestore';
 
 const USERS_COLLECTION = 'users';
 
@@ -15,10 +25,16 @@ export const createUser = async (uid, userData) => {
 
 export const getUser = async (uid) => {
   try {
+    if (!uid) {
+      console.log('UID non fourni');
+      return null;
+    }
+
     const userDoc = await getDoc(doc(db, USERS_COLLECTION, uid));
     if (userDoc.exists()) {
-      console.log('Utilisateur trouvé:', userDoc.data());
-      return { id: userDoc.id, ...userDoc.data() };
+      const userData = userDoc.data();
+      console.log('Utilisateur trouvé:', userData);
+      return { id: userDoc.id, ...userData };
     } else {
       console.log('Aucun utilisateur trouvé avec cet UID');
       return null;
@@ -57,8 +73,8 @@ export const getAllUsers = async () => {
     }
 
     const currentUserDoc = await getDoc(doc(db, USERS_COLLECTION, user.uid));
-    if (!currentUserDoc.exists()) {
-      throw new Error('Utilisateur non trouvé');
+    if (!currentUserDoc.exists() || currentUserDoc.data().role !== 'admin') {
+      throw new Error('Accès non autorisé');
     }
 
     const querySnapshot = await getDocs(collection(db, USERS_COLLECTION));
@@ -81,6 +97,26 @@ export const getMedecins = async () => {
     return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   } catch (error) {
     console.error('Erreur lors de la récupération des médecins:', error);
+    throw error;
+  }
+};
+
+export const getUserByEmail = async (email) => {
+  try {
+    const q = query(collection(db, USERS_COLLECTION), where("email", "==", email));
+    const querySnapshot = await getDocs(q);
+    
+    if (querySnapshot.empty) {
+      return null;
+    }
+
+    const userDoc = querySnapshot.docs[0];
+    return {
+      id: userDoc.id,
+      ...userDoc.data()
+    };
+  } catch (error) {
+    console.error('Erreur lors de la recherche de l\'utilisateur par email:', error);
     throw error;
   }
 };

@@ -7,7 +7,8 @@ import {
   Upload, 
   RefreshCcw, 
   Edit2, 
-  X 
+  X,
+  Download
 } from 'lucide-react';
 
 const PlanningHeader = ({
@@ -18,6 +19,7 @@ const PlanningHeader = ({
   onPublishClick,
   onSaveChanges,
   onBackClick,
+  onExportClick,
   planning
 }) => {
   return (
@@ -79,6 +81,23 @@ const PlanningHeader = ({
         }}>
           {!editMode ? (
             <>
+              <button
+                onClick={onExportClick}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  padding: '0.5rem 1rem',
+                  backgroundColor: '#F0FDF4',
+                  border: '1px solid #16A34A',
+                  color: '#16A34A',
+                  borderRadius: '0.375rem',
+                  cursor: 'pointer'
+                }}
+              >
+                <Download size={18} />
+                Exporter desiderata
+              </button>
               <button
                 onClick={onGenerateClick}
                 style={{

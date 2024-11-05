@@ -1,14 +1,19 @@
 import React, { useState } from 'react';
 import { useHistory } from 'react-router-dom';
 import { loginUser } from '../services/authService';
-import { getUser } from '../services/userService';
+import { getUser, getUserByEmail } from '../services/userService';
 import { Calendar } from 'lucide-react';
+import { sendPasswordResetEmail } from 'firebase/auth';
+import { auth } from '../firebase';
 
 function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
   const history = useHistory();
 
   const handleSubmit = async (e) => {
@@ -42,6 +47,38 @@ function Login() {
     }
   };
 
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+    setIsLoading(true);
+
+    try {
+      // Vérifier d'abord si l'utilisateur existe dans notre base
+      const user = await getUserByEmail(resetEmail);
+      
+      if (!user) {
+        setError('Aucun compte n\'est associé à cette adresse email.');
+        setIsLoading(false);
+        return;
+      }
+
+      // Envoyer l'email de réinitialisation
+      await sendPasswordResetEmail(auth, resetEmail);
+      setSuccess('Email de réinitialisation envoyé avec succès !');
+      setTimeout(() => {
+        setShowResetModal(false);
+        setResetEmail('');
+        setSuccess('');
+      }, 3000);
+    } catch (error) {
+      console.error("Erreur lors de l'envoi de l'email de réinitialisation:", error);
+      setError('Erreur lors de l\'envoi de l\'email de réinitialisation');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div style={{ 
       backgroundColor: '#f3f4f6', 
@@ -56,7 +93,7 @@ function Login() {
         backgroundColor: 'white', 
         borderRadius: '8px', 
         boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
-        margin: 'auto' // Ajout de margin: auto pour un centrage parfait
+        margin: 'auto'
       }}>
         <div style={{ 
           padding: '24px', 
@@ -137,6 +174,23 @@ function Login() {
               />
             </div>
 
+            <button
+              type="button"
+              onClick={() => setShowResetModal(true)}
+              style={{
+                width: '100%',
+                textAlign: 'center',
+                color: '#2563EB',
+                fontSize: '14px',
+                marginBottom: '16px',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer'
+              }}
+            >
+              Mot de passe oublié ?
+            </button>
+
             {error && (
               <div style={{ 
                 backgroundColor: '#FEE2E2', 
@@ -160,7 +214,8 @@ function Login() {
                 borderRadius: '4px',
                 fontSize: '14px',
                 fontWeight: '500',
-                cursor: isLoading ? 'not-allowed' : 'pointer'
+                cursor: isLoading ? 'not-allowed' : 'pointer',
+                border: 'none'
               }}
             >
               {isLoading ? 'Connexion...' : 'Se connecter'}
@@ -168,6 +223,129 @@ function Login() {
           </form>
         </div>
       </div>
+
+      {/* Modal de réinitialisation du mot de passe */}
+      {showResetModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '24px'
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '8px',
+            padding: '24px',
+            width: '100%',
+            maxWidth: '400px',
+            position: 'relative'
+          }}>
+            <button
+              onClick={() => {
+                setShowResetModal(false);
+                setError('');
+                setSuccess('');
+                setResetEmail('');
+              }}
+              style={{
+                position: 'absolute',
+                top: '12px',
+                right: '12px',
+                background: 'none',
+                border: 'none',
+                fontSize: '24px',
+                cursor: 'pointer',
+                color: '#6B7280'
+              }}
+            >
+              ×
+            </button>
+
+            <h3 style={{
+              fontSize: '18px',
+              fontWeight: 'bold',
+              color: '#111827',
+              marginBottom: '16px'
+            }}>
+              Réinitialisation du mot de passe
+            </h3>
+
+            <form onSubmit={handleResetPassword}>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{
+                  display: 'block',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  color: '#374151',
+                  marginBottom: '4px'
+                }}>
+                  Email
+                </label>
+                <input
+                  type="email"
+                  required
+                  value={resetEmail}
+                  onChange={(e) => setResetEmail(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '4px',
+                    border: '1px solid #D1D5DB',
+                    fontSize: '14px'
+                  }}
+                  placeholder="Entrez votre adresse email"
+                />
+              </div>
+
+              {error && (
+                <div style={{
+                  backgroundColor: '#FEE2E2',
+                  padding: '12px',
+                  borderRadius: '4px',
+                  marginBottom: '16px'
+                }}>
+                  <p style={{ color: '#DC2626', fontSize: '14px' }}>{error}</p>
+                </div>
+              )}
+
+              {success && (
+                <div style={{
+                  backgroundColor: '#D1FAE5',
+                  padding: '12px',
+                  borderRadius: '4px',
+                  marginBottom: '16px'
+                }}>
+                  <p style={{ color: '#059669', fontSize: '14px' }}>{success}</p>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={isLoading}
+                style={{
+                  width: '100%',
+                  padding: '8px 16px',
+                  backgroundColor: isLoading ? '#93C5FD' : '#2563EB',
+                  color: 'white',
+                  borderRadius: '4px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  cursor: isLoading ? 'not-allowed' : 'pointer',
+                  border: 'none'
+                }}
+              >
+                {isLoading ? 'Envoi...' : 'Envoyer le lien de réinitialisation'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
