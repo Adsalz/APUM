@@ -13,7 +13,8 @@ import {
   Key,
   ClipboardList,
   Settings,
-  ChevronRight
+  ChevronRight,
+  CheckSquare
 } from 'lucide-react';
 import ChangePasswordModal from './ChangePasswordModal';
 
@@ -354,6 +355,44 @@ function DashboardAdmin() {
                 </div>
               </div>
               <ChevronRight size={20} color="#059669" />
+            </button>
+
+            {/* État des desiderata */}
+            <button
+              onClick={() => history.push('/gestion-desiderata')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '1rem',
+                backgroundColor: '#FEF3C7',
+                border: '1px solid #D97706',
+                borderRadius: '0.5rem',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                textAlign: 'left'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.backgroundColor = '#FDE68A';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.backgroundColor = '#FEF3C7';
+              }}
+            >
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '1rem'
+              }}>
+                <div style={{ color: '#D97706' }}>
+                  <CheckSquare size={24} />
+                </div>
+                <div>
+                  <div style={{ fontWeight: '500', color: '#1F2937' }}>État des desiderata</div>
+                  <div style={{ fontSize: '0.875rem', color: '#6B7280' }}>Suivre la saisie des desiderata</div>
+                </div>
+              </div>
+              <ChevronRight size={20} color="#D97706" />
             </button>
           </div>
         </div>

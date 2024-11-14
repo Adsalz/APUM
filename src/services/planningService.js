@@ -108,6 +108,30 @@ export const getPeriodeSaisie = async () => {
   }
 };
 
+export const getDesiderataStatus = async () => {
+  try {
+    const user = auth.currentUser;
+    if (!user) {
+      throw new Error('Utilisateur non authentifié');
+    }
+
+    const periode = await getPeriodeSaisie();
+    if (!periode) {
+      throw new Error('Aucune période de saisie définie');
+    }
+
+    const desiderataData = await getDesiderataForPeriod(periode.startDate, periode.endDate);
+
+    return {
+      periode,
+      desiderata: desiderataData
+    };
+  } catch (error) {
+    console.error('Erreur lors de la récupération du statut des desiderata:', error);
+    throw error;
+  }
+};
+
 export const addDesiderata = async (userId, desiderata) => {
   try {
     const user = auth.currentUser;
@@ -121,7 +145,7 @@ export const addDesiderata = async (userId, desiderata) => {
       endDate: convertToTimestamp(desiderata.endDate),
       desiderata: desiderata.desiderata,
       nombreGardesSouhaitees: desiderata.nombreGardesSouhaitees,
-      nombreGardesMaxParSemaine: desiderata.nombreGardesMaxParSemaine, // Ajout de ce champ
+      nombreGardesMaxParSemaine: desiderata.nombreGardesMaxParSemaine,
       gardesGroupees: desiderata.gardesGroupees,
       renfortsAssocies: desiderata.renfortsAssocies
     });
@@ -140,7 +164,7 @@ export const updateDesiderata = async (desiderataId, desiderata) => {
       endDate: convertToTimestamp(desiderata.endDate),
       desiderata: desiderata.desiderata,
       nombreGardesSouhaitees: desiderata.nombreGardesSouhaitees,
-      nombreGardesMaxParSemaine: desiderata.nombreGardesMaxParSemaine, // Ajout de ce champ
+      nombreGardesMaxParSemaine: desiderata.nombreGardesMaxParSemaine,
       gardesGroupees: desiderata.gardesGroupees,
       renfortsAssocies: desiderata.renfortsAssocies
     });
