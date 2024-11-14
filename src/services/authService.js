@@ -1,17 +1,45 @@
 import { auth } from '../firebase';
 import { 
-  createUserWithEmailAndPassword, 
   signInWithEmailAndPassword, 
   signOut,
-  updatePassword
+  updatePassword,
+  sendPasswordResetEmail
 } from 'firebase/auth';
 import { getUser } from './userService';
 
-export const registerUser = async (email, password) => {
+export const registerUser = async (email) => {
   try {
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    console.log('Utilisateur enregistré:', userCredential);
-    return userCredential;
+    // Générer un mot de passe temporaire
+    const tempPassword = Math.random().toString(36).slice(-8);
+
+    // Utiliser l'API REST Firebase pour créer l'utilisateur
+    const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=AIzaSyDesXYDyPsrG5HxkkPbj9XuqFQV91j2ixY`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        email: email,
+        password: tempPassword,
+        returnSecureToken: true
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error('Erreur lors de la création de l\'utilisateur');
+    }
+
+    const data = await response.json();
+
+    // Envoyer l'email de réinitialisation de mot de passe
+    await sendPasswordResetEmail(auth, email);
+
+    return {
+      user: {
+        uid: data.localId,
+        email: data.email
+      }
+    };
   } catch (error) {
     console.error('Erreur lors de l\'enregistrement:', error);
     throw error;

@@ -1,11 +1,16 @@
-// src/components/DashboardMedecin.js
 import React, { useState, useEffect } from 'react';
 import { useHistory } from 'react-router-dom';
 import { auth } from '../firebase';
 import { getUser } from '../services/userService';
 import { getDesiderataByUser } from '../services/planningService';
 import { logoutUser } from '../services/authService';
-import { Calendar, ClipboardList, LogOut, Key, Menu, X } from 'lucide-react';
+import { 
+  Key, 
+  LogOut,
+  ClipboardList, 
+  Calendar,
+  ChevronRight 
+} from 'lucide-react';
 import ChangePasswordModal from './ChangePasswordModal';
 
 function DashboardMedecin() {
@@ -14,7 +19,6 @@ function DashboardMedecin() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showChangePassword, setShowChangePassword] = useState(false);
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const history = useHistory();
 
   useEffect(() => {
@@ -106,7 +110,6 @@ function DashboardMedecin() {
           justifyContent: 'space-between',
           alignItems: 'center'
         }}>
-          {/* Logo et titre */}
           <div style={{
             display: 'flex',
             alignItems: 'center',
@@ -119,48 +122,11 @@ function DashboardMedecin() {
             <span>Planning APUM</span>
           </div>
 
-          {/* Navigation principale - Desktop */}
           <div style={{
-            display: 'none',
-            gap: '1rem',
-            '@media (min-width: 768px)': {
-              display: 'flex'
-            }
+            display: 'flex',
+            alignItems: 'center',
+            gap: '1rem'
           }}>
-            <button
-              onClick={() => history.push('/formulaire-desirata')}
-              style={{
-                padding: '0.5rem 1rem',
-                color: '#4b5563',
-                borderRadius: '0.375rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                border: 'none',
-                background: 'none',
-                cursor: 'pointer'
-              }}
-            >
-              <ClipboardList size={18} />
-              Saisir desiderata
-            </button>
-            <button
-              onClick={() => history.push('/planning-visualisation')}
-              style={{
-                padding: '0.5rem 1rem',
-                color: '#4b5563',
-                borderRadius: '0.375rem',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                border: 'none',
-                background: 'none',
-                cursor: 'pointer'
-              }}
-            >
-              <Calendar size={18} />
-              Voir planning
-            </button>
             <button
               onClick={() => setShowChangePassword(true)}
               style={{
@@ -196,125 +162,6 @@ function DashboardMedecin() {
               Déconnexion
             </button>
           </div>
-
-          {/* Bouton menu mobile */}
-          <button
-            onClick={() => setIsMenuOpen(!isMenuOpen)}
-            style={{
-              display: 'flex',
-              padding: '0.5rem',
-              color: '#4b5563',
-              border: 'none',
-              background: 'none',
-              cursor: 'pointer',
-              '@media (min-width: 768px)': {
-                display: 'none'
-              }
-            }}
-          >
-            {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
-          </button>
-        </div>
-
-        {/* Menu mobile */}
-        <div style={{
-          display: isMenuOpen ? 'block' : 'none',
-          backgroundColor: 'white',
-          borderTop: '1px solid #e5e7eb',
-          '@media (min-width: 768px)': {
-            display: 'none'
-          }
-        }}>
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            padding: '0.5rem'
-          }}>
-            <button
-              onClick={() => {
-                history.push('/formulaire-desirata');
-                setIsMenuOpen(false);
-              }}
-              style={{
-                padding: '1rem',
-                color: '#4b5563',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                border: 'none',
-                background: 'none',
-                cursor: 'pointer',
-                width: '100%',
-                justifyContent: 'flex-start'
-              }}
-            >
-              <ClipboardList size={18} />
-              Saisir desiderata
-            </button>
-            <button
-              onClick={() => {
-                history.push('/planning-visualisation');
-                setIsMenuOpen(false);
-              }}
-              style={{
-                padding: '1rem',
-                color: '#4b5563',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                border: 'none',
-                background: 'none',
-                cursor: 'pointer',
-                width: '100%',
-                justifyContent: 'flex-start'
-              }}
-            >
-              <Calendar size={18} />
-              Voir planning
-            </button>
-            <button
-              onClick={() => {
-                setShowChangePassword(true);
-                setIsMenuOpen(false);
-              }}
-              style={{
-                padding: '1rem',
-                color: '#4b5563',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                border: 'none',
-                background: 'none',
-                cursor: 'pointer',
-                width: '100%',
-                justifyContent: 'flex-start'
-              }}
-            >
-              <Key size={18} />
-              Mot de passe
-            </button>
-            <button
-              onClick={() => {
-                handleLogout();
-                setIsMenuOpen(false);
-              }}
-              style={{
-                padding: '1rem',
-                color: '#dc2626',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                border: 'none',
-                background: 'none',
-                cursor: 'pointer',
-                width: '100%',
-                justifyContent: 'flex-start'
-              }}
-            >
-              <LogOut size={18} />
-              Déconnexion
-            </button>
-          </div>
         </div>
       </nav>
 
@@ -343,6 +190,105 @@ function DashboardMedecin() {
           <p style={{ color: '#6b7280' }}>
             Gérez vos gardes et consultez le planning depuis votre tableau de bord
           </p>
+        </div>
+
+        {/* Actions principales */}
+        <div style={{
+          backgroundColor: 'white',
+          borderRadius: '0.5rem',
+          padding: '1.5rem',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+          marginBottom: '2rem'
+        }}>
+          <h2 style={{
+            fontSize: '1.25rem',
+            fontWeight: '600',
+            color: '#1f2937',
+            marginBottom: '1rem'
+          }}>
+            Actions principales
+          </h2>
+          <div style={{
+            display: 'grid',
+            gap: '1rem',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))'
+          }}>
+            {/* Saisir desiderata */}
+            <button
+              onClick={() => history.push('/formulaire-desirata')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '1rem',
+                backgroundColor: '#F3E8FF',
+                border: '1px solid #9333EA',
+                borderRadius: '0.5rem',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                textAlign: 'left'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.backgroundColor = '#EDE9FE';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.backgroundColor = '#F3E8FF';
+              }}
+            >
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '1rem'
+              }}>
+                <div style={{ color: '#9333EA' }}>
+                  <ClipboardList size={24} />
+                </div>
+                <div>
+                  <div style={{ fontWeight: '500', color: '#1F2937' }}>Saisir desiderata</div>
+                  <div style={{ fontSize: '0.875rem', color: '#6B7280' }}>Indiquez vos disponibilités</div>
+                </div>
+              </div>
+              <ChevronRight size={20} color="#9333EA" />
+            </button>
+
+            {/* Voir planning */}
+            <button
+              onClick={() => history.push('/planning-visualisation')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '1rem',
+                backgroundColor: '#ECFDF5',
+                border: '1px solid #059669',
+                borderRadius: '0.5rem',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                textAlign: 'left'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.backgroundColor = '#D1FAE5';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.backgroundColor = '#ECFDF5';
+              }}
+            >
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '1rem'
+              }}>
+                <div style={{ color: '#059669' }}>
+                  <Calendar size={24} />
+                </div>
+                <div>
+                  <div style={{ fontWeight: '500', color: '#1F2937' }}>Voir planning</div>
+                  <div style={{ fontSize: '0.875rem', color: '#6B7280' }}>Consultez le planning publié</div>
+                </div>
+              </div>
+              <ChevronRight size={20} color="#059669" />
+            </button>
+          </div>
         </div>
 
         {/* Carte des derniers desiderata */}

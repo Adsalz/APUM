@@ -48,12 +48,18 @@ function FormulaireDesirata() {
   
   const history = useHistory();
 
-  // Génération des dates
+  // Génération des dates avec correction de fuseau horaire
   const generateDates = useCallback(() => {
     if (!periodeSaisie) return [];
     const dates = [];
     let currentDate = new Date(periodeSaisie.startDate);
+    
+    // Définir l'heure à midi pour éviter les problèmes de changement de jour
+    currentDate.setHours(12, 0, 0, 0);
+    
     const end = new Date(periodeSaisie.endDate);
+    end.setHours(12, 0, 0, 0);
+
     while (currentDate <= end) {
       dates.push(new Date(currentDate));
       currentDate.setDate(currentDate.getDate() + 1);
@@ -111,34 +117,47 @@ function FormulaireDesirata() {
 
   // Gestion des changements de desiderata
   const handleDesiderataChange = (date, creneau, value) => {
-    setDesiderata(prev => ({
-      ...prev,
-      [date]: {
-        ...(prev[date] || {}),
-        [creneau]: value
+    setDesiderata(prev => {
+      const newDesiderata = { ...prev };
+      
+      // Créer une copie profonde de l'objet pour la date
+      if (!newDesiderata[date]) {
+        newDesiderata[date] = {};
       }
-    }));
+
+      // Définir la nouvelle valeur pour ce créneau à cette date
+      newDesiderata[date][creneau] = value;
+
+      return newDesiderata;
+    });
   };
 
   // Gestion du remplissage rapide
   const handleQuickFill = ({ creneaux: selectedCreneaux, jours: selectedJours, disponibilite, startDate, endDate }) => {
     const start = new Date(startDate);
+    start.setHours(12, 0, 0, 0);
     const end = new Date(endDate);
+    end.setHours(12, 0, 0, 0);
     
     setDesiderata(prev => {
       const newDesiderata = { ...prev };
-      const dates = generateDates().filter(date => 
-        date >= start && 
-        date <= end
-      );
+      const dates = generateDates().filter(date => {
+        date.setHours(12, 0, 0, 0);
+        return date >= start && date <= end;
+      });
 
       dates.forEach(date => {
-        if (selectedJours.includes(date.getDay().toString())) {
+        // Utiliser getDay() de manière cohérente
+        const dayOfWeek = date.getDay().toString();
+
+        if (selectedJours.includes(dayOfWeek)) {
           const dateString = date.toISOString().split('T')[0];
           if (!newDesiderata[dateString]) {
             newDesiderata[dateString] = {};
           }
+
           selectedCreneaux.forEach(creneauId => {
+            // Vérifier si c'est un samedi pour RENFORT_1
             if (creneauId !== 'RENFORT_1' || date.getDay() === 6) {
               newDesiderata[dateString][creneauId] = disponibilite;
             }
@@ -293,7 +312,7 @@ function FormulaireDesirata() {
       minHeight: '100vh',
       width: '100%',
       maxWidth: '100%',
-      overflowX: 'hidden' // Empêche le scroll horizontal
+      overflowX: 'hidden'
     }}>
       {/* Menu fixe en haut */}
       <nav style={{
@@ -514,17 +533,12 @@ function FormulaireDesirata() {
           display: 'grid',
           gap: '2rem',
           marginBottom: '2rem',
-          gridTemplateColumns: '1fr', // Par défaut en une colonne sur mobile
-          padding: '0 1rem', // Padding sur les côtés
-          maxWidth: '100%', // S'assure que rien ne déborde
-          boxSizing: 'border-box', // Inclut le padding dans la largeur
-          margin: '0 auto 2rem', // Centre le contenu
-          '@media (min-width: 768px)': { // Sur les écrans plus larges
-            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-            padding: 0
-          }
+          gridTemplateColumns: '1fr',
+          padding: '0 1rem',
+          maxWidth: '100%',
+          boxSizing: 'border-box',
+          margin: '0 auto 2rem'
         }}>
-          {/* Section remplissage rapide */}
           <div style={{ width: '100%', maxWidth: '100%', overflow: 'hidden' }}>
             <QuickFill
               creneaux={creneaux}
@@ -533,7 +547,6 @@ function FormulaireDesirata() {
             />
           </div>
 
-          {/* Section pattern hebdomadaire */}
           <div style={{ width: '100%', maxWidth: '100%', overflow: 'hidden' }}>
             <WeeklyPattern
               creneaux={creneaux}
@@ -543,129 +556,129 @@ function FormulaireDesirata() {
           </div>
         </div>
 
-{/* Tableau des desiderata */}
-<div style={{
-  backgroundColor: 'white',
-  borderRadius: '0.5rem',
-  padding: '1.5rem',
-  boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-  overflowX: 'auto'
-}}>
-  <table style={{
-    width: '100%',
-    borderCollapse: 'collapse',
-    fontSize: '0.875rem'
-  }}>
-    <thead>
-      <tr>
-        <th style={{
-          padding: '0.75rem',
-          backgroundColor: '#F3F4F6',
-          borderBottom: '1px solid #E5E7EB',
-          textAlign: 'left',
-          fontWeight: '600',
-          position: 'sticky',
-          left: 0,
+        {/* Tableau des desiderata */}
+        <div style={{
           backgroundColor: 'white',
-          zIndex: 10
+          borderRadius: '0.5rem',
+          padding: '1.5rem',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+          overflowX: 'auto'
         }}>
-          Date
-        </th>
-        {creneaux.map(creneau => (
-          <th key={creneau.id} style={{
-            padding: '0.75rem',
-            backgroundColor: '#F3F4F6',
-            borderBottom: '1px solid #E5E7EB',
-            textAlign: 'left',
-            fontWeight: '600',
-            minWidth: '150px'
+          <table style={{
+            width: '100%',
+            borderCollapse: 'collapse',
+            fontSize: '0.875rem'
           }}>
-            <div>{creneau.label}</div>
-            <div style={{ 
-              fontSize: '0.75rem', 
-              color: '#6B7280',
-              fontWeight: 'normal'
-            }}>
-              {creneau.hours}
-            </div>
-            <div style={{ 
-              fontSize: '0.75rem', 
-              color: '#6B7280',
-              fontWeight: 'normal'
-            }}>
-              {creneau.medecins} médecin{creneau.medecins > 1 ? 's' : ''}
-            </div>
-          </th>
-        ))}
-      </tr>
-    </thead>
-    <tbody>
-      {dates.map(date => {
-        const isHighlighted = isWeekendOrHoliday(date);
-        const dateString = date.toISOString().split('T')[0];
-        return (
-          <tr key={dateString} style={{
-            backgroundColor: isHighlighted ? '#F3F4F6' : 'white'
-          }}>
-            <td style={{
-              padding: '0.75rem',
-              borderBottom: '1px solid #E5E7EB',
-              fontWeight: '500',
-              position: 'sticky',
-              left: 0,
-              backgroundColor: isHighlighted ? '#F3F4F6' : 'white',
-              zIndex: 10
-            }}>
-              {formatDate(date)}
-            </td>
-            {creneaux.map(creneau => (
-              <td key={`${dateString}-${creneau.id}`} style={{
-                padding: '0.75rem',
-                borderBottom: '1px solid #E5E7EB'
-              }}>
-                {(!creneau.samediOnly || date.getDay() === 6) && (
-                  <select
-                    value={desiderata[dateString]?.[creneau.id] || ''}
-                    onChange={(e) => handleDesiderataChange(dateString, creneau.id, e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '0.5rem',
-                      border: '1px solid #D1D5DB',
-                      borderRadius: '0.375rem',
-                      backgroundColor: 'white',
-                      color: (() => {
-                        const value = desiderata[dateString]?.[creneau.id];
-                        switch(value) {
-                          case 'Oui': return '#059669';
-                          case 'Possible': return '#D97706';
-                          case 'Non': return '#DC2626';
-                          default: return '#6B7280';
-                        }
-                      })()
-                    }}
-                  >
-                    <option value="">Sélectionnez</option>
-                    {options.map(option => (
-                      <option 
-                        key={option} 
-                        value={option}
-                      >
-                        {option}
-                      </option>
+            <thead>
+              <tr>
+                <th style={{
+                  padding: '0.75rem',
+                  backgroundColor: '#F3F4F6',
+                  borderBottom: '1px solid #E5E7EB',
+                  textAlign: 'left',
+                  fontWeight: '600',
+                  position: 'sticky',
+                  left: 0,
+                  backgroundColor: 'white',
+                  zIndex: 10
+                }}>
+                  Date
+                </th>
+                {creneaux.map(creneau => (
+                  <th key={creneau.id} style={{
+                    padding: '0.75rem',
+                    backgroundColor: '#F3F4F6',
+                    borderBottom: '1px solid #E5E7EB',
+                    textAlign: 'left',
+                    fontWeight: '600',
+                    minWidth: '150px'
+                  }}>
+                    <div>{creneau.label}</div>
+                    <div style={{ 
+                      fontSize: '0.75rem', 
+                      color: '#6B7280',
+                      fontWeight: 'normal'
+                    }}>
+                      {creneau.hours}
+                    </div>
+                    <div style={{ 
+                      fontSize: '0.75rem', 
+                      color: '#6B7280',
+                      fontWeight: 'normal'
+                    }}>
+                      {creneau.medecins} médecin{creneau.medecins > 1 ? 's' : ''}
+                    </div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {dates.map(date => {
+                const isHighlighted = isWeekendOrHoliday(date);
+                const dateString = date.toISOString().split('T')[0];
+                return (
+                  <tr key={dateString} style={{
+                    backgroundColor: isHighlighted ? '#F3F4F6' : 'white'
+                  }}>
+                    <td style={{
+                      padding: '0.75rem',
+                      borderBottom: '1px solid #E5E7EB',
+                      fontWeight: '500',
+                      position: 'sticky',
+                      left: 0,
+                      backgroundColor: isHighlighted ? '#F3F4F6' : 'white',
+                      zIndex: 10
+                    }}>
+                      {formatDate(date)}
+                    </td>
+                    {creneaux.map(creneau => (
+                      <td key={`${dateString}-${creneau.id}`} style={{
+                        padding: '0.75rem',
+                        borderBottom: '1px solid #E5E7EB'
+                      }}>
+                        {(!creneau.samediOnly || date.getDay() === 6) && (
+                          <select
+                            value={desiderata[dateString]?.[creneau.id] || ''}
+                            onChange={(e) => handleDesiderataChange(dateString, creneau.id, e.target.value)}
+                            style={{
+                              width: '100%',
+                              padding: '0.5rem',
+                              border: '1px solid #D1D5DB',
+                              borderRadius: '0.375rem',
+                              backgroundColor: 'white',
+                              color: (() => {
+                                const value = desiderata[dateString]?.[creneau.id];
+                                switch(value) {
+                                  case 'Oui': return '#059669';
+                                  case 'Possible': return '#D97706';
+                                  case 'Non': return '#DC2626';
+                                  default: return '#6B7280';
+                                }
+                              })()
+                            }}
+                          >
+                            <option value="">Sélectionnez</option>
+                            {options.map(option => (
+                              <option 
+                                key={option} 
+                                value={option}
+                              >
+                                {option}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </td>
                     ))}
-                  </select>
-                )}
-              </td>
-            ))}
-          </tr>
-        );
-      })}
-    </tbody>
-  </table>
-</div>
-</main>
-</div>
-);
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </main>
+    </div>
+  );
 }
 
 export default FormulaireDesirata;

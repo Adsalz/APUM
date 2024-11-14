@@ -36,15 +36,15 @@ function WeeklyPattern({ creneaux, onApplyPattern, periodeSaisie }) {
  };
 
  const handleApplyPattern = () => {
-   if (!startDate || !endDate) {
-     alert('Veuillez sélectionner une période');
-     return;
-   }
+     if (!startDate || !endDate) {
+       alert('Veuillez sélectionner une période');
+       return;
+     }
 
-   if (Object.keys(pattern).length === 0) {
-     alert('Veuillez définir au moins une préférence dans le pattern');
-     return;
-   }
+     if (Object.keys(pattern).length === 0) {
+       alert('Veuillez définir au moins une préférence dans le pattern');
+       return;
+     }
 
    onApplyPattern(pattern, startDate, endDate);
  };

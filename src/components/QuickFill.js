@@ -50,36 +50,39 @@ function QuickFill({ creneaux, onApply, periodeSaisie }) {
       alert('Veuillez sélectionner une disponibilité');
       return;
     }
-
+  
     if (!startDate || !endDate) {
       alert('Veuillez sélectionner une période');
       return;
     }
-
+  
     const selectedCreneauxArray = Object.entries(selectedCreneaux)
       .filter(([_, isSelected]) => isSelected)
       .map(([creneauId]) => creneauId);
-
+  
     const selectedJoursArray = Object.entries(selectedJours)
       .filter(([_, isSelected]) => isSelected)
-      .map(([jourId]) => jourId);
-
+      .map(([jourId]) => {
+        // Converti correctement les IDs de jours
+        return jourId;
+      });
+  
     if (selectedCreneauxArray.length === 0) {
       alert('Veuillez sélectionner au moins un créneau');
       return;
     }
-
+  
     if (selectedJoursArray.length === 0) {
       alert('Veuillez sélectionner au moins un jour');
       return;
     }
-
+  
     onApply({
       creneaux: selectedCreneauxArray,
       jours: selectedJoursArray,
       disponibilite: selectedDispo,
-      startDate,
-      endDate
+      startDate: startDate,
+      endDate: endDate
     });
   };
 

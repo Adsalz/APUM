@@ -25,6 +25,7 @@ function GestionUtilisateurs() {
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(null); // Ajout de la déclaration de la variable d'état 'success'
   const history = useHistory();
 
   // États pour le formulaire d'ajout
@@ -44,49 +45,49 @@ function GestionUtilisateurs() {
 
   // État pour la pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const [usersPerPage] = useState(12); // Augmenté pour la vue en grille
+  const [usersPerPage] = useState(12); 
 
   // État pour la confirmation
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [userToDelete, setUserToDelete] = useState(null);
 
   // Effet pour charger les données
- useEffect(() => {
-  const fetchData = async () => {
-    try {
-      const authUser = auth.currentUser;
-      if (!authUser) {
-        history.push('/');
-        return;
-      }
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const authUser = auth.currentUser;
+        if (!authUser) {
+          history.push('/');
+          return;
+        }
 
-      const userData = await getUser(authUser.uid);
-      if (!userData || userData.role !== 'admin') {
+        const userData = await getUser(authUser.uid);
+        if (!userData || userData.role !== 'admin') {
         setError('Utilisateur non autorisé');
-        history.push('/');
-        return;
-      }
+          history.push('/');
+          return;
+        }
 
-      setCurrentUser(userData);
-      await fetchUsers();
-    } catch (error) {
-      console.error("Erreur:", error);
+        setCurrentUser(userData);
+        await fetchUsers();
+      } catch (error) {
+        console.error("Erreur:", error);
       setError("Erreur lors de la récupération des données");
-    } finally {
-      setLoading(false);
-    }
-  };
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  fetchData();
-}, [history]);
+    fetchData();
+  }, [history]);
 
 // Fonction pour récupérer les utilisateurs
-const fetchUsers = async () => {
-  try {
-    const fetchedUsers = await getAllUsers();
-    setUsers(fetchedUsers);
-  } catch (error) {
-    console.error("Erreur lors de la récupération des utilisateurs:", error);
+  const fetchUsers = async () => {
+    try {
+      const fetchedUsers = await getAllUsers();
+      setUsers(fetchedUsers);
+    } catch (error) {
+      console.error("Erreur lors de la récupération des utilisateurs:", error);
     setError("Erreur lors de la récupération des utilisateurs");
   }
 };
@@ -111,33 +112,40 @@ const currentUsers = filteredUsers.slice(indexOfFirstUser, indexOfLastUser);
 const totalPages = Math.ceil(filteredUsers.length / usersPerPage);
 
 // Gestion du formulaire d'ajout
-const handleInputChange = (e) => {
-  const { name, value } = e.target;
-  setNewUser(prev => ({ ...prev, [name]: value }));
-};
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setNewUser(prev => ({ ...prev, [name]: value }));
+  };
 
 // Gestion de l'ajout d'utilisateur
-const handleAddUser = async (e) => {
-  e.preventDefault();
-  setError(null);
+  const handleAddUser = async (e) => {
+    e.preventDefault();
+    setError(null);
+    setSuccess(null);
 
-  try {
-    const userCredential = await registerUser(newUser.email);
-    await createUser(userCredential.user.uid, {
-      nom: newUser.nom,
-      prenom: newUser.prenom,
-      email: newUser.email,
-      role: newUser.role
-    });
+    try {
+      if (!currentUser || currentUser.role !== 'admin') {
+        throw new Error('Vous n\'avez pas les permissions nécessaires pour ajouter un utilisateur.');
+      }
 
-    setNewUser({ nom: '', prenom: '', email: '', role: 'medecin' });
-    setShowAddForm(false);
-    await fetchUsers();
+      // Créer l'utilisateur dans Firebase Auth
+      const userCredential = await registerUser(newUser.email);
+      
+      // Créer le document utilisateur dans Firestore
+      await createUser(userCredential.user.uid, {
+        nom: newUser.nom,
+        prenom: newUser.prenom,
+        email: newUser.email,
+        role: newUser.role
+      });
 
-    // Afficher une notification de succès
-    showNotification('Utilisateur ajouté avec succès');
-  } catch (error) {
-    console.error("Erreur lors de l'ajout de l'utilisateur:", error);
+      setNewUser({ nom: '', prenom: '', email: '', role: 'medecin' });
+      setShowAddForm(false);
+      await fetchUsers();
+
+      setSuccess('Utilisateur ajouté avec succès'); // Mise à jour de la variable 'success'
+    } catch (error) {
+      console.error("Erreur lors de l'ajout de l'utilisateur:", error);
     let errorMessage = "Une erreur est survenue lors de l'ajout de l'utilisateur";
     
     if (error.code === "auth/email-already-in-use") {
@@ -157,15 +165,15 @@ const handleDeleteClick = (user) => {
 const handleConfirmDelete = async () => {
   try {
     await deleteUser(userToDelete.id);
-    await fetchUsers();
+        await fetchUsers();
     setShowConfirmDelete(false);
     setUserToDelete(null);
     showNotification('Utilisateur supprimé avec succès');
-  } catch (error) {
+      } catch (error) {
     console.error("Erreur lors de la suppression:", error);
     setError("Erreur lors de la suppression de l'utilisateur");
-  }
-};
+    }
+  };
 
 // Fonction pour afficher les notifications
 const showNotification = (message) => {
@@ -997,7 +1005,7 @@ return (
        </div>
      )}
    </div>
- );
+  );
 }
 
 export default GestionUtilisateurs;
