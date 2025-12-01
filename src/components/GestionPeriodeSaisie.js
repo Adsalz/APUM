@@ -5,6 +5,7 @@ import { auth } from '../firebase';
 import { getUser } from '../services/userService';
 import { setPeriodeSaisie, getPeriodeSaisie } from '../services/planningService';
 import { ArrowLeft, Calendar, Save, AlertTriangle, Check } from 'lucide-react';
+import logger from '../utils/logger';
 
 function GestionPeriodeSaisie() {
   const [startDate, setStartDate] = useState('');
@@ -21,7 +22,7 @@ function GestionPeriodeSaisie() {
         try {
           const userData = await getUser(authUser.uid);
           if (userData.role !== 'admin') {
-            setError("Accès non autorisé");
+            setError('Accès non autorisé');
             history.push('/');
           } else {
             setCurrentUser(userData);
@@ -32,8 +33,8 @@ function GestionPeriodeSaisie() {
             }
           }
         } catch (error) {
-          console.error("Erreur lors de la récupération des données utilisateur:", error);
-          setError("Erreur lors de la récupération des données utilisateur");
+          logger.error('Erreur lors de la récupération des données utilisateur:', error);
+          setError('Erreur lors de la récupération des données utilisateur');
         }
       } else {
         history.push('/');
@@ -60,8 +61,8 @@ function GestionPeriodeSaisie() {
       await setPeriodeSaisie(startDate, endDate);
       showNotification('Période de saisie mise à jour avec succès! Les desiderata obsolètes ont été supprimés.');
     } catch (error) {
-      console.error("Erreur lors de la mise à jour de la période de saisie:", error);
-      showNotification("Une erreur est survenue lors de la mise à jour de la période de saisie", true);
+      logger.error('Erreur lors de la mise à jour de la période de saisie:', error);
+      showNotification('Une erreur est survenue lors de la mise à jour de la période de saisie', true);
     }
   };
 

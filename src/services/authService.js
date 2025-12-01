@@ -1,11 +1,12 @@
 import { auth } from '../firebase';
-import { 
-  signInWithEmailAndPassword, 
+import {
+  signInWithEmailAndPassword,
   signOut,
   updatePassword,
   sendPasswordResetEmail
 } from 'firebase/auth';
 import { getUser } from './userService';
+import logger from '../utils/logger';
 
 export const registerUser = async (email) => {
   try {
@@ -13,7 +14,7 @@ export const registerUser = async (email) => {
     const tempPassword = Math.random().toString(36).slice(-8);
 
     // Utiliser l'API REST Firebase pour créer l'utilisateur
-    const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=AIzaSyDesXYDyPsrG5HxkkPbj9XuqFQV91j2ixY`, {
+    const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${process.env.REACT_APP_FIREBASE_API_KEY}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -41,7 +42,7 @@ export const registerUser = async (email) => {
       }
     };
   } catch (error) {
-    console.error('Erreur lors de l\'enregistrement:', error);
+    logger.error('Erreur lors de l\'enregistrement:', error);
     throw error;
   }
 };
@@ -49,11 +50,11 @@ export const registerUser = async (email) => {
 export const loginUser = async (email, password) => {
   try {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
-    console.log('Utilisateur connecté:', userCredential);
+    logger.debug('Utilisateur connecté:', userCredential.user.uid);
     const userDetails = await getUser(userCredential.user.uid);
     return { ...userCredential, role: userDetails.role };
   } catch (error) {
-    console.error('Erreur lors de la connexion:', error);
+    logger.error('Erreur lors de la connexion:', error);
     throw error;
   }
 };
@@ -61,9 +62,9 @@ export const loginUser = async (email, password) => {
 export const logoutUser = async () => {
   try {
     await signOut(auth);
-    console.log('Utilisateur déconnecté');
+    logger.debug('Utilisateur déconnecté');
   } catch (error) {
-    console.error('Erreur lors de la déconnexion:', error);
+    logger.error('Erreur lors de la déconnexion:', error);
     throw error;
   }
 };
@@ -76,7 +77,7 @@ export const checkUserRole = async (uid, allowedRoles) => {
     }
     return false;
   } catch (error) {
-    console.error('Erreur lors de la vérification du rôle:', error);
+    logger.error('Erreur lors de la vérification du rôle:', error);
     return false;
   }
 };
@@ -86,12 +87,12 @@ export const updateUserPassword = async (newPassword) => {
     const user = auth.currentUser;
     if (user) {
       await updatePassword(user, newPassword);
-      console.log('Mot de passe mis à jour avec succès');
+      logger.debug('Mot de passe mis à jour avec succès');
     } else {
       throw new Error('Aucun utilisateur connecté');
     }
   } catch (error) {
-    console.error('Erreur lors de la mise à jour du mot de passe:', error);
+    logger.error('Erreur lors de la mise à jour du mot de passe:', error);
     throw error;
   }
 };

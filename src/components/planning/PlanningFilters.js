@@ -1,6 +1,6 @@
 // src/components/planning/PlanningFilters.js
 import React from 'react';
-import { Filter, ChevronDown, ChevronUp, Search, List, Grid } from 'lucide-react';
+import { Filter, ChevronDown, ChevronUp, List, Grid } from 'lucide-react';
 import MedecinSearchSelect from './components/MedecinSearchSelect';
 
 const PlanningFilters = ({
@@ -136,22 +136,22 @@ const PlanningFilters = ({
 
             {/* Filtre par médecin */}
             <div>
-  <label style={{
-    display: 'block',
-    fontSize: '0.875rem',
-    fontWeight: '500',
-    color: '#374151',
-    marginBottom: '0.5rem'
-  }}>
+              <label style={{
+                display: 'block',
+                fontSize: '0.875rem',
+                fontWeight: '500',
+                color: '#374151',
+                marginBottom: '0.5rem'
+              }}>
     Médecin
-  </label>
-  <MedecinSearchSelect
-    medecins={medecins}
-    value={selectedMedecin}
-    onChange={onMedecinFilterChange}
-    placeholder="Rechercher un médecin..."
-  />
-</div>
+              </label>
+              <MedecinSearchSelect
+                medecins={medecins}
+                value={selectedMedecin}
+                onChange={onMedecinFilterChange}
+                placeholder="Rechercher un médecin..."
+              />
+            </div>
 
             {/* Sélecteur de vue */}
             <div>

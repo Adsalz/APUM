@@ -5,6 +5,7 @@ import Login from './components/Login';
 import DashboardMedecin from './components/DashboardMedecin';
 import DashboardAdmin from './components/DashboardAdmin';
 import FormulaireDesirata from './components/FormulaireDesirata';
+import FormulaireDesiderataAdmin from './components/FormulaireDesiderataAdmin';
 import GestionUtilisateurs from './components/GestionUtilisateurs';
 import GestionPlanning from './components/planning/GestionPlanning';
 import GestionPeriodeSaisie from './components/GestionPeriodeSaisie';
@@ -20,6 +21,7 @@ function App() {
           <Route path="/dashboard-medecin" component={DashboardMedecin} />
           <Route path="/dashboard-admin" component={DashboardAdmin} />
           <Route path="/formulaire-desirata" component={FormulaireDesirata} />
+          <Route path="/desiderata-admin" component={FormulaireDesiderataAdmin} />
           <Route path="/gestion-utilisateurs" component={GestionUtilisateurs} />
           <Route path="/gestion-planning-admin" render={() => <GestionPlanning isAdmin={true} />} />
           <Route path="/planning-visualisation" component={PlanningVisualisation} />

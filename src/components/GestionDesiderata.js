@@ -2,9 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useHistory } from 'react-router-dom';
 import { auth } from '../firebase';
 import { getUser, getMedecins } from '../services/userService';
-import { getDesiderataStatus } from '../services/planningService';
-import { ArrowLeft, ClipboardList, Search } from 'lucide-react';
+import { getDesiderataStatus, getPeriodeSaisie } from '../services/planningService';
+import { ArrowLeft, ClipboardList, Search, Mail, Download } from 'lucide-react';
 import DesiderataStatus from './DesiderataStatus';
+import RelanceEmailModal from './RelanceEmailModal';
+import { getMedecinsSansDesiderata } from '../services/emailService';
+import { exportDesiderataToExcel } from '../services/excelExportService';
+import logger from '../utils/logger';
 
 function GestionDesiderata() {
   const [medecins, setMedecins] = useState([]);
@@ -13,6 +17,9 @@ function GestionDesiderata() {
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('tous');
+  const [showRelanceModal, setShowRelanceModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [isExporting, setIsExporting] = useState(false);
   const history = useHistory();
 
   useEffect(() => {
@@ -38,7 +45,7 @@ function GestionDesiderata() {
         setDesiderataStatus(statusData.desiderata);
 
       } catch (error) {
-        console.error('Erreur:', error);
+        logger.error('Erreur:', error);
         setError('Erreur lors de la récupération des données');
       } finally {
         setLoading(false);
@@ -49,7 +56,7 @@ function GestionDesiderata() {
   }, [history]);
 
   const getFilteredMedecins = () => {
-    if (!medecins) return [];
+    if (!medecins) {return [];}
 
     let filtered = medecins;
 
@@ -67,19 +74,45 @@ function GestionDesiderata() {
         const medecinDesiderata = desiderataStatus?.find(d => d.userId === medecin.id);
         
         switch (statusFilter) {
-          case 'complet':
-            return medecinDesiderata && Object.keys(medecinDesiderata.desiderata || {}).length > 0;
-          case 'incomplet':
-            return medecinDesiderata && Object.keys(medecinDesiderata.desiderata || {}).length === 0;
-          case 'non_saisi':
-            return !medecinDesiderata;
-          default:
-            return true;
+        case 'complet':
+          return medecinDesiderata && Object.keys(medecinDesiderata.desiderata || {}).length > 0;
+        case 'non_saisi':
+          return !medecinDesiderata;
+        default:
+          return true;
         }
       });
     }
 
     return filtered;
+  };
+
+  const handleRelanceSuccess = (resultats) => {
+    setSuccessMessage(`${resultats.succes} email(s) de relance envoyé(s) avec succès !`);
+    setTimeout(() => setSuccessMessage(''), 5000); // Masquer après 5 secondes
+  };
+
+  const medecinsSansDesiderata = getMedecinsSansDesiderata(medecins, desiderataStatus || []);
+
+  const handleExportExcel = async () => {
+    setIsExporting(true);
+    try {
+      const periode = await getPeriodeSaisie();
+      if (!periode) {
+        setSuccessMessage('Erreur: Aucune période de saisie définie');
+        return;
+      }
+
+      const result = await exportDesiderataToExcel(medecins, desiderataStatus || [], periode);
+      setSuccessMessage(result.message);
+      setTimeout(() => setSuccessMessage(''), 5000);
+    } catch (error) {
+      logger.error('Erreur lors de l\'export Excel:', error);
+      setSuccessMessage('Erreur lors de l\'export Excel');
+      setTimeout(() => setSuccessMessage(''), 5000);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   if (loading) {
@@ -205,10 +238,76 @@ function GestionDesiderata() {
           }}>
             Suivi des Desiderata
           </h1>
-          <p style={{ color: '#6B7280' }}>
-            Visualisez l'état de saisie des desiderata pour chaque médecin
-          </p>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+            <div>
+              <p style={{ color: '#6B7280' }}>
+                Visualisez l'état de saisie des desiderata pour chaque médecin
+              </p>
+            </div>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button
+                onClick={handleExportExcel}
+                disabled={isExporting || medecins.length === 0}
+                style={{
+                  padding: '0.75rem 1rem',
+                  backgroundColor: isExporting ? '#9CA3AF' : '#059669',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '0.375rem',
+                  cursor: isExporting || medecins.length === 0 ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  fontSize: '0.875rem',
+                  fontWeight: '500'
+                }}
+                title="Exporter tous les desiderata vers Excel"
+              >
+                <Download size={16} />
+                {isExporting ? 'Export...' : 'Exporter Excel'}
+              </button>
+              <button
+                onClick={() => setShowRelanceModal(true)}
+                disabled={medecinsSansDesiderata.length === 0}
+                style={{
+                  padding: '0.75rem 1rem',
+                  backgroundColor: medecinsSansDesiderata.length > 0 ? '#DC2626' : '#9CA3AF',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '0.375rem',
+                  cursor: medecinsSansDesiderata.length > 0 ? 'pointer' : 'not-allowed',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  fontSize: '0.875rem',
+                  fontWeight: '500'
+                }}
+                title={medecinsSansDesiderata.length === 0 ? 'Tous les médecins ont saisi leurs desiderata' : 'Envoyer des relances par email'}
+              >
+                <Mail size={16} />
+                Relancer par email ({medecinsSansDesiderata.length})
+              </button>
+            </div>
+          </div>
         </div>
+
+        {/* Message de succès */}
+        {successMessage && (
+          <div style={{
+            backgroundColor: '#F0FDF4',
+            border: '1px solid #D1FAE5',
+            borderRadius: '0.5rem',
+            padding: '1rem',
+            marginBottom: '1rem',
+            color: '#059669',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}>
+            <Mail size={20} />
+            {successMessage}
+          </div>
+        )}
 
         {/* Filtres et recherche */}
         <div style={{
@@ -291,21 +390,6 @@ function GestionDesiderata() {
                 Complet
               </button>
               <button
-                onClick={() => setStatusFilter('incomplet')}
-                style={{
-                  padding: '0.5rem 1rem',
-                  borderRadius: '0.375rem',
-                  border: '1px solid #E5E7EB',
-                  backgroundColor: statusFilter === 'incomplet' ? '#D97706' : '#F9FAFB',
-                  color: statusFilter === 'incomplet' ? 'white' : '#4B5563',
-                  fontSize: '0.875rem',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
-                }}
-              >
-                Incomplet
-              </button>
-              <button
                 onClick={() => setStatusFilter('non_saisi')}
                 style={{
                   padding: '0.5rem 1rem',
@@ -348,6 +432,16 @@ function GestionDesiderata() {
           )}
         </div>
       </main>
+
+      {/* Modals */}
+      <RelanceEmailModal
+        isOpen={showRelanceModal}
+        onClose={() => setShowRelanceModal(false)}
+        medecins={medecins}
+        desiderataStatus={desiderataStatus || []}
+        onSuccess={handleRelanceSuccess}
+      />
+      
     </div>
   );
 }

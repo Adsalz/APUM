@@ -3,16 +3,19 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useHistory } from 'react-router-dom';
 import { auth } from '../firebase';
 import { getUser } from '../services/userService';
-import { 
-  addDesiderata, 
-  getPeriodeSaisie, 
-  getDesiderataByUser, 
-  updateDesiderata 
+import {
+  addDesiderata,
+  getPeriodeSaisie,
+  getDesiderataByUser,
+  updateDesiderata
 } from '../services/planningService';
-import { 
+import { exportMedecinDesiderataToExcel } from '../services/excelExportService';
+import logger from '../utils/logger';
+import {
   Calendar,
   ArrowLeft,
-  Save
+  Save,
+  Download
 } from 'lucide-react';
 import QuickFill from './QuickFill';
 import WeeklyPattern from './WeeklyPattern';
@@ -45,14 +48,16 @@ function FormulaireDesirata() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [existingDesiderataId, setExistingDesiderataId] = useState(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportMessage, setExportMessage] = useState('');
   
   const history = useHistory();
 
   // Génération des dates avec correction de fuseau horaire
   const generateDates = useCallback(() => {
-    if (!periodeSaisie) return [];
+    if (!periodeSaisie) {return [];}
     const dates = [];
-    let currentDate = new Date(periodeSaisie.startDate);
+    const currentDate = new Date(periodeSaisie.startDate);
     
     // Définir l'heure à midi pour éviter les problèmes de changement de jour
     currentDate.setHours(12, 0, 0, 0);
@@ -105,7 +110,7 @@ function FormulaireDesirata() {
           history.push('/');
         }
       } catch (error) {
-        console.error('Erreur lors de la récupération des données:', error);
+        logger.error('Erreur lors de la récupération des données:', error);
         setError('Erreur lors de la récupération des données: ' + error.message);
       } finally {
         setLoading(false);
@@ -176,7 +181,7 @@ function FormulaireDesirata() {
 
     setDesiderata(prev => {
       const newDesiderata = { ...prev };
-      let currentDate = new Date(start);
+      const currentDate = new Date(start);
 
       while (currentDate <= end) {
         const dayOfWeek = currentDate.getDay().toString();
@@ -221,9 +226,41 @@ function FormulaireDesirata() {
         }
         history.push('/dashboard-medecin');
       } catch (error) {
-        console.error("Erreur lors de la soumission des desiderata:", error);
+        logger.error('Erreur lors de la soumission des desiderata:', error);
         setError('Une erreur est survenue lors de la soumission des desiderata: ' + error.message);
       }
+    }
+  };
+
+  // Export Excel individuel
+  const handleExportExcel = async () => {
+    if (!user || !periodeSaisie) {return;}
+
+    setIsExporting(true);
+    setExportMessage('');
+
+    try {
+      // Préparer les données actuelles pour l'export
+      const currentDesiderata = {
+        userId: user.id,
+        startDate: periodeSaisie.startDate,
+        endDate: periodeSaisie.endDate,
+        desiderata: desiderata,
+        nombreGardesSouhaitees,
+        nombreGardesMaxParSemaine,
+        gardesGroupees,
+        renfortsAssocies
+      };
+
+      const result = await exportMedecinDesiderataToExcel(user, currentDesiderata, periodeSaisie);
+      setExportMessage(result.message);
+      setTimeout(() => setExportMessage(''), 5000);
+    } catch (error) {
+      logger.error('Erreur lors de l\'export Excel:', error);
+      setExportMessage('Erreur lors de l\'export Excel');
+      setTimeout(() => setExportMessage(''), 5000);
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -367,24 +404,47 @@ function FormulaireDesirata() {
             </div>
           </div>
 
-          <button
-            onClick={handleSubmit}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              padding: '0.5rem 1rem',
-              backgroundColor: '#2563EB',
-              color: 'white',
-              borderRadius: '0.375rem',
-              border: 'none',
-              cursor: 'pointer',
-              fontWeight: '500'
-            }}
-          >
-            <Save size={18} />
-            Enregistrer
-          </button>
+          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <button
+              onClick={handleExportExcel}
+              disabled={isExporting}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                padding: '0.5rem 1rem',
+                backgroundColor: isExporting ? '#9CA3AF' : '#059669',
+                color: 'white',
+                borderRadius: '0.375rem',
+                border: 'none',
+                cursor: isExporting ? 'not-allowed' : 'pointer',
+                fontWeight: '500'
+              }}
+              title="Exporter mes desiderata vers Excel"
+            >
+              <Download size={18} />
+              {isExporting ? 'Export...' : 'Exporter Excel'}
+            </button>
+
+            <button
+              onClick={handleSubmit}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                padding: '0.5rem 1rem',
+                backgroundColor: '#2563EB',
+                color: 'white',
+                borderRadius: '0.375rem',
+                border: 'none',
+                cursor: 'pointer',
+                fontWeight: '500'
+              }}
+            >
+              <Save size={18} />
+              Enregistrer
+            </button>
+          </div>
         </div>
       </nav>
 
@@ -396,6 +456,23 @@ function FormulaireDesirata() {
         maxWidth: '1280px',
         boxSizing: 'border-box'
       }}>
+        {/* Message de succès/erreur pour l'export */}
+        {exportMessage && (
+          <div style={{
+            backgroundColor: exportMessage.includes('Erreur') ? '#FEE2E2' : '#F0FDF4',
+            border: `1px solid ${exportMessage.includes('Erreur') ? '#FECACA' : '#D1FAE5'}`,
+            borderRadius: '0.5rem',
+            padding: '1rem',
+            marginBottom: '1rem',
+            color: exportMessage.includes('Erreur') ? '#DC2626' : '#059669',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}>
+            <Download size={20} />
+            {exportMessage}
+          </div>
+        )}
         {/* En-tête avec période */}
         <div style={{
           backgroundColor: 'white',
@@ -573,13 +650,12 @@ function FormulaireDesirata() {
               <tr>
                 <th style={{
                   padding: '0.75rem',
-                  backgroundColor: '#F3F4F6',
+                  backgroundColor: 'white',
                   borderBottom: '1px solid #E5E7EB',
                   textAlign: 'left',
                   fontWeight: '600',
                   position: 'sticky',
                   left: 0,
-                  backgroundColor: 'white',
                   zIndex: 10
                 }}>
                   Date
@@ -649,10 +725,10 @@ function FormulaireDesirata() {
                               color: (() => {
                                 const value = desiderata[dateString]?.[creneau.id];
                                 switch(value) {
-                                  case 'Oui': return '#059669';
-                                  case 'Possible': return '#D97706';
-                                  case 'Non': return '#DC2626';
-                                  default: return '#6B7280';
+                                case 'Oui': return '#059669';
+                                case 'Possible': return '#D97706';
+                                case 'Non': return '#DC2626';
+                                default: return '#6B7280';
                                 }
                               })()
                             }}

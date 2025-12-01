@@ -6,7 +6,7 @@ const MedecinSearchSelect = ({
   medecins, 
   value, 
   onChange,
-  placeholder = "Rechercher un médecin..." 
+  placeholder = 'Rechercher un médecin...' 
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');

@@ -1,10 +1,10 @@
 // src/components/planning/MedecinInfoPanel.js
 import React from 'react';
-import { User, Calendar } from 'lucide-react';
+import { User } from 'lucide-react';
 import { compterGardesParMedecin, getNombreGardesSouhaitees } from '../../utils/planningUtils';
 
 const MedecinInfoPanel = ({ medecin, planning, desiderata }) => {
-  if (!medecin) return null;
+  if (!medecin) {return null;}
 
   const gardesAttribuees = compterGardesParMedecin(planning, medecin.id);
   const gardesSouhaitees = getNombreGardesSouhaitees(desiderata, medecin.id);

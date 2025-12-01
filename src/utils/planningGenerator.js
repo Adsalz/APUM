@@ -1,6 +1,7 @@
 // src/utils/planningGenerator.js
 import { getDesiderataForPeriod } from '../services/planningService';
 import { getAllUsers } from '../services/userService';
+import logger from './logger';
 
 const creneaux = [
   { id: 'QUART_1', label: '1er QUART (1h - 7h)', medecins: 2 },
@@ -8,7 +9,7 @@ const creneaux = [
   { id: 'RENFORT_1', label: 'RENFORT 10h / 13h', medecins: 1, samediOnly: true },
   { id: 'QUART_3', label: '3ème QUART (13h - 19h)', medecins: 3 },
   { id: 'RENFORT_2', label: 'RENFORT 20H / 00H', medecins: 1 },
-  { id: 'QUART_4', label: '4ème QUART (19h - 1h)', medecins: 3 },
+  { id: 'QUART_4', label: '4ème QUART (19h - 1h)', medecins: 3 }
 ];
 
 const creneauxChevauchants = {
@@ -19,7 +20,7 @@ const creneauxChevauchants = {
 };
 
 const aCreneauxChevauchants = (medecinId, date, creneauId, planning) => {
-  if (!creneauxChevauchants[creneauId]) return false;
+  if (!creneauxChevauchants[creneauId]) {return false;}
   
   const creneauxDuJour = planning[date];
   return creneauxChevauchants[creneauId].some(creneauChevauchant => 
@@ -57,14 +58,14 @@ const genererPlanning = async (debut, fin) => {
     planning = rechercheTabou(planning, debut, fin, desiderata, medecins);
     return planning;
   } catch (error) {
-    console.error('Erreur lors de la génération du planning:', error);
+    logger.error('Erreur lors de la génération du planning:', error);
     throw error;
   }
 };
 
 const genererPlanningSolution = (debut, fin, desiderata, medecins) => {
   const planning = {};
-  let currentDate = new Date(debut);
+  const currentDate = new Date(debut);
   const endDate = new Date(fin);
 
   while (currentDate <= endDate) {
@@ -134,8 +135,8 @@ const assignerMedecins = (date, creneau, desiderata, medecins, planning) => {
   const medecinsPriorises = medecinsDispo.sort((a, b) => {
     const choixA = desiderata[a]?.preferences[date]?.[creneau.id];
     const choixB = desiderata[b]?.preferences[date]?.[creneau.id];
-    if (choixA === 'Oui' && choixB !== 'Oui') return -1;
-    if (choixB === 'Oui' && choixA !== 'Oui') return 1;
+    if (choixA === 'Oui' && choixB !== 'Oui') {return -1;}
+    if (choixB === 'Oui' && choixA !== 'Oui') {return 1;}
     return 0;
   });
 
@@ -185,14 +186,14 @@ const calculerScoreMedecin = (medecinId, date, creneau, desiderata, planning, mo
   }
 
   // Respect des préférences
-  if (prefMedecin.preferences[date]?.[creneau.id] === 'Oui') score += 3;
-  else if (prefMedecin.preferences[date]?.[creneau.id] === 'Possible') score += 1;
-  else if (prefMedecin.preferences[date]?.[creneau.id] === 'Non') score -= 5;
+  if (prefMedecin.preferences[date]?.[creneau.id] === 'Oui') {score += 3;}
+  else if (prefMedecin.preferences[date]?.[creneau.id] === 'Possible') {score += 1;}
+  else if (prefMedecin.preferences[date]?.[creneau.id] === 'Non') {score -= 5;}
 
   // Nombre de gardes souhaitées
   const gardesDuMois = compterGardesMois(medecinId, planning, mois);
-  if (gardesDuMois < prefMedecin.nombreGardesSouhaitees) score += 2;
-  else score -= (gardesDuMois - prefMedecin.nombreGardesSouhaitees) * 2;
+  if (gardesDuMois < prefMedecin.nombreGardesSouhaitees) {score += 2;}
+  else {score -= (gardesDuMois - prefMedecin.nombreGardesSouhaitees) * 2;}
 
   // Gardes groupées
   if (prefMedecin.gardesGroupees && estWeekEnd(date) && aGardeWeekEnd(medecinId, date, planning)) {
@@ -201,8 +202,8 @@ const calculerScoreMedecin = (medecinId, date, creneau, desiderata, planning, mo
 
   // Renforts associés
   if (prefMedecin.renfortsAssocies) {
-    if (creneau.id.startsWith('RENFORT') && aGardeJour(medecinId, date, planning)) score += 2;
-    if (!creneau.id.startsWith('RENFORT') && aRenfortJour(medecinId, date, planning)) score += 2;
+    if (creneau.id.startsWith('RENFORT') && aGardeJour(medecinId, date, planning)) {score += 2;}
+    if (!creneau.id.startsWith('RENFORT') && aRenfortJour(medecinId, date, planning)) {score += 2;}
   }
 
   return score;
@@ -317,7 +318,7 @@ const evaluerPlanning = (planning, desiderata) => {
   for (const date in planning) {
     for (const creneauId in planning[date]) {
       for (const medecinId of planning[date][creneauId]) {
-        if (medecinId === null) continue;
+        if (medecinId === null) {continue;}
 
         // Compter les gardes par semaine
         const semaine = getWeekNumber(date);
@@ -340,13 +341,13 @@ const evaluerPlanning = (planning, desiderata) => {
           score -= 50;
         }
 
-        if (!gardesParMedecin[medecinId]) gardesParMedecin[medecinId] = 0;
+        if (!gardesParMedecin[medecinId]) {gardesParMedecin[medecinId] = 0;}
         gardesParMedecin[medecinId]++;
 
         const choix = desiderata[medecinId]?.preferences[date]?.[creneauId];
-        if (choix === 'Oui') score += 3;
-        else if (choix === 'Possible') score += 1;
-        else if (choix === 'Non') score -= 5;
+        if (choix === 'Oui') {score += 3;}
+        else if (choix === 'Possible') {score += 1;}
+        else if (choix === 'Non') {score -= 5;}
 
         // Gardes groupées
         if (desiderata[medecinId]?.gardesGroupees && estWeekEnd(date) && aGardeWeekEnd(medecinId, date, planning)) {
@@ -355,8 +356,8 @@ const evaluerPlanning = (planning, desiderata) => {
 
         // Renforts associés
         if (desiderata[medecinId]?.renfortsAssocies) {
-          if (creneauId.startsWith('RENFORT') && aGardeJour(medecinId, date, planning)) score += 2;
-          if (!creneauId.startsWith('RENFORT') && aRenfortJour(medecinId, date, planning)) score += 2;
+          if (creneauId.startsWith('RENFORT') && aGardeJour(medecinId, date, planning)) {score += 2;}
+          if (!creneauId.startsWith('RENFORT') && aRenfortJour(medecinId, date, planning)) {score += 2;}
         }
       }
     }
@@ -383,7 +384,7 @@ const verifierContraintes = (planning) => {
     for (const creneauId in planning[date]) {
       const medecins = planning[date][creneauId];
       for (const medecinId of medecins) {
-        if (medecinId === null) continue;
+        if (medecinId === null) {continue;}
 
         if (aCreneauxChevauchants(medecinId, date, creneauId, planning)) {
           return false;
@@ -400,11 +401,11 @@ const verifierContraintes = (planning) => {
         const avantHierMedecins = new Set();
 
         Object.values(planning[dates[i - 1]]).forEach(medecins => {
-          medecins.forEach(m => { if (m !== null) hierMedecins.add(m); });
+          medecins.forEach(m => { if (m !== null) {hierMedecins.add(m);} });
         });
 
         Object.values(planning[dates[i - 2]]).forEach(medecins => {
-          medecins.forEach(m => { if (m !== null) avantHierMedecins.add(m); });
+          medecins.forEach(m => { if (m !== null) {avantHierMedecins.add(m);} });
         });
 
         if (hierMedecins.has(medecinId) && avantHierMedecins.has(medecinId)) {

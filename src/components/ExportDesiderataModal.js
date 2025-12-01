@@ -2,13 +2,13 @@ import React, { useState } from 'react';
 import { X, Download, Search } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 
-function ExportDesiderataModal({ 
-  isOpen, 
-  onClose, 
-  medecins, 
+function ExportDesiderataModal({
+  isOpen,
+  onClose,
+  medecins,
   desiderata,
-  periodeSaisie,
-  creneaux 
+  _periodeSaisie,
+  _creneaux
 }) {
   const [selectedMedecins, setSelectedMedecins] = useState({});
   const [selectAll, setSelectAll] = useState(false);
@@ -44,10 +44,10 @@ function ExportDesiderataModal({
 
   const getPreferenceSymbol = (preference) => {
     switch(preference) {
-      case 'Oui': return 'O';
-      case 'Possible': return 'P';
-      case 'Non': return 'N';
-      default: return '-';
+    case 'Oui': return 'O';
+    case 'Possible': return 'P';
+    case 'Non': return 'N';
+    default: return '-';
     }
   };
 
@@ -142,8 +142,8 @@ function ExportDesiderataModal({
           if (symbol !== '-') {
             doc.setFillColor(
               symbol === 'O' ? '#BBF7D0' :
-              symbol === 'P' ? '#FEF08A' :
-              '#FECACA'
+                symbol === 'P' ? '#FEF08A' :
+                  '#FECACA'
             );
             doc.rect(dateWidth + (index * cellWidth), currentY - 4, cellWidth, rowHeight, 'F');
           }
@@ -187,7 +187,7 @@ function ExportDesiderataModal({
     doc.save('desiderata.pdf');
   };
 
-  if (!isOpen) return null;
+  if (!isOpen) {return null;}
 
   return (
     <div style={{

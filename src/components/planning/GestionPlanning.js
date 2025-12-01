@@ -3,17 +3,19 @@ import React, { useState, useEffect } from 'react';
 import { useHistory } from 'react-router-dom';
 import { auth } from '../../firebase';
 import { getUser, getMedecins } from '../../services/userService';
-import { 
-  getLatestPlanning, 
-  savePlanning, 
-  updatePlanning, 
-  getDesiderataForPeriod, 
-  publishPlanning, 
-  getPublishedPlanning, 
-  getPeriodeSaisie 
+import {
+  getLatestPlanning,
+  savePlanning,
+  updatePlanning,
+  getDesiderataForPeriod,
+  publishPlanning,
+  getPublishedPlanning,
+  getPeriodeSaisie
 } from '../../services/planningService';
 import { genererPlanning, creneaux } from '../../utils/planningGenerator';
+import { genererPlanningPriorite } from '../../utils/planningGeneratorPriorite';
 import { AlertTriangle, Check } from 'lucide-react';
+import logger from '../../utils/logger';
 
 // Import des sous-composants
 import PlanningHeader from './PlanningHeader';
@@ -26,7 +28,7 @@ import PublishPlanningModal from './modals/PublishPlanningModal';
 import DiscardChangesModal from './modals/DiscardChangesModal';
 import ExportDesiderataModal from '../ExportDesiderataModal';
 
-function GestionPlanning({ isAdmin = true }) {
+function GestionPlanning({ _isAdmin = true }) {
   // États pour les données
   const [periodeSaisie, setPeriodeSaisie] = useState(null);
   const [planning, setPlanning] = useState(null);
@@ -104,7 +106,7 @@ function GestionPlanning({ isAdmin = true }) {
         }
 
       } catch (error) {
-        console.error('Erreur:', error);
+        logger.error('Erreur:', error);
         setError('Erreur lors du chargement des données');
       } finally {
         setLoading(false);
@@ -126,22 +128,34 @@ function GestionPlanning({ isAdmin = true }) {
   };
 
   // Handlers pour les actions principales
-  const handleGeneratePlanning = async () => {
+  const handleGeneratePlanning = async (modeGeneration = 'classique', listePriorite = null) => {
     setLoading(true);
     try {
       if (!periodeSaisie) {
         throw new Error('Période de saisie non définie');
       }
 
-      const newPlanningData = await genererPlanning(
-        periodeSaisie.startDate, 
-        periodeSaisie.endDate
-      );
+      let newPlanningData;
+
+      if (modeGeneration === 'priorite' && listePriorite) {
+        newPlanningData = await genererPlanningPriorite(
+          periodeSaisie.startDate,
+          periodeSaisie.endDate,
+          listePriorite
+        );
+        logger.info('Planning généré en mode priorité', { listePriorite });
+      } else {
+        newPlanningData = await genererPlanning(
+          periodeSaisie.startDate,
+          periodeSaisie.endDate
+        );
+        logger.info('Planning généré en mode classique');
+      }
 
       if (planning && planning.id) {
-        const updatedPlanning = { 
-          ...planning, 
-          planning: newPlanningData 
+        const updatedPlanning = {
+          ...planning,
+          planning: newPlanningData
         };
         await updatePlanning(planning.id, updatedPlanning);
         setPlanning(updatedPlanning);
@@ -151,18 +165,19 @@ function GestionPlanning({ isAdmin = true }) {
           startDate: periodeSaisie.startDate,
           endDate: periodeSaisie.endDate
         });
-        setPlanning({ 
-          id: savedPlanningId, 
-          planning: newPlanningData 
+        setPlanning({
+          id: savedPlanningId,
+          planning: newPlanningData
         });
       }
 
-      showNotification('Planning généré avec succès');
+      const modeMessage = modeGeneration === 'priorite' ? 'par ordre de priorité' : 'en mode classique';
+      showNotification(`Planning généré avec succès ${modeMessage}`);
       setModified(false);
       setShowGenerateConfirm(false);
     } catch (error) {
-      console.error("Erreur lors de la génération du planning:", error);
-      showNotification("Erreur lors de la génération du planning", true);
+      logger.error('Erreur lors de la génération du planning:', error);
+      showNotification('Erreur lors de la génération du planning', true);
     } finally {
       setLoading(false);
     }
@@ -182,8 +197,8 @@ function GestionPlanning({ isAdmin = true }) {
       showNotification('Planning publié avec succès');
       setShowPublishConfirm(false);
     } catch (error) {
-      console.error("Erreur lors de la publication:", error);
-      showNotification("Erreur lors de la publication du planning", true);
+      logger.error('Erreur lors de la publication:', error);
+      showNotification('Erreur lors de la publication du planning', true);
     } finally {
       setLoading(false);
     }
@@ -200,15 +215,15 @@ function GestionPlanning({ isAdmin = true }) {
       showNotification('Modifications sauvegardées avec succès');
       setModified(false);
     } catch (error) {
-      console.error("Erreur lors de la sauvegarde:", error);
-      showNotification("Erreur lors de la sauvegarde des modifications", true);
+      logger.error('Erreur lors de la sauvegarde:', error);
+      showNotification('Erreur lors de la sauvegarde des modifications', true);
     } finally {
       setLoading(false);
     }
   };
 
   const handleMedecinChange = (date, creneau, index, medecinId) => {
-    if (!editMode) return;
+    if (!editMode) {return;}
 
     setPlanning(prev => {
       const newPlanning = { ...prev };
@@ -380,6 +395,7 @@ function GestionPlanning({ isAdmin = true }) {
         onClose={() => setShowGenerateConfirm(false)}
         onConfirm={handleGeneratePlanning}
         planning={planning}
+        medecins={medecins}
       />
 
       <PublishPlanningModal

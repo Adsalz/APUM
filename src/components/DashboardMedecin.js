@@ -4,6 +4,7 @@ import { auth } from '../firebase';
 import { getUser } from '../services/userService';
 import { getDesiderataByUser } from '../services/planningService';
 import { logoutUser } from '../services/authService';
+import logger from '../utils/logger';
 import { 
   Key, 
   LogOut,
@@ -32,14 +33,14 @@ function DashboardMedecin() {
               const userDesiderata = await getDesiderataByUser(userData.id);
               setDesiderata(userDesiderata);
             } catch (error) {
-              console.error('Erreur lors de la récupération des desiderata:', error);
+              logger.error('Erreur lors de la récupération des desiderata:', error);
             }
           } else {
             setError('Utilisateur non autorisé');
             history.push('/');
           }
         } catch (error) {
-          console.error('Erreur:', error);
+          logger.error('Erreur:', error);
           setError('Erreur lors de la récupération des données');
         }
       } else {
@@ -56,7 +57,7 @@ function DashboardMedecin() {
       await logoutUser();
       history.push('/');
     } catch (error) {
-      console.error("Erreur lors de la déconnexion:", error);
+      logger.error('Erreur lors de la déconnexion:', error);
       setError('Erreur lors de la déconnexion');
     }
   };
@@ -169,7 +170,7 @@ function DashboardMedecin() {
       <main style={{
         maxWidth: '1280px',
         margin: '0 auto',
-        padding: '6rem 1rem 2rem',
+        padding: '6rem 1rem 2rem'
       }}>
         {/* Carte de bienvenue */}
         <div style={{

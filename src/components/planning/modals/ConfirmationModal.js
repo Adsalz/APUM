@@ -1,6 +1,6 @@
 // src/components/planning/modals/ConfirmationModal.js
 import React from 'react';
-import { AlertTriangle, Check } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 
 const ConfirmationModal = ({
   isOpen,
@@ -15,7 +15,7 @@ const ConfirmationModal = ({
   iconBgColor = '#FEE2E2',
   confirmButtonColor = '#DC2626'
 }) => {
-  if (!isOpen) return null;
+  if (!isOpen) {return null;}
 
   return (
     <div style={{

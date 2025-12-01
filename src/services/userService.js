@@ -1,24 +1,25 @@
 import { db, auth } from '../firebase';
-import { 
-  doc, 
-  getDoc, 
-  setDoc, 
-  updateDoc, 
-  deleteDoc, 
-  getDocs, 
-  collection, 
-  query, 
-  where 
+import {
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  getDocs,
+  collection,
+  query,
+  where
 } from 'firebase/firestore';
+import logger from '../utils/logger';
 
 const USERS_COLLECTION = 'users';
 
 export const createUser = async (uid, userData) => {
   try {
     await setDoc(doc(db, USERS_COLLECTION, uid), userData);
-    console.log('Utilisateur créé avec succès');
+    logger.debug('Utilisateur créé avec succès');
   } catch (error) {
-    console.error('Erreur lors de la création de l\'utilisateur:', error);
+    logger.error('Erreur lors de la création de l\'utilisateur:', error);
     throw error;
   }
 };
@@ -26,21 +27,21 @@ export const createUser = async (uid, userData) => {
 export const getUser = async (uid) => {
   try {
     if (!uid) {
-      console.log('UID non fourni');
+      logger.warn('UID non fourni');
       return null;
     }
 
     const userDoc = await getDoc(doc(db, USERS_COLLECTION, uid));
     if (userDoc.exists()) {
       const userData = userDoc.data();
-      console.log('Utilisateur trouvé:', userData);
+      logger.debug('Utilisateur trouvé:', userData);
       return { id: userDoc.id, ...userData };
     } else {
-      console.log('Aucun utilisateur trouvé avec cet UID');
+      logger.warn('Aucun utilisateur trouvé avec cet UID');
       return null;
     }
   } catch (error) {
-    console.error('Erreur lors de la récupération de l\'utilisateur:', error);
+    logger.error('Erreur lors de la récupération de l\'utilisateur:', error);
     throw error;
   }
 };
@@ -48,9 +49,9 @@ export const getUser = async (uid) => {
 export const updateUser = async (uid, userData) => {
   try {
     await updateDoc(doc(db, USERS_COLLECTION, uid), userData);
-    console.log('Utilisateur mis à jour avec succès');
+    logger.debug('Utilisateur mis à jour avec succès');
   } catch (error) {
-    console.error('Erreur lors de la mise à jour de l\'utilisateur:', error);
+    logger.error('Erreur lors de la mise à jour de l\'utilisateur:', error);
     throw error;
   }
 };
@@ -58,9 +59,9 @@ export const updateUser = async (uid, userData) => {
 export const deleteUser = async (uid) => {
   try {
     await deleteDoc(doc(db, USERS_COLLECTION, uid));
-    console.log('Utilisateur supprimé avec succès');
+    logger.debug('Utilisateur supprimé avec succès');
   } catch (error) {
-    console.error('Erreur lors de la suppression de l\'utilisateur:', error);
+    logger.error('Erreur lors de la suppression de l\'utilisateur:', error);
     throw error;
   }
 };
@@ -80,7 +81,7 @@ export const getAllUsers = async () => {
     const querySnapshot = await getDocs(collection(db, USERS_COLLECTION));
     return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   } catch (error) {
-    console.error('Erreur lors de la récupération de tous les utilisateurs:', error);
+    logger.error('Erreur lors de la récupération de tous les utilisateurs:', error);
     throw error;
   }
 };
@@ -92,18 +93,18 @@ export const getMedecins = async () => {
       throw new Error('Utilisateur non authentifié');
     }
 
-    const q = query(collection(db, USERS_COLLECTION), where("role", "==", "medecin"));
+    const q = query(collection(db, USERS_COLLECTION), where('role', '==', 'medecin'));
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
   } catch (error) {
-    console.error('Erreur lors de la récupération des médecins:', error);
+    logger.error('Erreur lors de la récupération des médecins:', error);
     throw error;
   }
 };
 
 export const getUserByEmail = async (email) => {
   try {
-    const q = query(collection(db, USERS_COLLECTION), where("email", "==", email));
+    const q = query(collection(db, USERS_COLLECTION), where('email', '==', email));
     const querySnapshot = await getDocs(q);
     
     if (querySnapshot.empty) {
@@ -116,7 +117,7 @@ export const getUserByEmail = async (email) => {
       ...userDoc.data()
     };
   } catch (error) {
-    console.error('Erreur lors de la recherche de l\'utilisateur par email:', error);
+    logger.error('Erreur lors de la recherche de l\'utilisateur par email:', error);
     throw error;
   }
 };

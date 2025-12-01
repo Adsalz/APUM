@@ -5,6 +5,7 @@ import { getUser, getUserByEmail } from '../services/userService';
 import { Calendar } from 'lucide-react';
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { auth } from '../firebase';
+import logger from '../utils/logger';
 
 function Login() {
   const [email, setEmail] = useState('');
@@ -38,11 +39,11 @@ function Login() {
         history.push('/dashboard-admin');
       } else {
         setError('Rôle utilisateur non reconnu');
+        setIsLoading(false);
       }
     } catch (error) {
-      console.error("Erreur de connexion:", error);
+      logger.error('Erreur de connexion:', error);
       setError('Identifiants incorrects ou erreur de connexion');
-    } finally {
       setIsLoading(false);
     }
   };
@@ -72,7 +73,7 @@ function Login() {
         setSuccess('');
       }, 3000);
     } catch (error) {
-      console.error("Erreur lors de l'envoi de l'email de réinitialisation:", error);
+      logger.error('Erreur lors de l\'envoi de l\'email de réinitialisation:', error);
       setError('Erreur lors de l\'envoi de l\'email de réinitialisation');
     } finally {
       setIsLoading(false);
@@ -139,6 +140,7 @@ function Login() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                autoComplete="username"
                 style={{
                   width: '100%',
                   padding: '8px 12px',
@@ -164,6 +166,7 @@ function Login() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
                 style={{
                   width: '100%',
                   padding: '8px 12px',

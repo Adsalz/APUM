@@ -1,12 +1,12 @@
 import { db, auth } from '../firebase';
-import { 
-  collection, 
-  addDoc, 
-  updateDoc, 
-  doc, 
-  deleteDoc, 
-  getDocs, 
-  query, 
+import {
+  collection,
+  addDoc,
+  updateDoc,
+  doc,
+  deleteDoc,
+  getDocs,
+  query,
   where,
   orderBy,
   limit,
@@ -15,6 +15,7 @@ import {
   Timestamp,
   writeBatch
 } from 'firebase/firestore';
+import logger from '../utils/logger';
 
 const DESIDERATA_COLLECTION = 'desiderata';
 const PLANNING_COLLECTION = 'planning';
@@ -35,7 +36,7 @@ const convertFromTimestamp = (timestamp) => {
   if (typeof timestamp === 'string') {
     return timestamp;
   }
-  console.error('Format de date non reconnu:', timestamp);
+  logger.error('Format de date non reconnu:', timestamp);
   return null;
 };
 
@@ -53,9 +54,9 @@ export const setPeriodeSaisie = async (startDate, endDate) => {
 
     await deleteObsoleteDesiderata(startDate, endDate);
 
-    console.log('Période de saisie mise à jour et desiderata obsolètes supprimés');
+    logger.debug('Période de saisie mise à jour et desiderata obsolètes supprimés');
   } catch (error) {
-    console.error('Erreur lors de la mise à jour de la période de saisie:', error);
+    logger.error('Erreur lors de la mise à jour de la période de saisie:', error);
     throw error;
   }
 };
@@ -75,9 +76,9 @@ const deleteObsoleteDesiderata = async (newStartDate, newEndDate) => {
     });
 
     await batch.commit();
-    console.log('Desiderata obsolètes supprimés');
+    logger.debug('Desiderata obsolètes supprimés');
   } catch (error) {
-    console.error('Erreur lors de la suppression des desiderata obsolètes:', error);
+    logger.error('Erreur lors de la suppression des desiderata obsolètes:', error);
     throw error;
   }
 };
@@ -103,7 +104,7 @@ export const getPeriodeSaisie = async () => {
     }
     return null;
   } catch (error) {
-    console.error('Erreur lors de la récupération de la période de saisie:', error);
+    logger.error('Erreur lors de la récupération de la période de saisie:', error);
     throw error;
   }
 };
@@ -127,7 +128,7 @@ export const getDesiderataStatus = async () => {
       desiderata: desiderataData
     };
   } catch (error) {
-    console.error('Erreur lors de la récupération du statut des desiderata:', error);
+    logger.error('Erreur lors de la récupération du statut des desiderata:', error);
     throw error;
   }
 };
@@ -151,7 +152,7 @@ export const addDesiderata = async (userId, desiderata) => {
     });
     return docRef.id;
   } catch (error) {
-    console.error('Erreur lors de l\'ajout des desiderata:', error);
+    logger.error('Erreur lors de l\'ajout des desiderata:', error);
     throw error;
   }
 };
@@ -168,9 +169,9 @@ export const updateDesiderata = async (desiderataId, desiderata) => {
       gardesGroupees: desiderata.gardesGroupees,
       renfortsAssocies: desiderata.renfortsAssocies
     });
-    console.log('Desiderata mis à jour avec succès');
+    logger.debug('Desiderata mis à jour avec succès');
   } catch (error) {
-    console.error('Erreur lors de la mise à jour des desiderata:', error);
+    logger.error('Erreur lors de la mise à jour des desiderata:', error);
     throw error;
   }
 };
@@ -181,7 +182,7 @@ export const getDesiderataByUser = async (userId) => {
     if (!user) {
       throw new Error('Utilisateur non authentifié');
     }
-    const q = query(collection(db, DESIDERATA_COLLECTION), where("userId", "==", userId));
+    const q = query(collection(db, DESIDERATA_COLLECTION), where('userId', '==', userId));
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(doc => {
       const data = doc.data();
@@ -193,7 +194,7 @@ export const getDesiderataByUser = async (userId) => {
       };
     });
   } catch (error) {
-    console.error('Erreur lors de la récupération des desiderata:', error);
+    logger.error('Erreur lors de la récupération des desiderata:', error);
     throw error;
   }
 };
@@ -210,8 +211,8 @@ export const getDesiderataForPeriod = async (debut, fin) => {
 
     const q = query(
       collection(db, DESIDERATA_COLLECTION),
-      where("startDate", "<=", finTimestamp),
-      where("endDate", ">=", debutTimestamp)
+      where('startDate', '<=', finTimestamp),
+      where('endDate', '>=', debutTimestamp)
     );
     const querySnapshot = await getDocs(q);
     return querySnapshot.docs.map(doc => {
@@ -229,7 +230,7 @@ export const getDesiderataForPeriod = async (debut, fin) => {
       };
     });
   } catch (error) {
-    console.error('Erreur lors de la récupération des desiderata pour la période:', error);
+    logger.error('Erreur lors de la récupération des desiderata pour la période:', error);
     throw error;
   }
 };
@@ -243,11 +244,11 @@ export const savePlanning = async (planning) => {
     const docRef = await addDoc(collection(db, PLANNING_COLLECTION), {
       ...planning,
       startDate: convertToTimestamp(planning.startDate),
-      endDate: convertToTimestamp(planning.endDate),
+      endDate: convertToTimestamp(planning.endDate)
     });
     return docRef.id;
   } catch (error) {
-    console.error('Erreur lors de la sauvegarde du planning:', error);
+    logger.error('Erreur lors de la sauvegarde du planning:', error);
     throw error;
   }
 };
@@ -262,10 +263,10 @@ export const updatePlanning = async (planningId, planning) => {
     await updateDoc(planningRef, {
       ...planning,
       startDate: convertToTimestamp(planning.startDate),
-      endDate: convertToTimestamp(planning.endDate),
+      endDate: convertToTimestamp(planning.endDate)
     });
   } catch (error) {
-    console.error('Erreur lors de la mise à jour du planning:', error);
+    logger.error('Erreur lors de la mise à jour du planning:', error);
     throw error;
   }
 };
@@ -290,7 +291,7 @@ export const getLatestPlanning = async () => {
       endDate: convertFromTimestamp(data.endDate)
     };
   } catch (error) {
-    console.error('Erreur lors de la récupération du dernier planning:', error);
+    logger.error('Erreur lors de la récupération du dernier planning:', error);
     throw error;
   }
 };
@@ -303,7 +304,7 @@ export const deletePlanning = async (planningId) => {
     }
     await deleteDoc(doc(db, PLANNING_COLLECTION, planningId));
   } catch (error) {
-    console.error('Erreur lors de la suppression du planning:', error);
+    logger.error('Erreur lors de la suppression du planning:', error);
     throw error;
   }
 };
@@ -319,7 +320,7 @@ export const publishPlanning = async (planningId) => {
       publishedAt: Timestamp.now()
     });
   } catch (error) {
-    console.error('Erreur lors de la publication du planning:', error);
+    logger.error('Erreur lors de la publication du planning:', error);
     throw error;
   }
 };
@@ -332,8 +333,8 @@ export const getPublishedPlanning = async () => {
     }
     const q = query(
       collection(db, PLANNING_COLLECTION), 
-      where("publishedAt", "!=", null),
-      orderBy("publishedAt", "desc"),
+      where('publishedAt', '!=', null),
+      orderBy('publishedAt', 'desc'),
       limit(1)
     );
     const querySnapshot = await getDocs(q);
@@ -350,7 +351,7 @@ export const getPublishedPlanning = async () => {
       publishedAt: convertFromTimestamp(data.publishedAt)
     };
   } catch (error) {
-    console.error('Erreur lors de la récupération du planning publié:', error);
+    logger.error('Erreur lors de la récupération du planning publié:', error);
     throw error;
   }
 };

@@ -5,16 +5,18 @@ import { auth } from '../firebase';
 import { getUser, getMedecins } from '../services/userService';
 import { logoutUser } from '../services/authService';
 import { getPeriodeSaisie, getPublishedPlanning } from '../services/planningService';
-import { 
-  Users, 
-  Calendar, 
-  Clock, 
-  LogOut, 
+import logger from '../utils/logger';
+import {
+  Users,
+  Calendar,
+  Clock,
+  LogOut,
   Key,
   ClipboardList,
   Settings,
   ChevronRight,
-  CheckSquare
+  CheckSquare,
+  UserPlus
 } from 'lucide-react';
 import ChangePasswordModal from './ChangePasswordModal';
 
@@ -57,7 +59,7 @@ function DashboardAdmin() {
         setPlanning(publishedPlan);
 
       } catch (error) {
-        console.error('Erreur:', error);
+        logger.error('Erreur:', error);
         setError('Erreur lors de la récupération des données');
       } finally {
         setLoading(false);
@@ -72,7 +74,7 @@ function DashboardAdmin() {
       await logoutUser();
       history.push('/');
     } catch (error) {
-      console.error("Erreur lors de la déconnexion:", error);
+      logger.error('Erreur lors de la déconnexion:', error);
       setError('Erreur lors de la déconnexion');
     }
   };
@@ -199,7 +201,7 @@ function DashboardAdmin() {
       <main style={{
         maxWidth: '1280px',
         margin: '0 auto',
-        padding: '6rem 1rem 2rem',
+        padding: '6rem 1rem 2rem'
       }}>
         {/* Carte de bienvenue */}
         <div style={{
@@ -394,6 +396,44 @@ function DashboardAdmin() {
               </div>
               <ChevronRight size={20} color="#D97706" />
             </button>
+
+            {/* Remplir desiderata pour un médecin */}
+            <button
+              onClick={() => history.push('/desiderata-admin')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '1rem',
+                backgroundColor: '#FEE2E2',
+                border: '1px solid #DC2626',
+                borderRadius: '0.5rem',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                textAlign: 'left'
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.backgroundColor = '#FECACA';
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.backgroundColor = '#FEE2E2';
+              }}
+            >
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '1rem'
+              }}>
+                <div style={{ color: '#DC2626' }}>
+                  <UserPlus size={24} />
+                </div>
+                <div>
+                  <div style={{ fontWeight: '500', color: '#1F2937' }}>Remplir desiderata</div>
+                  <div style={{ fontSize: '0.875rem', color: '#6B7280' }}>Saisir les desiderata pour un médecin</div>
+                </div>
+              </div>
+              <ChevronRight size={20} color="#DC2626" />
+            </button>
           </div>
         </div>
 
@@ -489,46 +529,46 @@ function DashboardAdmin() {
             borderRadius: '0.5rem',
             padding: '1.5rem',
             boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-         }}>
-           <div style={{
-             display: 'flex',
-             alignItems: 'center',
-             gap: '0.75rem',
-             marginBottom: '1rem'
-           }}>
-             <div style={{
-               backgroundColor: '#FFF7ED',
-               borderRadius: '0.5rem',
-               padding: '0.75rem',
-               color: '#EA580C'
-             }}>
-               <Calendar size={24} />
-             </div>
-             <h2 style={{
-               fontSize: '1.125rem',
-               fontWeight: '600',
-               color: '#1f2937'
-             }}>
+          }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              marginBottom: '1rem'
+            }}>
+              <div style={{
+                backgroundColor: '#FFF7ED',
+                borderRadius: '0.5rem',
+                padding: '0.75rem',
+                color: '#EA580C'
+              }}>
+                <Calendar size={24} />
+              </div>
+              <h2 style={{
+                fontSize: '1.125rem',
+                fontWeight: '600',
+                color: '#1f2937'
+              }}>
                Planning
-             </h2>
-           </div>
-           <p style={{
-             fontSize: '0.875rem',
-             color: planning ? '#16A34A' : '#DC2626',
-             fontWeight: '500'
-           }}>
-             {planning ? 'Planning publié' : 'Aucun planning publié'}
-           </p>
-         </div>
-       </div>
-     </main>
+              </h2>
+            </div>
+            <p style={{
+              fontSize: '0.875rem',
+              color: planning ? '#16A34A' : '#DC2626',
+              fontWeight: '500'
+            }}>
+              {planning ? 'Planning publié' : 'Aucun planning publié'}
+            </p>
+          </div>
+        </div>
+      </main>
 
-     {/* Modal de changement de mot de passe */}
-     {showChangePassword && (
-       <ChangePasswordModal onClose={() => setShowChangePassword(false)} />
-     )}
-   </div>
- );
+      {/* Modal de changement de mot de passe */}
+      {showChangePassword && (
+        <ChangePasswordModal onClose={() => setShowChangePassword(false)} />
+      )}
+    </div>
+  );
 }
 
 export default DashboardAdmin;

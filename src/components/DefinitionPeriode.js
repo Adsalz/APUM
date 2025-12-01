@@ -3,6 +3,7 @@ import { Link, useHistory } from 'react-router-dom';
 import { auth } from '../firebase';
 import { getUser } from '../services/userService';
 import { setPeriodeSaisie, getPeriodeSaisie } from '../services/planningService';
+import logger from '../utils/logger';
 
 function DefinitionPeriode() {
   const [startDate, setStartDate] = useState('');
@@ -18,7 +19,7 @@ function DefinitionPeriode() {
         try {
           const userData = await getUser(authUser.uid);
           if (userData.role !== 'admin') {
-            setError("Accès non autorisé");
+            setError('Accès non autorisé');
             history.push('/');
           } else {
             setCurrentUser(userData);
@@ -29,8 +30,8 @@ function DefinitionPeriode() {
             }
           }
         } catch (error) {
-          console.error("Erreur lors de la récupération des données utilisateur:", error);
-          setError("Erreur lors de la récupération des données utilisateur");
+          logger.error('Erreur lors de la récupération des données utilisateur:', error);
+          setError('Erreur lors de la récupération des données utilisateur');
         }
       } else {
         history.push('/');
@@ -47,8 +48,8 @@ function DefinitionPeriode() {
       await setPeriodeSaisie(startDate, endDate);
       alert('Période de saisie définie avec succès!');
     } catch (error) {
-      console.error("Erreur lors de la définition de la période:", error);
-      setError("Erreur lors de la définition de la période");
+      logger.error('Erreur lors de la définition de la période:', error);
+      setError('Erreur lors de la définition de la période');
     }
   };
 

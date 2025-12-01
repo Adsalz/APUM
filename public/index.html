@@ -12,6 +12,72 @@
     <link rel="apple-touch-icon" href="logo192.png" />
     <link rel="manifest" href="manifest.json" />
     <title>Planning Médecins</title>
+    <script>
+      // Browser polyfills - must run before any modules load
+      (function() {
+        'use strict';
+
+        // Define global if not available
+        if (typeof window.global === 'undefined') {
+          window.global = window;
+        }
+
+        // Define process with comprehensive API
+        if (typeof window.process === 'undefined') {
+          window.process = {
+            env: {
+              NODE_ENV: 'production',
+              BROWSER: 'true'
+            },
+            version: 'v16.0.0',
+            versions: {
+              node: '16.0.0'
+            },
+            platform: 'browser',
+            browser: true,
+            argv: [],
+            title: 'browser',
+            pid: 1,
+            ppid: 0,
+            uid: 501,
+            gid: 20,
+            cwd: function() { return '/'; },
+            chdir: function() {},
+            umask: function() { return 0; },
+            nextTick: function(callback) {
+              setTimeout(callback, 0);
+            },
+            stdout: { write: function() {} },
+            stderr: { write: function() {} },
+            stdin: { read: function() {} }
+          };
+        }
+
+        // Define Buffer if not available
+        if (typeof window.Buffer === 'undefined') {
+          window.Buffer = {
+            isBuffer: function() { return false; },
+            from: function() { return []; },
+            alloc: function() { return []; },
+            allocUnsafe: function() { return []; }
+          };
+        }
+
+        // Define setImmediate if not available
+        if (typeof window.setImmediate === 'undefined') {
+          window.setImmediate = function(callback) {
+            return setTimeout(callback, 0);
+          };
+        }
+
+        // Define clearImmediate if not available
+        if (typeof window.clearImmediate === 'undefined') {
+          window.clearImmediate = function(id) {
+            return clearTimeout(id);
+          };
+        }
+      })();
+    </script>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
