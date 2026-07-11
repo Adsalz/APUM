@@ -2,11 +2,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Search, X, ChevronDown, ChevronUp } from 'lucide-react';
 
-const MedecinSearchSelect = ({ 
-  medecins, 
-  value, 
+const MedecinSearchSelect = ({
+  medecins,
+  value,
   onChange,
-  placeholder = 'Rechercher un médecin...' 
+  placeholder = 'Rechercher un médecin...'
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -36,27 +36,21 @@ const MedecinSearchSelect = ({
   // Récupérer le médecin sélectionné
   const selectedMedecin = medecins.find(m => m.id === value);
 
+  const optionClass = (active) =>
+    `w-full rounded-lg px-3 py-2 text-left text-sm transition-colors ${
+      active
+        ? 'bg-primary-50 font-semibold text-primary-700'
+        : 'text-ink-700 hover:bg-ink-50'
+    }`;
+
   return (
-    <div 
-      ref={wrapperRef}
-      style={{
-        position: 'relative',
-        width: '100%'
-      }}
-    >
+    <div ref={wrapperRef} className="relative w-full">
       {/* Input de recherche */}
-      <div style={{
-        position: 'relative',
-        display: 'flex',
-        alignItems: 'center'
-      }}>
-        <Search 
+      <div className="relative flex items-center">
+        <Search
           size={18}
-          style={{
-            position: 'absolute',
-            left: '0.75rem',
-            color: '#6B7280'
-          }}
+          aria-hidden="true"
+          className="pointer-events-none absolute left-3 text-ink-400"
         />
         <input
           type="text"
@@ -67,147 +61,77 @@ const MedecinSearchSelect = ({
           }}
           onFocus={() => setIsOpen(true)}
           placeholder={placeholder}
-          style={{
-            width: '100%',
-            padding: '0.5rem 2.5rem',
-            borderRadius: '0.375rem',
-            border: '1px solid #D1D5DB',
-            fontSize: '0.875rem'
-          }}
+          className="w-full rounded-lg border border-ink-200 bg-white py-2 pl-10 pr-16 text-sm text-ink-800 shadow-sm transition-colors hover:border-ink-300 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
         />
-        <div style={{
-          position: 'absolute',
-          right: '0.75rem',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem'
-        }}>
+        <div className="absolute right-2 flex items-center gap-1">
           {searchTerm && (
             <button
+              type="button"
               onClick={() => {
                 setSearchTerm('');
                 setIsOpen(true);
               }}
-              style={{
-                padding: '0.25rem',
-                border: 'none',
-                background: 'none',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                color: '#6B7280'
-              }}
+              aria-label="Effacer la recherche"
+              className="rounded-md p-1 text-ink-400 transition-colors hover:bg-ink-100 hover:text-ink-600"
             >
-              <X size={16} />
+              <X size={16} aria-hidden="true" />
             </button>
           )}
           <button
+            type="button"
             onClick={() => setIsOpen(!isOpen)}
-            style={{
-              padding: '0.25rem',
-              border: 'none',
-              background: 'none',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              color: '#6B7280'
-            }}
+            aria-label={isOpen ? 'Fermer la liste' : 'Ouvrir la liste'}
+            className="rounded-md p-1 text-ink-400 transition-colors hover:bg-ink-100 hover:text-ink-600"
           >
-            {isOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            {isOpen ? <ChevronUp size={16} aria-hidden="true" /> : <ChevronDown size={16} aria-hidden="true" />}
           </button>
         </div>
       </div>
 
       {/* Liste déroulante */}
       {isOpen && (
-        <div style={{
-          position: 'absolute',
-          top: 'calc(100% + 0.25rem)',
-          left: 0,
-          right: 0,
-          maxHeight: '15rem',
-          overflowY: 'auto',
-          backgroundColor: 'white',
-          borderRadius: '0.375rem',
-          border: '1px solid #D1D5DB',
-          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-          zIndex: 30
-        }}>
-          <div style={{
-            padding: '0.25rem'
-          }}>
-            {/* Option "Tous les médecins" */}
+        <div className="absolute left-0 right-0 top-[calc(100%+0.25rem)] z-30 max-h-60 overflow-y-auto rounded-xl border border-ink-200 bg-white p-1 shadow-pop">
+          {/* Option "Tous les médecins" */}
+          <button
+            type="button"
+            onClick={() => {
+              onChange('all');
+              setIsOpen(false);
+              setSearchTerm('');
+            }}
+            className={optionClass(value === 'all')}
+          >
+            Tous les médecins
+          </button>
+
+          {/* Liste des médecins filtrés */}
+          {filteredMedecins.map(medecin => (
             <button
+              key={medecin.id}
+              type="button"
               onClick={() => {
-                onChange('all');
+                onChange(medecin.id);
                 setIsOpen(false);
                 setSearchTerm('');
               }}
-              style={{
-                width: '100%',
-                padding: '0.5rem 0.75rem',
-                textAlign: 'left',
-                border: 'none',
-                borderRadius: '0.25rem',
-                backgroundColor: value === 'all' ? '#EBF5FF' : 'transparent',
-                color: value === 'all' ? '#2563EB' : '#374151',
-                cursor: 'pointer',
-                fontSize: '0.875rem',
-                fontWeight: value === 'all' ? '600' : 'normal'
-              }}
+              className={optionClass(value === medecin.id)}
             >
-              Tous les médecins
+              Dr. {medecin.prenom} {medecin.nom}
             </button>
+          ))}
 
-            {/* Liste des médecins filtrés */}
-            {filteredMedecins.map(medecin => (
-              <button
-                key={medecin.id}
-                onClick={() => {
-                  onChange(medecin.id);
-                  setIsOpen(false);
-                  setSearchTerm('');
-                }}
-                style={{
-                  width: '100%',
-                  padding: '0.5rem 0.75rem',
-                  textAlign: 'left',
-                  border: 'none',
-                  borderRadius: '0.25rem',
-                  backgroundColor: value === medecin.id ? '#EBF5FF' : 'transparent',
-                  color: value === medecin.id ? '#2563EB' : '#374151',
-                  cursor: 'pointer',
-                  fontSize: '0.875rem',
-                  fontWeight: value === medecin.id ? '600' : 'normal'
-                }}
-              >
-                Dr. {medecin.prenom} {medecin.nom}
-              </button>
-            ))}
-
-            {/* Message si aucun résultat */}
-            {filteredMedecins.length === 0 && (
-              <div style={{
-                padding: '0.5rem 0.75rem',
-                color: '#6B7280',
-                fontSize: '0.875rem',
-                textAlign: 'center'
-              }}>
-                Aucun médecin trouvé
-              </div>
-            )}
-          </div>
+          {/* Message si aucun résultat */}
+          {filteredMedecins.length === 0 && (
+            <div className="px-3 py-2 text-center text-sm text-ink-500">
+              Aucun médecin trouvé
+            </div>
+          )}
         </div>
       )}
 
       {/* Affichage du médecin sélectionné sous l'input */}
       {value !== 'all' && selectedMedecin && !isOpen && (
-        <div style={{
-          marginTop: '0.25rem',
-          fontSize: '0.75rem',
-          color: '#2563EB',
-          fontWeight: '500'
-        }}>
+        <div className="mt-1 text-xs font-medium text-primary-600">
           Médecin sélectionné : Dr. {selectedMedecin.prenom} {selectedMedecin.nom}
         </div>
       )}

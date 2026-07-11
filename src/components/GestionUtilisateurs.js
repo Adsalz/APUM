@@ -7,12 +7,26 @@ import {
   Trash2,
   Grid,
   List,
-  X,
   UserPlus,
-  Mail
+  Mail,
+  Users
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { AppHeader, LoadingScreen, ErrorScreen, Alert, Button, Modal } from './ui';
+import {
+  AppHeader,
+  LoadingScreen,
+  ErrorScreen,
+  Alert,
+  Button,
+  Modal,
+  Card,
+  Badge,
+  Select,
+  SegmentedControl,
+  FormField,
+  EmptyState,
+  useToast,
+} from './ui';
 import logger from '../utils/logger';
 
 function GestionUtilisateurs() {
@@ -20,16 +34,16 @@ function GestionUtilisateurs() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(null);
   const { profile } = useAuth();
+  const toast = useToast();
 
   // États pour le formulaire d'ajout
   const [showAddForm, setShowAddForm] = useState(false);
-  const [newUser, setNewUser] = useState({ 
-    nom: '', 
-    prenom: '', 
-    email: '', 
-    role: 'medecin' 
+  const [newUser, setNewUser] = useState({
+    nom: '',
+    prenom: '',
+    email: '',
+    role: 'medecin'
   });
 
   // États pour les filtres et la vue
@@ -40,7 +54,7 @@ function GestionUtilisateurs() {
 
   // État pour la pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const [usersPerPage] = useState(12); 
+  const [usersPerPage] = useState(12);
 
   // État pour la confirmation
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
@@ -61,15 +75,6 @@ function GestionUtilisateurs() {
 
     fetchData();
   }, []);
-
-  // Masquage automatique de la bannière de succès
-  useEffect(() => {
-    if (!success) {
-      return undefined;
-    }
-    const timer = setTimeout(() => setSuccess(null), 5000);
-    return () => clearTimeout(timer);
-  }, [success]);
 
   // Fonction pour récupérer les utilisateurs
   const fetchUsers = async () => {
@@ -111,7 +116,6 @@ function GestionUtilisateurs() {
   const handleAddUser = async (e) => {
     e.preventDefault();
     setError(null);
-    setSuccess(null);
 
     try {
       if (!profile || profile.role !== 'admin') {
@@ -120,7 +124,7 @@ function GestionUtilisateurs() {
 
       // Créer l'utilisateur dans Firebase Auth
       const userCredential = await registerUser(newUser.email);
-      
+
       // Créer le document utilisateur dans Firestore
       await createUser(userCredential.user.uid, {
         nom: newUser.nom,
@@ -133,11 +137,11 @@ function GestionUtilisateurs() {
       setShowAddForm(false);
       await fetchUsers();
 
-      setSuccess('Utilisateur ajouté avec succès'); // Mise à jour de la variable 'success'
+      toast.success('Utilisateur ajouté avec succès');
     } catch (error) {
       logger.error('Erreur lors de l\'ajout de l\'utilisateur:', error);
       let errorMessage = 'Une erreur est survenue lors de l\'ajout de l\'utilisateur';
-    
+
       if (error.code === 'auth/email-already-in-use') {
         errorMessage = 'Cette adresse email est déjà utilisée.';
       }
@@ -158,12 +162,24 @@ function GestionUtilisateurs() {
       await fetchUsers();
       setShowConfirmDelete(false);
       setUserToDelete(null);
-      setSuccess('Utilisateur supprimé avec succès');
+      toast.success('Utilisateur supprimé avec succès');
     } catch (error) {
       logger.error('Erreur lors de la suppression:', error);
-      setError('Erreur lors de la suppression de l\'utilisateur');
+      toast.error('Erreur lors de la suppression de l\'utilisateur');
     }
   };
+
+  // Boutons de pagination réutilisables (vue tableau + vue grille)
+  const paginationButtons = Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+    <Button
+      key={page}
+      size="sm"
+      variant={currentPage === page ? 'primary' : 'secondary'}
+      onClick={() => setCurrentPage(page)}
+    >
+      {page}
+    </Button>
+  ));
 
   // Si chargement en cours
   if (loading) {
@@ -185,7 +201,7 @@ function GestionUtilisateurs() {
   }
 
   return (
-    <div style={{ backgroundColor: '#f3f4f6', minHeight: '100vh' }}>
+    <div className="min-h-screen bg-ink-50">
       {/* Menu fixe en haut */}
       <AppHeader
         backTo="/dashboard-admin"
@@ -202,267 +218,128 @@ function GestionUtilisateurs() {
       />
 
       {/* Contenu principal */}
-      <main style={{
-        maxWidth: '1280px',
-        margin: '0 auto',
-        padding: '6rem 1rem 2rem'
-      }}>
-        {/* Bannière de succès */}
-        {success && (
-          <Alert kind="success" className="mb-4">
-            {success}
-          </Alert>
-        )}
-
+      <main className="mx-auto max-w-7xl px-4 pb-12 pt-24 sm:px-6 animate-fade-up">
         {/* Barre d'outils */}
-        <div style={{
-          backgroundColor: 'white',
-          borderRadius: '0.5rem',
-          padding: '1rem',
-          marginBottom: '1.5rem',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-          display: 'flex',
-          flexWrap: 'wrap',
-          gap: '1rem',
-          alignItems: 'center',
-          justifyContent: 'space-between'
-        }}>
+        <Card className="mb-6 flex flex-wrap items-center justify-between gap-4 p-4">
           {/* Barre de recherche */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            flex: '1',
-            minWidth: '200px',
-            maxWidth: '400px',
-            position: 'relative'
-          }}>
-            <Search size={20} style={{
-              position: 'absolute',
-              left: '0.75rem',
-              color: '#6B7280'
-            }} />
+          <div className="relative min-w-[200px] max-w-md flex-1">
+            <Search
+              size={18}
+              aria-hidden="true"
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-400"
+            />
             <input
               type="text"
               placeholder="Rechercher un utilisateur..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '0.5rem 0.75rem 0.5rem 2.5rem',
-                borderRadius: '0.375rem',
-                border: '1px solid #D1D5DB',
-                fontSize: '0.875rem'
-              }}
+              className="w-full rounded-lg border border-ink-200 bg-white py-2 pl-10 pr-3 text-sm text-ink-900 placeholder-ink-400 shadow-sm transition-colors hover:border-ink-300 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
             />
           </div>
 
           {/* Filtres et vue */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '1rem'
-          }}>
+          <div className="flex items-center gap-3">
             {/* Filtre par rôle */}
-            <select
+            <Select
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value)}
-              style={{
-                padding: '0.5rem',
-                borderRadius: '0.375rem',
-                border: '1px solid #D1D5DB',
-                backgroundColor: 'white',
-                fontSize: '0.875rem'
-              }}
+              className="min-w-[160px]"
             >
               <option value="all">Tous les rôles</option>
               <option value="medecin">Médecins</option>
               <option value="admin">Administrateurs</option>
-            </select>
+            </Select>
 
             {/* Boutons de vue */}
-            <div style={{
-              display: 'flex',
-              gap: '0.5rem',
-              backgroundColor: '#F3F4F6',
-              padding: '0.25rem',
-              borderRadius: '0.375rem'
-            }}>
-              <button
-                onClick={() => setViewMode('table')}
-                style={{
-                  padding: '0.5rem',
-                  borderRadius: '0.25rem',
-                  border: 'none',
-                  backgroundColor: viewMode === 'table' ? 'white' : 'transparent',
-                  boxShadow: viewMode === 'table' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                  cursor: 'pointer'
-                }}
-              >
-                <List size={20} color={viewMode === 'table' ? '#2563EB' : '#6B7280'} />
-              </button>
-              <button
-                onClick={() => setViewMode('grid')}
-                style={{
-                  padding: '0.5rem',
-                  borderRadius: '0.25rem',
-                  border: 'none',
-                  backgroundColor: viewMode === 'grid' ? 'white' : 'transparent',
-                  boxShadow: viewMode === 'grid' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                  cursor: 'pointer'
-                }}
-              >
-                <Grid size={20} color={viewMode === 'grid' ? '#2563EB' : '#6B7280'} />
-              </button>
-            </div>
+            <SegmentedControl
+              value={viewMode}
+              onChange={setViewMode}
+              options={[
+                { value: 'table', label: 'Liste', icon: <List size={16} aria-hidden="true" /> },
+                { value: 'grid', label: 'Grille', icon: <Grid size={16} aria-hidden="true" /> },
+              ]}
+            />
           </div>
-        </div>
+        </Card>
 
-        {/* Affichage des erreurs */}
-        {error && (
+        {/* Affichage des erreurs (hors modale d'ajout) */}
+        {error && !showAddForm && (
           <Alert kind="error" className="mb-6">
             {error}
           </Alert>
         )}
 
-        {/* Vue tableau */}
-        {viewMode === 'table' && (
-          <div style={{
-            backgroundColor: 'white',
-            borderRadius: '0.5rem',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-            overflow: 'hidden'
-          }}>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{
-                width: '100%',
-                borderCollapse: 'collapse',
-                fontSize: '0.875rem'
-              }}>
+        {/* Aucun résultat */}
+        {filteredUsers.length === 0 ? (
+          <Card className="p-0">
+            <EmptyState
+              icon={<Users size={26} aria-hidden="true" />}
+              title="Aucun utilisateur"
+              description="Aucun utilisateur ne correspond à votre recherche."
+              action={
+                <Button
+                  variant="primary"
+                  icon={<UserPlus size={16} aria-hidden="true" />}
+                  onClick={() => setShowAddForm(true)}
+                >
+                  Ajouter un utilisateur
+                </Button>
+              }
+            />
+          </Card>
+        ) : viewMode === 'table' ? (
+          /* Vue tableau */
+          <div className="overflow-hidden rounded-xl border border-ink-100 bg-white shadow-card">
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-sm">
                 <thead>
                   <tr>
-                    <th style={{
-                      padding: '1rem',
-                      textAlign: 'left',
-                      backgroundColor: '#F9FAFB',
-                      borderBottom: '1px solid #E5E7EB',
-                      color: '#374151',
-                      fontWeight: '600'
-                    }}>
-                     Nom
+                    <th className="border-b border-ink-100 bg-ink-50 px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-ink-500">
+                      Nom
                     </th>
-                    <th style={{
-                      padding: '1rem',
-                      textAlign: 'left',
-                      backgroundColor: '#F9FAFB',
-                      borderBottom: '1px solid #E5E7EB',
-                      color: '#374151',
-                      fontWeight: '600'
-                    }}>
-                     Prénom
+                    <th className="border-b border-ink-100 bg-ink-50 px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-ink-500">
+                      Prénom
                     </th>
-                    <th style={{
-                      padding: '1rem',
-                      textAlign: 'left',
-                      backgroundColor: '#F9FAFB',
-                      borderBottom: '1px solid #E5E7EB',
-                      color: '#374151',
-                      fontWeight: '600'
-                    }}>
-                     Email
+                    <th className="border-b border-ink-100 bg-ink-50 px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-ink-500">
+                      Email
                     </th>
-                    <th style={{
-                      padding: '1rem',
-                      textAlign: 'left',
-                      backgroundColor: '#F9FAFB',
-                      borderBottom: '1px solid #E5E7EB',
-                      color: '#374151',
-                      fontWeight: '600'
-                    }}>
-                     Rôle
+                    <th className="border-b border-ink-100 bg-ink-50 px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-ink-500">
+                      Rôle
                     </th>
-                    <th style={{
-                      padding: '1rem',
-                      textAlign: 'right',
-                      backgroundColor: '#F9FAFB',
-                      borderBottom: '1px solid #E5E7EB',
-                      color: '#374151',
-                      fontWeight: '600'
-                    }}>
-                     Actions
+                    <th className="border-b border-ink-100 bg-ink-50 px-4 py-3 text-right text-xs font-bold uppercase tracking-wide text-ink-500">
+                      Actions
                     </th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-ink-100">
                   {currentUsers.map((user) => (
-                    <tr 
+                    <tr
                       key={user.id}
-                      style={{
-                        borderBottom: '1px solid #E5E7EB',
-                        transition: 'background-color 0.2s'
-                      }}
-                      onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#F9FAFB'}
-                      onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'white'}
+                      className="transition-colors odd:bg-white even:bg-ink-50/40 hover:bg-ink-100/60"
                     >
-                      <td style={{ padding: '1rem' }}>{user.nom}</td>
-                      <td style={{ padding: '1rem' }}>{user.prenom}</td>
-                      <td style={{ padding: '1rem' }}>
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '0.5rem'
-                        }}>
-                          <Mail size={16} color="#6B7280" />
+                      <td className="px-4 py-3 font-medium text-ink-900">{user.nom}</td>
+                      <td className="px-4 py-3 text-ink-700">{user.prenom}</td>
+                      <td className="px-4 py-3 text-ink-700">
+                        <div className="flex items-center gap-2">
+                          <Mail size={16} className="text-ink-400" aria-hidden="true" />
                           {user.email}
                         </div>
                       </td>
-                      <td style={{ padding: '1rem' }}>
-                        <span style={{
-                          padding: '0.25rem 0.5rem',
-                          borderRadius: '9999px',
-                          fontSize: '0.75rem',
-                          fontWeight: '500',
-                          backgroundColor: user.role === 'admin' ? '#EBF5FF' : '#F0FDF4',
-                          color: user.role === 'admin' ? '#2563EB' : '#16A34A'
-                        }}>
+                      <td className="px-4 py-3">
+                        <Badge tone={user.role === 'admin' ? 'primary' : 'success'}>
                           {user.role === 'admin' ? 'Administrateur' : 'Médecin'}
-                        </span>
+                        </Badge>
                       </td>
-                      <td style={{
-                        padding: '1rem',
-                        textAlign: 'right'
-                      }}>
-                        <div style={{
-                          display: 'flex',
-                          gap: '0.5rem',
-                          justifyContent: 'flex-end'
-                        }}>
-                          <button
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex justify-end">
+                          <Button
+                            variant="danger"
+                            size="sm"
+                            icon={<Trash2 size={16} aria-hidden="true" />}
                             onClick={() => handleDeleteClick(user)}
-                            style={{
-                              padding: '0.5rem',
-                              borderRadius: '0.375rem',
-                              border: '1px solid #DC2626',
-                              backgroundColor: 'white',
-                              color: '#DC2626',
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '0.25rem',
-                              transition: 'all 0.2s'
-                            }}
-                            onMouseOver={(e) => {
-                              e.currentTarget.style.backgroundColor = '#DC2626';
-                              e.currentTarget.style.color = 'white';
-                            }}
-                            onMouseOut={(e) => {
-                              e.currentTarget.style.backgroundColor = 'white';
-                              e.currentTarget.style.color = '#DC2626';
-                            }}
                           >
-                            <Trash2 size={16} />
-                           Supprimer
-                          </button>
+                            Supprimer
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -473,176 +350,53 @@ function GestionUtilisateurs() {
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <div style={{
-                padding: '1rem',
-                display: 'flex',
-                justifyContent: 'center',
-                gap: '0.5rem',
-                borderTop: '1px solid #E5E7EB'
-              }}>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                  <button
-                    key={page}
-                    onClick={() => setCurrentPage(page)}
-                    style={{
-                      padding: '0.5rem 1rem',
-                      borderRadius: '0.375rem',
-                      border: '1px solid #E5E7EB',
-                      backgroundColor: currentPage === page ? '#2563EB' : 'white',
-                      color: currentPage === page ? 'white' : '#374151',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s'
-                    }}
-                  >
-                    {page}
-                  </button>
-                ))}
+              <div className="flex justify-center gap-2 border-t border-ink-100 p-4">
+                {paginationButtons}
               </div>
             )}
           </div>
-        )}
-
-        {/* Vue grille */}
-        {viewMode === 'grid' && (
+        ) : (
+          /* Vue grille */
           <div>
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-              gap: '1rem'
-            }}>
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(300px,1fr))] gap-4">
               {currentUsers.map((user) => (
-                <div
+                <Card
                   key={user.id}
-                  style={{
-                    backgroundColor: 'white',
-                    borderRadius: '0.5rem',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-                    padding: '1.5rem',
-                    position: 'relative',
-                    transition: 'transform 0.2s, box-shadow 0.2s'
-                  }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-2px)';
-                    e.currentTarget.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
-                  }}
+                  className="flex flex-col transition-shadow hover:shadow-pop"
                 >
-                  <div style={{
-                    display: 'flex',
-                    alignItems: 'start',
-                    justifyContent: 'space-between',
-                    marginBottom: '1rem'
-                  }}>
-                    <div>
-                      <h3 style={{
-                        fontSize: '1.125rem',
-                        fontWeight: '600',
-                        color: '#111827',
-                        marginBottom: '0.25rem'
-                      }}>
+                  <div className="mb-4 flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className="mb-0.5 truncate text-lg font-bold text-ink-900">
                         {user.prenom} {user.nom}
                       </h3>
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        color: '#6B7280',
-                        fontSize: '0.875rem'
-                      }}>
-                        <Mail size={16} />
-                        {user.email}
+                      <div className="flex items-center gap-2 text-sm text-ink-500">
+                        <Mail size={16} className="flex-shrink-0 text-ink-400" aria-hidden="true" />
+                        <span className="truncate">{user.email}</span>
                       </div>
                     </div>
-                    <span style={{
-                      padding: '0.25rem 0.75rem',
-                      borderRadius: '9999px',
-                      fontSize: '0.75rem',
-                      fontWeight: '500',
-                      backgroundColor: user.role === 'admin' ? '#EBF5FF' : '#F0FDF4',
-                      color: user.role === 'admin' ? '#2563EB' : '#16A34A'
-                    }}>
+                    <Badge tone={user.role === 'admin' ? 'primary' : 'success'}>
                       {user.role === 'admin' ? 'Administrateur' : 'Médecin'}
-                    </span>
+                    </Badge>
                   </div>
 
-                  <div style={{
-                    borderTop: '1px solid #E5E7EB',
-                    paddingTop: '1rem',
-                    display: 'flex',
-                    justifyContent: 'flex-end'
-                  }}>
-                    <button
+                  <div className="mt-auto flex justify-end border-t border-ink-100 pt-4">
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      icon={<Trash2 size={16} aria-hidden="true" />}
                       onClick={() => handleDeleteClick(user)}
-                      style={{
-                        padding: '0.5rem 1rem',
-                        borderRadius: '0.375rem',
-                        border: '1px solid #DC2626',
-                        backgroundColor: 'white',
-                        color: '#DC2626',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        transition: 'all 0.2s'
-                      }}
-                      onMouseOver={(e) => {
-                        e.currentTarget.style.backgroundColor = '#DC2626';
-                        e.currentTarget.style.color = 'white';
-                      }}
-                      onMouseOut={(e) => {
-                        e.currentTarget.style.backgroundColor = 'white';
-                        e.currentTarget.style.color = '#DC2626';
-                      }}
                     >
-                      <Trash2 size={16} />
-              Supprimer
-                    </button>
+                      Supprimer
+                    </Button>
                   </div>
-                </div>
+                </Card>
               ))}
             </div>
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <div style={{
-                padding: '1rem',
-                display: 'flex',
-                justifyContent: 'center',
-                gap: '0.5rem',
-                marginTop: '2rem'
-              }}>
-                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                  <button
-                    key={page}
-                    onClick={() => setCurrentPage(page)}
-                    style={{
-                      padding: '0.5rem 1rem',
-                      borderRadius: '0.375rem',
-                      border: '1px solid #E5E7EB',
-                      backgroundColor: currentPage === page ? '#2563EB' : 'white',
-                      color: currentPage === page ? 'white' : '#374151',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      minWidth: '2.5rem',
-                      fontWeight: currentPage === page ? '600' : '400'
-                    }}
-                    onMouseOver={(e) => {
-                      if (currentPage !== page) {
-                        e.currentTarget.style.backgroundColor = '#F3F4F6';
-                      }
-                    }}
-                    onMouseOut={(e) => {
-                      if (currentPage !== page) {
-                        e.currentTarget.style.backgroundColor = 'white';
-                      }
-                    }}
-                  >
-                    {page}
-                  </button>
-                ))}
+              <div className="mt-8 flex justify-center gap-2">
+                {paginationButtons}
               </div>
             )}
           </div>
@@ -650,191 +404,82 @@ function GestionUtilisateurs() {
       </main>
 
       {/* Modal d'ajout d'utilisateur */}
-      {showAddForm && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 50
-        }}>
-          <div style={{
-            backgroundColor: 'white',
-            borderRadius: '0.5rem',
-            padding: '2rem',
-            width: '90%',
-            maxWidth: '500px',
-            position: 'relative'
-          }}>
-            <button
-              onClick={() => setShowAddForm(false)}
-              style={{
-                position: 'absolute',
-                top: '1rem',
-                right: '1rem',
-                padding: '0.5rem',
-                border: 'none',
-                backgroundColor: 'transparent',
-                cursor: 'pointer'
-              }}
+      <Modal
+        open={showAddForm}
+        onClose={() => setShowAddForm(false)}
+        title="Ajouter un utilisateur"
+        size="md"
+      >
+        <form onSubmit={handleAddUser}>
+          {error && (
+            <Alert kind="error" className="mb-4">
+              {error}
+            </Alert>
+          )}
+
+          <FormField
+            label="Nom"
+            type="text"
+            name="nom"
+            value={newUser.nom}
+            onChange={handleInputChange}
+            required
+          />
+
+          <FormField
+            label="Prénom"
+            type="text"
+            name="prenom"
+            value={newUser.prenom}
+            onChange={handleInputChange}
+            required
+          />
+
+          <FormField
+            label="Email"
+            type="email"
+            name="email"
+            value={newUser.email}
+            onChange={handleInputChange}
+            required
+          />
+
+          <div className="mb-4">
+            <label
+              htmlFor="new-user-role"
+              className="mb-1.5 block text-sm font-semibold text-ink-700"
             >
-              <X size={20} color="#6B7280" />
-            </button>
-
-            <h2 style={{
-              fontSize: '1.5rem',
-              fontWeight: 'bold',
-              color: '#111827',
-              marginBottom: '1.5rem'
-            }}>
-             Ajouter un utilisateur
-            </h2>
-
-            <form onSubmit={handleAddUser}>
-              <div style={{ marginBottom: '1rem' }}>
-                <label style={{
-                  display: 'block',
-                  marginBottom: '0.5rem',
-                  fontSize: '0.875rem',
-                  fontWeight: '500',
-                  color: '#374151'
-                }}>
-                 Nom
-                </label>
-                <input
-                  type="text"
-                  name="nom"
-                  value={newUser.nom}
-                  onChange={handleInputChange}
-                  required
-                  style={{
-                    width: '100%',
-                    padding: '0.5rem',
-                    borderRadius: '0.375rem',
-                    border: '1px solid #D1D5DB'
-                  }}
-                />
-              </div>
-
-              <div style={{ marginBottom: '1rem' }}>
-                <label style={{
-                  display: 'block',
-                  marginBottom: '0.5rem',
-                  fontSize: '0.875rem',
-                  fontWeight: '500',
-                  color: '#374151'
-                }}>
-                 Prénom
-                </label>
-                <input
-                  type="text"
-                  name="prenom"
-                  value={newUser.prenom}
-                  onChange={handleInputChange}
-                  required
-                  style={{
-                    width: '100%',
-                    padding: '0.5rem',
-                    borderRadius: '0.375rem',
-                    border: '1px solid #D1D5DB'
-                  }}
-                />
-              </div>
-
-              <div style={{ marginBottom: '1rem' }}>
-                <label style={{
-                  display: 'block',
-                  marginBottom: '0.5rem',
-                  fontSize: '0.875rem',
-                  fontWeight: '500',
-                  color: '#374151'
-                }}>
-                 Email
-                </label>
-                <input
-                  type="email"
-                  name="email"
-                  value={newUser.email}
-                  onChange={handleInputChange}
-                  required
-                  style={{
-                    width: '100%',
-                    padding: '0.5rem',
-                    borderRadius: '0.375rem',
-                    border: '1px solid #D1D5DB'
-                  }}
-                />
-              </div>
-
-              <div style={{ marginBottom: '1.5rem' }}>
-                <label style={{
-                  display: 'block',
-                  marginBottom: '0.5rem',
-                  fontSize: '0.875rem',
-                  fontWeight: '500',
-                  color: '#374151'
-                }}>
-                 Rôle
-                </label>
-                <select
-                  name="role"
-                  value={newUser.role}
-                  onChange={handleInputChange}
-                  style={{
-                    width: '100%',
-                    padding: '0.5rem',
-                    borderRadius: '0.375rem',
-                    border: '1px solid #D1D5DB',
-                    backgroundColor: 'white'
-                  }}
-                >
-                  <option value="medecin">Médecin</option>
-                  <option value="admin">Administrateur</option>
-                </select>
-              </div>
-
-              <div style={{
-                display: 'flex',
-                gap: '1rem',
-                justifyContent: 'flex-end'
-              }}>
-                <button
-                  type="button"
-                  onClick={() => setShowAddForm(false)}
-                  style={{
-                    padding: '0.5rem 1rem',
-                    borderRadius: '0.375rem',
-                    border: '1px solid #D1D5DB',
-                    backgroundColor: 'white',
-                    color: '#374151',
-                    cursor: 'pointer'
-                  }}
-                >
-                 Annuler
-                </button>
-                <button
-                  type="submit"
-                  style={{
-                    padding: '0.5rem 1rem',
-                    borderRadius: '0.375rem',
-                    border: 'none',
-                    backgroundColor: '#2563EB',
-                    color: 'white',
-                    cursor: 'pointer'
-                  }}
-                >
-                 Ajouter
-                </button>
-              </div>
-            </form>
+              Rôle
+            </label>
+            <Select
+              id="new-user-role"
+              name="role"
+              value={newUser.role}
+              onChange={handleInputChange}
+            >
+              <option value="medecin">Médecin</option>
+              <option value="admin">Administrateur</option>
+            </Select>
           </div>
-        </div>
-      )}
+
+          <div className="flex justify-end gap-3 pt-2">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setShowAddForm(false)}
+            >
+              Annuler
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              icon={<UserPlus size={16} aria-hidden="true" />}
+            >
+              Ajouter
+            </Button>
+          </div>
+        </form>
+      </Modal>
 
       {/* Modal de confirmation de suppression */}
       <Modal
@@ -862,12 +507,12 @@ function GestionUtilisateurs() {
           </>
         }
       >
-        <p style={{ color: '#6B7280' }}>
-         Êtes-vous sûr de vouloir supprimer l'utilisateur{' '}
-          <span style={{ fontWeight: '600' }}>
+        <p className="text-sm text-ink-600">
+          Êtes-vous sûr de vouloir supprimer l'utilisateur{' '}
+          <span className="font-semibold text-ink-900">
             {userToDelete?.prenom} {userToDelete?.nom}
           </span>
-         ? Cette action est irréversible.
+          {' '}? Cette action est irréversible.
         </p>
       </Modal>
     </div>

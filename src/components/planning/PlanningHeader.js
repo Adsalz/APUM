@@ -1,15 +1,16 @@
 // src/components/planning/PlanningHeader.js
 import React from 'react';
-import { 
-  ArrowLeft, 
-  Calendar, 
-  Save, 
-  Upload, 
-  RefreshCcw, 
-  Edit2, 
+import {
+  ArrowLeft,
+  Calendar,
+  Save,
+  Upload,
+  RefreshCcw,
+  Edit2,
   X,
   Download
 } from 'lucide-react';
+import { Button } from '../ui';
 
 const PlanningHeader = ({
   editMode,
@@ -23,172 +24,80 @@ const PlanningHeader = ({
   planning
 }) => {
   return (
-    <nav style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      backgroundColor: 'rgba(255, 255, 255, 0.95)',
-      borderBottom: '1px solid #e5e7eb',
-      boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-      zIndex: 40
-    }}>
-      <div style={{
-        maxWidth: '1280px',
-        margin: '0 auto',
-        padding: '1rem',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center'
-      }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '1rem'
-        }}>
-          <button
+    <nav className="fixed inset-x-0 top-0 z-40 border-b border-ink-200/70 bg-white/80 backdrop-blur-md">
+      <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2 px-4 py-2.5 sm:px-6">
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={<ArrowLeft size={18} aria-hidden="true" />}
             onClick={onBackClick}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              color: '#4B5563',
-              border: 'none',
-              background: 'none',
-              cursor: 'pointer',
-              padding: '0.5rem'
-            }}
           >
-            <ArrowLeft size={20} />
             Retour
-          </button>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            color: '#2563EB',
-            fontWeight: 'bold'
-          }}>
-            <Calendar size={24} />
-            <span>Gestion du planning</span>
-          </div>
+          </Button>
+          <span className="flex items-center gap-2 font-bold text-primary-700">
+            <Calendar size={20} aria-hidden="true" />
+            <span className="hidden sm:inline">Gestion du planning</span>
+          </span>
         </div>
 
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.75rem'
-        }}>
+        <div className="flex flex-wrap items-center gap-2">
           {!editMode ? (
             <>
-              <button
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={<Download size={16} aria-hidden="true" />}
                 onClick={onExportClick}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  padding: '0.5rem 1rem',
-                  backgroundColor: '#F0FDF4',
-                  border: '1px solid #16A34A',
-                  color: '#16A34A',
-                  borderRadius: '0.375rem',
-                  cursor: 'pointer'
-                }}
               >
-                <Download size={18} />
                 Exporter desiderata
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={<RefreshCcw size={16} aria-hidden="true" />}
                 onClick={onGenerateClick}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  padding: '0.5rem 1rem',
-                  backgroundColor: '#F3E8FF',
-                  border: '1px solid #9333EA',
-                  color: '#9333EA',
-                  borderRadius: '0.375rem',
-                  cursor: 'pointer'
-                }}
               >
-                <RefreshCcw size={18} />
                 {planning ? 'Regénérer' : 'Générer'}
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={<Edit2 size={16} aria-hidden="true" />}
                 onClick={onEditToggle}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  padding: '0.5rem 1rem',
-                  backgroundColor: '#EBF5FF',
-                  border: '1px solid #2563EB',
-                  color: '#2563EB',
-                  borderRadius: '0.375rem',
-                  cursor: 'pointer'
-                }}
               >
-                <Edit2 size={18} />
                 Modifier
-              </button>
+              </Button>
               {planning && (
-                <button
+                <Button
+                  variant="primary"
+                  size="sm"
+                  icon={<Upload size={16} aria-hidden="true" />}
                   onClick={onPublishClick}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    padding: '0.5rem 1rem',
-                    backgroundColor: '#ECFDF5',
-                    border: '1px solid #059669',
-                    color: '#059669',
-                    borderRadius: '0.375rem',
-                    cursor: 'pointer'
-                  }}
                 >
-                  <Upload size={18} />
                   Publier
-                </button>
+                </Button>
               )}
             </>
           ) : (
             <>
-              <button
+              <Button
+                variant="primary"
+                size="sm"
+                icon={<Save size={16} aria-hidden="true" />}
                 onClick={onSaveChanges}
                 disabled={!modified}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  padding: '0.5rem 1rem',
-                  backgroundColor: modified ? '#2563EB' : '#93C5FD',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '0.375rem',
-                  cursor: modified ? 'pointer' : 'not-allowed'
-                }}
               >
-                <Save size={18} />
                 Sauvegarder
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={<X size={16} aria-hidden="true" />}
                 onClick={onEditToggle}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  padding: '0.5rem 1rem',
-                  backgroundColor: '#F3F4F6',
-                  border: '1px solid #D1D5DB',
-                  color: '#374151',
-                  borderRadius: '0.375rem',
-                  cursor: 'pointer'
-                }}
               >
-                <X size={18} />
                 Annuler
-              </button>
+              </Button>
             </>
           )}
         </div>

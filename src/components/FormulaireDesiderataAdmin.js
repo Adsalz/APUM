@@ -1,5 +1,6 @@
 // src/components/FormulaireDesiderataAdmin.js
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { twMerge } from 'tailwind-merge';
 import { useHistory } from 'react-router-dom';
 import { getMedecins } from '../services/userService';
 import {
@@ -13,11 +14,28 @@ import logger from '../utils/logger';
 import {
   Calendar,
   Save,
-  Upload
+  Upload,
+  ChevronDown,
+  CalendarRange,
+  Sparkles,
+  Users
 } from 'lucide-react';
 import QuickFill from './QuickFill';
 import WeeklyPattern from './WeeklyPattern';
-import { AppHeader, LoadingScreen, ErrorScreen, Alert, Button, Modal } from './ui';
+import {
+  AppHeader,
+  LoadingScreen,
+  ErrorScreen,
+  Alert,
+  Button,
+  Card,
+  Modal,
+  Badge,
+  Checkbox,
+  Select,
+  FormField,
+  useToast
+} from './ui';
 import { useAuth } from '../contexts/AuthContext';
 
 const creneaux = [
@@ -31,6 +49,13 @@ const creneaux = [
 
 const options = ['Oui', 'Possible', 'Non'];
 
+// Habillage coloré du sélecteur de choix selon la valeur
+const choiceStyles = {
+  Oui: 'border-success-300 bg-success-50 text-success-700 focus:ring-success-500/30',
+  Possible: 'border-warning-300 bg-warning-50 text-warning-700 focus:ring-warning-500/30',
+  Non: 'border-danger-300 bg-danger-50 text-danger-700 focus:ring-danger-500/30',
+  '': 'border-ink-200 bg-white text-ink-400 focus:ring-primary-500/25'
+};
 
 function FormulaireDesiderataAdmin() {
   // États
@@ -46,31 +71,12 @@ function FormulaireDesiderataAdmin() {
   const [error, setError] = useState(null);
   const [existingDesiderataId, setExistingDesiderataId] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [feedback, setFeedback] = useState(null); // { kind, message }
   const [pendingImport, setPendingImport] = useState(null);
 
-  const feedbackTimerRef = useRef(null);
+  const fileInputRef = useRef(null);
   const history = useHistory();
   const { profile } = useAuth();
-
-  // Affichage d'un message de feedback en haut du contenu (auto-masqué après 5 s)
-  const showFeedback = useCallback((kind, message) => {
-    setFeedback({ kind, message });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    if (feedbackTimerRef.current) {
-      clearTimeout(feedbackTimerRef.current);
-    }
-    feedbackTimerRef.current = setTimeout(() => setFeedback(null), 5000);
-  }, []);
-
-  // Nettoyage du timer de feedback au démontage
-  useEffect(() => {
-    return () => {
-      if (feedbackTimerRef.current) {
-        clearTimeout(feedbackTimerRef.current);
-      }
-    };
-  }, []);
+  const toast = useToast();
 
   // Génération des dates avec correction de fuseau horaire
   const generateDates = useCallback(() => {
@@ -245,7 +251,7 @@ function FormulaireDesiderataAdmin() {
     setGardesGroupees(importedData.gardesGroupees || false);
     setRenfortsAssocies(importedData.renfortsAssocies || false);
 
-    showFeedback('success', `Desiderata importés avec succès ! ${Object.keys(importedData.desiderata).length} jours chargés.`);
+    toast.success(`Desiderata importés avec succès ! ${Object.keys(importedData.desiderata).length} jours chargés.`);
   };
 
   // Gestion de l'import de fichier JSON
@@ -257,14 +263,14 @@ function FormulaireDesiderataAdmin() {
 
     // Vérifier qu'un médecin est sélectionné
     if (!selectedMedecinId) {
-      showFeedback('warning', 'Veuillez d\'abord sélectionner un médecin');
+      toast.warning('Veuillez d\'abord sélectionner un médecin');
       event.target.value = '';
       return;
     }
 
     // Vérifier l'extension du fichier
     if (!file.name.endsWith('.json')) {
-      showFeedback('error', 'Le fichier doit être au format JSON');
+      toast.error('Le fichier doit être au format JSON');
       event.target.value = '';
       return;
     }
@@ -275,7 +281,7 @@ function FormulaireDesiderataAdmin() {
 
       // Valider la structure du JSON
       if (!importedData.desiderata || typeof importedData.desiderata !== 'object') {
-        showFeedback('error', 'Structure JSON invalide: le champ "desiderata" est manquant');
+        toast.error('Structure JSON invalide: le champ "desiderata" est manquant');
         event.target.value = '';
         return;
       }
@@ -294,7 +300,7 @@ function FormulaireDesiderataAdmin() {
 
     } catch (error) {
       logger.error('Erreur lors de l\'import du fichier:', error);
-      showFeedback('error', 'Erreur lors de la lecture du fichier JSON: ' + error.message);
+      toast.error('Erreur lors de la lecture du fichier JSON: ' + error.message);
       event.target.value = '';
     }
   };
@@ -317,7 +323,7 @@ function FormulaireDesiderataAdmin() {
     e.preventDefault();
 
     if (!selectedMedecinId) {
-      showFeedback('warning', 'Veuillez sélectionner un médecin');
+      toast.warning('Veuillez sélectionner un médecin');
       return;
     }
 
@@ -340,17 +346,17 @@ function FormulaireDesiderataAdmin() {
 
         if (existingDesiderataId) {
           await updateDesiderata(existingDesiderataId, desiderataData);
-          showFeedback('success', 'Desiderata mis à jour avec succès !');
+          toast.success('Desiderata mis à jour avec succès !');
         } else {
           await addDesiderata(selectedMedecinId, desiderataData);
-          showFeedback('success', 'Desiderata soumis avec succès !');
+          toast.success('Desiderata soumis avec succès !');
         }
         // Laisser le temps de voir le message avant de revenir au tableau de bord
         setTimeout(() => history.push('/dashboard-admin'), 1500);
       } catch (error) {
         logger.error('Erreur lors de la soumission des desiderata:', error);
         setIsSaving(false);
-        showFeedback('error', 'Une erreur est survenue lors de la soumission des desiderata: ' + error.message);
+        toast.error('Une erreur est survenue lors de la soumission des desiderata: ' + error.message);
       }
     }
   };
@@ -365,19 +371,18 @@ function FormulaireDesiderataAdmin() {
   const formatDate = (date) => {
     const days = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
     const months = ['jan', 'fév', 'mar', 'avr', 'mai', 'juin', 'juil', 'août', 'sep', 'oct', 'nov', 'déc'];
-
-    const dayOfWeek = days[date.getDay()];
-    const dayOfMonth = date.getDate().toString().padStart(2, '0');
-    const month = months[date.getMonth()];
-
-    return `${dayOfWeek} ${dayOfMonth} ${month}`;
+    return {
+      day: days[date.getDay()],
+      num: date.getDate().toString().padStart(2, '0'),
+      month: months[date.getMonth()]
+    };
   };
 
   const selectedMedecin = medecins.find(m => m.id === selectedMedecinId);
 
   // États de chargement et d'erreur
   if (loading) {
-    return <LoadingScreen />;
+    return <LoadingScreen message="Chargement des desiderata…" />;
   }
 
   if (error) {
@@ -385,37 +390,40 @@ function FormulaireDesiderataAdmin() {
   }
 
   const dates = generateDates();
+  const filledCount = Object.values(desiderata).reduce(
+    (acc, day) => acc + Object.values(day || {}).filter(Boolean).length,
+    0
+  );
+
+  const stickyLeft = 'sticky left-0 z-10';
 
   return (
-    <div style={{
-      backgroundColor: '#f3f4f6',
-      minHeight: '100vh',
-      width: '100%',
-      maxWidth: '100%',
-      overflowX: 'hidden'
-    }}>
+    <div className="min-h-screen bg-ink-100">
       {/* Menu fixe en haut */}
       <AppHeader
         backTo="/dashboard-admin"
         actions={
           <>
-            <label
-              htmlFor="file-upload"
-              className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<Upload size={16} />}
+              onClick={() => fileInputRef.current?.click()}
+              title="Importer les desiderata depuis un fichier JSON"
             >
-              <Upload size={18} aria-hidden="true" />
               <span className="hidden sm:inline">Importer JSON</span>
-            </label>
+            </Button>
             <input
-              id="file-upload"
+              ref={fileInputRef}
               type="file"
               accept=".json"
               onChange={handleFileImport}
               className="hidden"
             />
             <Button
-              variant="primary"
-              icon={<Save size={18} aria-hidden="true" />}
+              variant="success"
+              size="sm"
+              icon={<Save size={16} />}
               onClick={handleSubmit}
               disabled={!selectedMedecinId}
               loading={isSaving}
@@ -443,378 +451,255 @@ function FormulaireDesiderataAdmin() {
           </>
         }
       >
-        <p className="text-sm text-gray-600">
+        <p className="text-sm text-ink-600">
           Ce médecin a déjà des desiderata saisis. Voulez-vous les remplacer par les données importées ?
         </p>
       </Modal>
 
       {/* Contenu principal */}
-      <main style={{
-        margin: '0 auto',
-        paddingTop: '6rem',
-        width: '100%',
-        maxWidth: '1280px',
-        boxSizing: 'border-box'
-      }}>
-        {/* Message de feedback */}
-        {feedback && (
-          <Alert kind={feedback.kind} className="mb-4">
-            {feedback.message}
-          </Alert>
-        )}
+      <main className="mx-auto max-w-7xl px-4 pb-16 pt-24 sm:px-6 animate-fade-up">
+        {/* En-tête de page */}
+        <div className="mb-6">
+          <h1 className="text-2xl font-extrabold tracking-tight text-ink-900 sm:text-3xl">
+            Saisir des desiderata
+          </h1>
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-ink-500">
+            <Badge tone="primary">
+              <CalendarRange size={13} />
+              {new Date(periodeSaisie.startDate).toLocaleDateString('fr-FR')} –{' '}
+              {new Date(periodeSaisie.endDate).toLocaleDateString('fr-FR')}
+            </Badge>
+            {selectedMedecin && (
+              <>
+                <span>·</span>
+                <span>
+                  Dr {selectedMedecin.prenom} {selectedMedecin.nom} · {dates.length} jours · {filledCount} choix renseignés
+                </span>
+              </>
+            )}
+          </div>
+        </div>
 
         {/* Sélection du médecin */}
-        <div style={{
-          backgroundColor: 'white',
-          borderRadius: '0.5rem',
-          padding: '1.5rem',
-          marginBottom: '2rem',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-        }}>
-          <h2 style={{
-            fontSize: '1.25rem',
-            fontWeight: 'bold',
-            color: '#1F2937',
-            marginBottom: '1rem'
-          }}>
+        <Card className="mb-6">
+          <h2 className="mb-4 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-ink-500">
+            <Users size={15} className="text-primary-500" />
             Sélectionner un médecin
           </h2>
-          <select
+          <Select
             value={selectedMedecinId}
             onChange={(e) => setSelectedMedecinId(e.target.value)}
-            style={{
-              width: '100%',
-              maxWidth: '400px',
-              padding: '0.75rem',
-              border: '2px solid #D1D5DB',
-              borderRadius: '0.375rem',
-              backgroundColor: 'white',
-              fontSize: '1rem',
-              color: '#1F2937'
-            }}
+            className="sm:max-w-md"
           >
-            <option value="">-- Choisir un médecin --</option>
+            <option value="">— Choisir un médecin —</option>
             {medecins.map(medecin => (
               <option key={medecin.id} value={medecin.id}>
                 Dr {medecin.prenom} {medecin.nom}
               </option>
             ))}
-          </select>
+          </Select>
           {selectedMedecin && (
-            <div>
-              <p style={{ marginTop: '0.5rem', color: '#059669', fontSize: '0.875rem' }}>
-                {existingDesiderataId ?
-                  '✓ Ce médecin a déjà saisi des desiderata. Vous pouvez les modifier.' :
-                  'Aucun desiderata existant pour ce médecin.'}
-              </p>
-              <p style={{
-                marginTop: '0.5rem',
-                fontSize: '0.75rem',
-                color: '#6B7280'
-              }}>
+            <div className="mt-4 space-y-2">
+              <Alert kind={existingDesiderataId ? 'success' : 'info'}>
+                {existingDesiderataId
+                  ? 'Ce médecin a déjà saisi des desiderata. Vous pouvez les modifier.'
+                  : 'Aucun desiderata existant pour ce médecin.'}
+              </Alert>
+              <p className="text-xs text-ink-500">
                 Vous pouvez importer un fichier JSON contenant les desiderata du médecin via le bouton « Importer JSON » en haut de page.
               </p>
             </div>
           )}
-        </div>
+        </Card>
 
         {/* Formulaire (affiché seulement si un médecin est sélectionné) */}
         {selectedMedecinId && periodeSaisie && (
           <>
-            {/* En-tête avec période */}
-            <div style={{
-              backgroundColor: 'white',
-              borderRadius: '0.5rem',
-              padding: '1.5rem',
-              marginBottom: '2rem',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-            }}>
-              <h2 style={{
-                fontSize: '1.25rem',
-                fontWeight: 'bold',
-                color: '#1F2937',
-                marginBottom: '1rem'
-              }}>
-                Période de saisie : du {new Date(periodeSaisie.startDate).toLocaleDateString()} au {new Date(periodeSaisie.endDate).toLocaleDateString()}
+            {/* Préférences générales */}
+            <Card className="mb-6">
+              <h2 className="mb-4 text-sm font-bold uppercase tracking-wide text-ink-500">
+                Préférences générales
               </h2>
-
-              {/* Préférences générales */}
-              <div style={{
-                display: 'grid',
-                gap: '1.5rem',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))'
-              }}>
-                <div>
-                  <label style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: '500',
-                    color: '#374151',
-                    marginBottom: '0.5rem'
-                  }}>
-                    Nombre de gardes souhaitées par mois
-                  </label>
-                  <input
-                    type="number"
-                    value={nombreGardesSouhaitees}
-                    onChange={(e) => setNombreGardesSouhaitees(parseInt(e.target.value))}
-                    min="0"
-                    style={{
-                      width: '100%',
-                      padding: '0.5rem',
-                      border: '1px solid #D1D5DB',
-                      borderRadius: '0.375rem',
-                      backgroundColor: 'white'
-                    }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: '500',
-                    color: '#374151',
-                    marginBottom: '0.5rem'
-                  }}>
-                    Maximum de gardes par semaine
-                  </label>
-                  <input
-                    type="number"
-                    value={nombreGardesMaxParSemaine}
-                    onChange={(e) => setNombreGardesMaxParSemaine(parseInt(e.target.value))}
-                    min="1"
-                    max="7"
-                    style={{
-                      width: '100%',
-                      padding: '0.5rem',
-                      border: '1px solid #D1D5DB',
-                      borderRadius: '0.375rem',
-                      backgroundColor: 'white'
-                    }}
-                  />
-                </div>
-
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem'
-                }}>
-                  <input
-                    type="checkbox"
-                    id="gardesGroupees"
-                    checked={gardesGroupees}
-                    onChange={(e) => setGardesGroupees(e.target.checked)}
-                    style={{
-                      width: '1rem',
-                      height: '1rem',
-                      borderRadius: '0.25rem',
-                      borderColor: '#D1D5DB'
-                    }}
-                  />
-                  <label
-                    htmlFor="gardesGroupees"
-                    style={{
-                      fontSize: '0.875rem',
-                      color: '#374151'
-                    }}
-                  >
-                    Gardes groupées dans un même week-end
-                  </label>
-                </div>
-
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem'
-                }}>
-                  <input
-                    type="checkbox"
-                    id="renfortsAssocies"
-                    checked={renfortsAssocies}
-                    onChange={(e) => setRenfortsAssocies(e.target.checked)}
-                    style={{
-                      width: '1rem',
-                      height: '1rem',
-                      borderRadius: '0.25rem',
-                      borderColor: '#D1D5DB'
-                    }}
-                  />
-                  <label
-                    htmlFor="renfortsAssocies"
-                    style={{
-                      fontSize: '0.875rem',
-                      color: '#374151'
-                    }}
-                  >
-                    Renforts associés à une garde
-                  </label>
-                </div>
+              <div className="grid gap-x-6 gap-y-5 sm:grid-cols-2">
+                <FormField
+                  label="Nombre de gardes souhaitées par mois"
+                  type="number"
+                  min="0"
+                  className="mb-0"
+                  value={nombreGardesSouhaitees}
+                  onChange={(e) => setNombreGardesSouhaitees(parseInt(e.target.value))}
+                />
+                <FormField
+                  label="Maximum de gardes par semaine"
+                  type="number"
+                  min="1"
+                  max="7"
+                  className="mb-0"
+                  value={nombreGardesMaxParSemaine}
+                  onChange={(e) => setNombreGardesMaxParSemaine(parseInt(e.target.value))}
+                />
+                <Checkbox
+                  checked={gardesGroupees}
+                  onChange={setGardesGroupees}
+                  label="Gardes groupées dans un même week-end"
+                />
+                <Checkbox
+                  checked={renfortsAssocies}
+                  onChange={setRenfortsAssocies}
+                  label="Renforts associés à une garde"
+                />
               </div>
-            </div>
+            </Card>
 
             {/* Outils de remplissage */}
-            <div style={{
-              display: 'grid',
-              gap: '2rem',
-              marginBottom: '2rem',
-              gridTemplateColumns: '1fr',
-              padding: '0 1rem',
-              maxWidth: '100%',
-              boxSizing: 'border-box',
-              margin: '0 auto 2rem'
-            }}>
-              <div style={{ width: '100%', maxWidth: '100%', overflow: 'hidden' }}>
-                <QuickFill
-                  creneaux={creneaux}
-                  onApply={handleQuickFill}
-                  periodeSaisie={periodeSaisie}
-                />
-              </div>
-
-              <div style={{ width: '100%', maxWidth: '100%', overflow: 'hidden' }}>
-                <WeeklyPattern
-                  creneaux={creneaux}
-                  onApplyPattern={handleApplyPattern}
-                  periodeSaisie={periodeSaisie}
-                />
-              </div>
+            <div className="mb-6 grid gap-4">
+              <QuickFill
+                creneaux={creneaux}
+                onApply={handleQuickFill}
+                periodeSaisie={periodeSaisie}
+              />
+              <WeeklyPattern
+                creneaux={creneaux}
+                onApplyPattern={handleApplyPattern}
+                periodeSaisie={periodeSaisie}
+              />
             </div>
 
             {/* Tableau des desiderata */}
-            <div style={{
-              backgroundColor: 'white',
-              borderRadius: '0.5rem',
-              padding: '1.5rem',
-              boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-              overflowX: 'auto'
-            }}>
-              <table style={{
-                width: '100%',
-                borderCollapse: 'collapse',
-                fontSize: '0.875rem'
-              }}>
-                <thead>
-                  <tr>
-                    <th style={{
-                      padding: '0.75rem',
-                      backgroundColor: 'white',
-                      borderBottom: '1px solid #E5E7EB',
-                      textAlign: 'left',
-                      fontWeight: '600',
-                      position: 'sticky',
-                      left: 0,
-                      zIndex: 10
-                    }}>
-                      Date
-                    </th>
-                    {creneaux.map(creneau => (
-                      <th key={creneau.id} style={{
-                        padding: '0.75rem',
-                        backgroundColor: '#F3F4F6',
-                        borderBottom: '1px solid #E5E7EB',
-                        textAlign: 'left',
-                        fontWeight: '600',
-                        minWidth: '150px'
-                      }}>
-                        <div>{creneau.label}</div>
-                        <div style={{
-                          fontSize: '0.75rem',
-                          color: '#6B7280',
-                          fontWeight: 'normal'
-                        }}>
-                          {creneau.hours}
-                        </div>
-                        <div style={{
-                          fontSize: '0.75rem',
-                          color: '#6B7280',
-                          fontWeight: 'normal'
-                        }}>
-                          {creneau.medecins} médecin{creneau.medecins > 1 ? 's' : ''}
-                        </div>
+            <Card className="overflow-hidden p-0">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-ink-100 px-5 py-4">
+                <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-ink-500">
+                  <Sparkles size={15} className="text-primary-500" />
+                  Disponibilités par créneau
+                </h2>
+                {/* Légende */}
+                <div className="flex items-center gap-3 text-xs font-semibold">
+                  <span className="inline-flex items-center gap-1.5 text-success-700">
+                    <span className="h-2.5 w-2.5 rounded-full bg-success-400" /> Oui
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 text-warning-700">
+                    <span className="h-2.5 w-2.5 rounded-full bg-warning-400" /> Possible
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 text-danger-700">
+                    <span className="h-2.5 w-2.5 rounded-full bg-danger-400" /> Non
+                  </span>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse text-sm">
+                  <thead>
+                    <tr>
+                      <th className={twMerge(
+                        'bg-ink-50 px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-ink-500',
+                        'sticky left-0 top-0 z-30 border-b border-ink-200'
+                      )}>
+                        Date
                       </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {dates.map(date => {
-                    const isHighlighted = isWeekendOrHoliday(date);
-                    const dateString = date.toISOString().split('T')[0];
-                    return (
-                      <tr key={dateString} style={{
-                        backgroundColor: isHighlighted ? '#F3F4F6' : 'white'
-                      }}>
-                        <td style={{
-                          padding: '0.75rem',
-                          borderBottom: '1px solid #E5E7EB',
-                          fontWeight: '500',
-                          position: 'sticky',
-                          left: 0,
-                          backgroundColor: isHighlighted ? '#F3F4F6' : 'white',
-                          zIndex: 10
-                        }}>
-                          {formatDate(date)}
-                        </td>
-                        {creneaux.map(creneau => (
-                          <td key={`${dateString}-${creneau.id}`} style={{
-                            padding: '0.75rem',
-                            borderBottom: '1px solid #E5E7EB'
-                          }}>
-                            {(!creneau.samediOnly || date.getDay() === 6) && (
-                              <select
-                                value={desiderata[dateString]?.[creneau.id] || ''}
-                                onChange={(e) => handleDesiderataChange(dateString, creneau.id, e.target.value)}
-                                style={{
-                                  width: '100%',
-                                  padding: '0.5rem',
-                                  border: '1px solid #D1D5DB',
-                                  borderRadius: '0.375rem',
-                                  backgroundColor: 'white',
-                                  color: (() => {
-                                    const value = desiderata[dateString]?.[creneau.id];
-                                    switch(value) {
-                                    case 'Oui': return '#059669';
-                                    case 'Possible': return '#D97706';
-                                    case 'Non': return '#DC2626';
-                                    default: return '#6B7280';
-                                    }
-                                  })()
-                                }}
-                              >
-                                <option value="">Sélectionnez</option>
-                                {options.map(option => (
-                                  <option
-                                    key={option}
-                                    value={option}
-                                  >
-                                    {option}
-                                  </option>
-                                ))}
-                              </select>
-                            )}
+                      {creneaux.map(creneau => (
+                        <th key={creneau.id} className="sticky top-0 z-20 min-w-[150px] border-b border-l border-ink-100 bg-ink-50 px-4 py-3 text-left">
+                          <div className="font-bold text-ink-800">{creneau.label}</div>
+                          <div className="text-xs font-medium text-ink-400">{creneau.hours}</div>
+                          <div className="text-[11px] text-ink-400">
+                            {creneau.medecins} médecin{creneau.medecins > 1 ? 's' : ''}
+                          </div>
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dates.map(date => {
+                      const isHighlighted = isWeekendOrHoliday(date);
+                      const dateString = date.toISOString().split('T')[0];
+                      const rowBg = isHighlighted ? 'bg-primary-50/40' : 'bg-white';
+                      const d = formatDate(date);
+                      return (
+                        <tr key={dateString} className={twMerge('group', rowBg)}>
+                          <td className={twMerge(
+                            'border-b border-ink-100 px-4 py-2.5 font-semibold',
+                            stickyLeft, rowBg
+                          )}>
+                            <span className="flex items-baseline gap-1.5">
+                              <span className={twMerge(
+                                'text-xs font-bold uppercase',
+                                isHighlighted ? 'text-primary-600' : 'text-ink-400'
+                              )}>
+                                {d.day}
+                              </span>
+                              <span className="text-ink-900">{d.num}</span>
+                              <span className="text-xs text-ink-400">{d.month}</span>
+                            </span>
                           </td>
-                        ))}
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                          {creneaux.map(creneau => {
+                            const value = desiderata[dateString]?.[creneau.id] || '';
+                            const disabled = creneau.samediOnly && date.getDay() !== 6;
+                            return (
+                              <td key={`${dateString}-${creneau.id}`} className="border-b border-l border-ink-100 px-3 py-2">
+                                {!disabled ? (
+                                  <div className="relative">
+                                    <select
+                                      value={value}
+                                      onChange={(e) => handleDesiderataChange(dateString, creneau.id, e.target.value)}
+                                      className={twMerge(
+                                        'w-full appearance-none rounded-lg border py-1.5 pl-2.5 pr-7 text-sm font-semibold shadow-sm transition-colors focus:outline-none focus:ring-2',
+                                        choiceStyles[value] || choiceStyles['']
+                                      )}
+                                    >
+                                      <option value="">—</option>
+                                      {options.map(option => (
+                                        <option key={option} value={option}>{option}</option>
+                                      ))}
+                                    </select>
+                                    <ChevronDown
+                                      size={14}
+                                      aria-hidden="true"
+                                      className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 opacity-60"
+                                    />
+                                  </div>
+                                ) : (
+                                  <span className="block text-center text-xs text-ink-300">—</span>
+                                )}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+
+            {/* Barre d'action bas de page */}
+            <div className="mt-6 flex justify-end">
+              <Button
+                variant="success"
+                size="lg"
+                onClick={handleSubmit}
+                disabled={!selectedMedecinId}
+                loading={isSaving}
+                icon={<Save size={18} />}
+              >
+                Enregistrer les desiderata
+              </Button>
             </div>
           </>
         )}
 
         {!selectedMedecinId && (
-          <div style={{
-            backgroundColor: 'white',
-            borderRadius: '0.5rem',
-            padding: '3rem',
-            boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-            textAlign: 'center',
-            color: '#6B7280'
-          }}>
-            <Calendar size={48} style={{ margin: '0 auto 1rem', opacity: 0.3 }} />
-            <p>Veuillez sélectionner un médecin pour remplir ses desiderata</p>
-          </div>
+          <Card>
+            <div className="flex flex-col items-center justify-center gap-3 px-6 py-14 text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-ink-100 text-ink-400">
+                <Calendar size={28} aria-hidden="true" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-base font-bold text-ink-800">Aucun médecin sélectionné</h3>
+                <p className="mx-auto max-w-sm text-sm text-ink-500">
+                  Veuillez sélectionner un médecin pour remplir ses desiderata.
+                </p>
+              </div>
+            </div>
+          </Card>
         )}
       </main>
     </div>

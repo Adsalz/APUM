@@ -13,8 +13,7 @@ import {
 } from '../../services/planningService';
 import { genererPlanning, creneaux } from '../../utils/planningGenerator';
 import { genererPlanningPriorite } from '../../utils/planningGeneratorPriorite';
-import { AlertTriangle, Check } from 'lucide-react';
-import { LoadingScreen } from '../ui';
+import { LoadingScreen, Alert } from '../ui';
 import logger from '../../utils/logger';
 
 // Import des sous-composants
@@ -242,7 +241,7 @@ function GestionPlanning({ _isAdmin = true }) {
   }
 
   return (
-    <div style={{ backgroundColor: '#f3f4f6', minHeight: '100vh' }}>
+    <div className="min-h-screen bg-ink-50">
       {/* En-tête */}
       <PlanningHeader
         editMode={editMode}
@@ -257,52 +256,15 @@ function GestionPlanning({ _isAdmin = true }) {
       />
 
       {/* Notifications */}
-      {error && (
-        <div style={{
-          position: 'fixed',
-          top: '1rem',
-          right: '1rem',
-          backgroundColor: '#FEE2E2',
-          color: '#DC2626',
-          padding: '1rem',
-          borderRadius: '0.5rem',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem',
-          zIndex: 50,
-          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-        }}>
-          <AlertTriangle size={20} />
-          {error}
-        </div>
-      )}
-
-      {success && (
-        <div style={{
-          position: 'fixed',
-          top: '1rem',
-          right: '1rem',
-          backgroundColor: '#DCFCE7',
-          color: '#16A34A',
-          padding: '1rem',
-          borderRadius: '0.5rem',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem',
-          zIndex: 50,
-          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-        }}>
-          <Check size={20} />
-          {success}
+      {(error || success) && (
+        <div className="fixed right-4 top-20 z-50 flex w-full max-w-sm flex-col gap-2 px-4 sm:px-0">
+          {error && <Alert kind="error">{error}</Alert>}
+          {success && <Alert kind="success">{success}</Alert>}
         </div>
       )}
 
       {/* Contenu principal */}
-      <main style={{
-        maxWidth: '1280px',
-        margin: '0 auto',
-        padding: '6rem 1rem 2rem'
-      }}>
+      <main className="mx-auto max-w-7xl px-4 pb-8 pt-24 sm:px-6 animate-fade-up">
         {/* Statistiques */}
         <PlanningStatistics
           medecins={medecins}

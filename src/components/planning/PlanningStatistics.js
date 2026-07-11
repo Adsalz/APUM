@@ -1,6 +1,7 @@
 // src/components/planning/PlanningStatistics.js
 import React from 'react';
 import { Users, Calendar, Clock } from 'lucide-react';
+import { StatCard, Badge } from '../ui';
 
 const PlanningStatistics = ({
   medecins,
@@ -9,142 +10,34 @@ const PlanningStatistics = ({
   publishedPlanning
 }) => {
   return (
-    <div style={{
-      display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-      gap: '1rem',
-      marginBottom: '2rem'
-    }}>
+    <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {/* Nombre de médecins */}
-      <div style={{
-        backgroundColor: 'white',
-        borderRadius: '0.5rem',
-        padding: '1.5rem',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-      }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.75rem',
-          marginBottom: '0.5rem'
-        }}>
-          <div style={{
-            backgroundColor: '#EBF5FF',
-            borderRadius: '0.5rem',
-            padding: '0.75rem',
-            color: '#2563EB'
-          }}>
-            <Users size={24} />
-          </div>
-          <h2 style={{
-            fontSize: '1rem',
-            fontWeight: '600',
-            color: '#374151'
-          }}>
-            Médecins disponibles
-          </h2>
-        </div>
-        <p style={{
-          fontSize: '1.5rem',
-          fontWeight: 'bold',
-          color: '#2563EB'
-        }}>
-          {medecins.length}
-        </p>
-      </div>
+      <StatCard tone="blue" icon={<Users size={22} aria-hidden="true" />} label="Médecins disponibles">
+        <p className="text-3xl font-extrabold text-ink-900">{medecins.length}</p>
+      </StatCard>
 
       {/* Période de saisie */}
-      <div style={{
-        backgroundColor: 'white',
-        borderRadius: '0.5rem',
-        padding: '1.5rem',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-      }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.75rem',
-          marginBottom: '0.5rem'
-        }}>
-          <div style={{
-            backgroundColor: '#F0FDF4',
-            borderRadius: '0.5rem',
-            padding: '0.75rem',
-            color: '#16A34A'
-          }}>
-            <Clock size={24} />
-          </div>
-          <h2 style={{
-            fontSize: '1rem',
-            fontWeight: '600',
-            color: '#374151'
-          }}>
-            Période de saisie
-          </h2>
-        </div>
-        <p style={{
-          fontSize: '0.875rem',
-          color: periodeSaisie ? '#16A34A' : '#DC2626',
-          fontWeight: '500'
-        }}>
+      <StatCard tone="green" icon={<Clock size={22} aria-hidden="true" />} label="Période de saisie">
+        <p className={`text-sm font-semibold ${periodeSaisie ? 'text-success-600' : 'text-danger-600'}`}>
           {periodeSaisie ? (
             `Du ${new Date(periodeSaisie.startDate).toLocaleDateString()} au ${new Date(periodeSaisie.endDate).toLocaleDateString()}`
           ) : (
             'Aucune période définie'
           )}
         </p>
-      </div>
+      </StatCard>
 
       {/* État du planning */}
-      <div style={{
-        backgroundColor: 'white',
-        borderRadius: '0.5rem',
-        padding: '1.5rem',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-      }}>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.75rem',
-          marginBottom: '0.5rem'
-        }}>
-          <div style={{
-            backgroundColor: '#FFF7ED',
-            borderRadius: '0.5rem',
-            padding: '0.75rem',
-            color: '#EA580C'
-          }}>
-            <Calendar size={24} />
-          </div>
-          <h2 style={{
-            fontSize: '1rem',
-            fontWeight: '600',
-            color: '#374151'
-          }}>
-            État du planning
-          </h2>
-        </div>
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '0.25rem'
-        }}>
-          <p style={{
-            fontSize: '0.875rem',
-            color: planning ? '#16A34A' : '#DC2626',
-            fontWeight: '500'
-          }}>
+      <StatCard tone="orange" icon={<Calendar size={22} aria-hidden="true" />} label="État du planning">
+        <div className="flex flex-wrap gap-2">
+          <Badge tone={planning ? 'success' : 'danger'} dot>
             {planning ? 'Planning généré' : 'Aucun planning généré'}
-          </p>
-          <p style={{
-            fontSize: '0.875rem',
-            color: publishedPlanning ? '#16A34A' : '#DC2626',
-            fontWeight: '500'
-          }}>
+          </Badge>
+          <Badge tone={publishedPlanning ? 'success' : 'danger'} dot>
             {publishedPlanning ? 'Planning publié' : 'Non publié'}
-          </p>
+          </Badge>
         </div>
-      </div>
+      </StatCard>
     </div>
   );
 };
