@@ -73,7 +73,7 @@ function DashboardAdmin() {
         {/* Bandeau de bienvenue */}
         <div className="mb-8 overflow-hidden rounded-2xl border border-ink-800 bg-gradient-to-br from-ink-800 to-ink-950 p-6 text-white shadow-card sm:p-8">
           <p className="text-sm font-medium text-ink-300">Espace administration</p>
-          <h1 className="mt-1 text-2xl font-extrabold tracking-tight sm:text-3xl">
+          <h1 className="mt-1 text-2xl font-extrabold tracking-tight text-white sm:text-3xl">
             {profile?.prenom} {profile?.nom}
           </h1>
           <p className="mt-1 max-w-lg text-sm text-ink-300">

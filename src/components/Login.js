@@ -106,7 +106,7 @@ function Login() {
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-white/15 backdrop-blur-sm ring-1 ring-white/25">
             <Calendar className="h-8 w-8" aria-hidden="true" />
           </div>
-          <h1 className="text-2xl font-extrabold tracking-tight">Planning APUM</h1>
+          <h1 className="text-2xl font-extrabold tracking-tight text-white">Planning APUM</h1>
           <p className="mt-1 text-sm text-primary-100">
             Connectez-vous pour accéder à votre espace
           </p>
