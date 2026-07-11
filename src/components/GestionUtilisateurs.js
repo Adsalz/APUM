@@ -1,30 +1,27 @@
 // src/components/GestionUtilisateurs.js
 import React, { useState, useEffect } from 'react';
-import { useHistory } from 'react-router-dom';
-import { auth } from '../firebase';
-import { getAllUsers, createUser, deleteUser, getUser } from '../services/userService';
+import { getAllUsers, createUser, deleteUser } from '../services/userService';
 import { registerUser } from '../services/authService';
 import {
-  ArrowLeft,
   Search,
   Trash2,
-  Users,
   Grid,
   List,
   X,
   UserPlus,
   Mail
 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { AppHeader, LoadingScreen, ErrorScreen, Alert, Button, Modal } from './ui';
 import logger from '../utils/logger';
 
 function GestionUtilisateurs() {
   // États de base
   const [users, setUsers] = useState([]);
-  const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [success, setSuccess] = useState(null); // eslint-disable-line no-unused-vars
-  const history = useHistory();
+  const [success, setSuccess] = useState(null);
+  const { profile } = useAuth();
 
   // États pour le formulaire d'ajout
   const [showAddForm, setShowAddForm] = useState(false);
@@ -53,20 +50,6 @@ function GestionUtilisateurs() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const authUser = auth.currentUser;
-        if (!authUser) {
-          history.push('/');
-          return;
-        }
-
-        const userData = await getUser(authUser.uid);
-        if (!userData || userData.role !== 'admin') {
-          setError('Utilisateur non autorisé');
-          history.push('/');
-          return;
-        }
-
-        setCurrentUser(userData);
         await fetchUsers();
       } catch (error) {
         logger.error('Erreur:', error);
@@ -77,7 +60,16 @@ function GestionUtilisateurs() {
     };
 
     fetchData();
-  }, [history]);
+  }, []);
+
+  // Masquage automatique de la bannière de succès
+  useEffect(() => {
+    if (!success) {
+      return undefined;
+    }
+    const timer = setTimeout(() => setSuccess(null), 5000);
+    return () => clearTimeout(timer);
+  }, [success]);
 
   // Fonction pour récupérer les utilisateurs
   const fetchUsers = async () => {
@@ -122,7 +114,7 @@ function GestionUtilisateurs() {
     setSuccess(null);
 
     try {
-      if (!currentUser || currentUser.role !== 'admin') {
+      if (!profile || profile.role !== 'admin') {
         throw new Error('Vous n\'avez pas les permissions nécessaires pour ajouter un utilisateur.');
       }
 
@@ -166,108 +158,48 @@ function GestionUtilisateurs() {
       await fetchUsers();
       setShowConfirmDelete(false);
       setUserToDelete(null);
-      showNotification('Utilisateur supprimé avec succès');
+      setSuccess('Utilisateur supprimé avec succès');
     } catch (error) {
       logger.error('Erreur lors de la suppression:', error);
       setError('Erreur lors de la suppression de l\'utilisateur');
     }
   };
 
-  // Fonction pour afficher les notifications
-  const showNotification = (message) => {
-  // On pourrait implémenter un système de notifications plus sophistiqué ici
-    alert(message);
-  };
-
   // Si chargement en cours
   if (loading) {
+    return <LoadingScreen message="Chargement des utilisateurs..." />;
+  }
+
+  // Si le chargement initial a échoué
+  if (error && users.length === 0) {
     return (
-      <div style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#f3f4f6'
-      }}>
-      Chargement...
-      </div>
+      <ErrorScreen
+        message={error}
+        onRetry={() => {
+          setError(null);
+          setLoading(true);
+          fetchUsers().finally(() => setLoading(false));
+        }}
+      />
     );
   }
 
   return (
     <div style={{ backgroundColor: '#f3f4f6', minHeight: '100vh' }}>
       {/* Menu fixe en haut */}
-      <nav style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        backgroundColor: 'rgba(255, 255, 255, 0.95)',
-        borderBottom: '1px solid #e5e7eb',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-        zIndex: 40
-      }}>
-        <div style={{
-          maxWidth: '1280px',
-          margin: '0 auto',
-          padding: '1rem',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '1rem'
-          }}>
-            <button
-              onClick={() => history.push('/dashboard-admin')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                color: '#4B5563',
-                border: 'none',
-                background: 'none',
-                cursor: 'pointer',
-                padding: '0.5rem'
-              }}
-            >
-              <ArrowLeft size={20} />
-            Retour
-            </button>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              color: '#2563EB',
-              fontWeight: 'bold'
-            }}>
-              <Users size={24} />
-              <span>Gestion des utilisateurs</span>
-            </div>
-          </div>
-
-          <button
+      <AppHeader
+        backTo="/dashboard-admin"
+        actions={
+          <Button
+            variant="primary"
+            size="sm"
+            icon={<UserPlus size={18} aria-hidden="true" />}
             onClick={() => setShowAddForm(true)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              padding: '0.5rem 1rem',
-              backgroundColor: '#2563EB',
-              color: 'white',
-              borderRadius: '0.375rem',
-              border: 'none',
-              cursor: 'pointer',
-              fontSize: '0.875rem'
-            }}
           >
-            <UserPlus size={18} />
-          Ajouter un utilisateur
-          </button>
-        </div>
-      </nav>
+            Ajouter un utilisateur
+          </Button>
+        }
+      />
 
       {/* Contenu principal */}
       <main style={{
@@ -275,6 +207,13 @@ function GestionUtilisateurs() {
         margin: '0 auto',
         padding: '6rem 1rem 2rem'
       }}>
+        {/* Bannière de succès */}
+        {success && (
+          <Alert kind="success" className="mb-4">
+            {success}
+          </Alert>
+        )}
+
         {/* Barre d'outils */}
         <div style={{
           backgroundColor: 'white',
@@ -381,19 +320,9 @@ function GestionUtilisateurs() {
 
         {/* Affichage des erreurs */}
         {error && (
-          <div style={{
-            backgroundColor: '#FEE2E2',
-            color: '#DC2626',
-            padding: '1rem',
-            borderRadius: '0.5rem',
-            marginBottom: '1.5rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}>
-            <X size={20} />
+          <Alert kind="error" className="mb-6">
             {error}
-          </div>
+          </Alert>
         )}
 
         {/* Vue tableau */}
@@ -908,100 +837,39 @@ function GestionUtilisateurs() {
       )}
 
       {/* Modal de confirmation de suppression */}
-      {showConfirmDelete && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 50
-        }}>
-          <div style={{
-            backgroundColor: 'white',
-            borderRadius: '0.5rem',
-            padding: '2rem',
-            width: '90%',
-            maxWidth: '400px',
-            textAlign: 'center'
-          }}>
-            <div style={{
-              width: '3rem',
-              height: '3rem',
-              backgroundColor: '#FEE2E2',
-              borderRadius: '50%',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              margin: '0 auto 1rem'
-            }}>
-              <Trash2 size={24} color="#DC2626" />
-            </div>
-
-            <h2 style={{
-              fontSize: '1.25rem',
-              fontWeight: 'bold',
-              color: '#111827',
-              marginBottom: '0.5rem'
-            }}>
-             Confirmer la suppression
-            </h2>
-
-            <p style={{
-              color: '#6B7280',
-              marginBottom: '1.5rem'
-            }}>
-             Êtes-vous sûr de vouloir supprimer l'utilisateur{' '}
-              <span style={{ fontWeight: '600' }}>
-                {userToDelete?.prenom} {userToDelete?.nom}
-              </span>
-             ? Cette action est irréversible.
-            </p>
-
-            <div style={{
-              display: 'flex',
-              gap: '1rem',
-              justifyContent: 'center'
-            }}>
-              <button
-                onClick={() => {
-                  setShowConfirmDelete(false);
-                  setUserToDelete(null);
-                }}
-                style={{
-                  padding: '0.5rem 1rem',
-                  borderRadius: '0.375rem',
-                  border: '1px solid #D1D5DB',
-                  backgroundColor: 'white',
-                  color: '#374151',
-                  cursor: 'pointer',
-                  minWidth: '100px'
-                }}
-              >
-               Annuler
-              </button>
-              <button
-                onClick={handleConfirmDelete}
-                style={{
-                  padding: '0.5rem 1rem',
-                  borderRadius: '0.375rem',
-                  border: 'none',
-                  backgroundColor: '#DC2626',
-                  color: 'white',
-                  cursor: 'pointer',
-                  minWidth: '100px'
-                }}
-              >
-               Supprimer
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Modal
+        open={showConfirmDelete}
+        onClose={() => {
+          setShowConfirmDelete(false);
+          setUserToDelete(null);
+        }}
+        title="Confirmer la suppression"
+        size="sm"
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setShowConfirmDelete(false);
+                setUserToDelete(null);
+              }}
+            >
+              Annuler
+            </Button>
+            <Button variant="danger" onClick={handleConfirmDelete}>
+              Supprimer
+            </Button>
+          </>
+        }
+      >
+        <p style={{ color: '#6B7280' }}>
+         Êtes-vous sûr de vouloir supprimer l'utilisateur{' '}
+          <span style={{ fontWeight: '600' }}>
+            {userToDelete?.prenom} {userToDelete?.nom}
+          </span>
+         ? Cette action est irréversible.
+        </p>
+      </Modal>
     </div>
   );
 }
