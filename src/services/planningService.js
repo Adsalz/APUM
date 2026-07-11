@@ -13,7 +13,8 @@ import {
   getDoc,
   setDoc,
   Timestamp,
-  writeBatch
+  writeBatch,
+  deleteField
 } from 'firebase/firestore';
 import logger from '../utils/logger';
 
@@ -46,8 +47,18 @@ export const setPeriodeSaisie = async (startDate, endDate) => {
     if (!user) {
       throw new Error('Utilisateur non authentifié');
     }
-    
-    await setDoc(doc(db, PLANNING_COLLECTION, PERIODE_SAISIE_DOC), { 
+
+    // Validation des entrées
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      throw new Error('Dates de période invalides');
+    }
+    if (start > end) {
+      throw new Error('La date de début doit être antérieure à la date de fin');
+    }
+
+    await setDoc(doc(db, PLANNING_COLLECTION, PERIODE_SAISIE_DOC), {
       startDate: convertToTimestamp(startDate),
       endDate: convertToTimestamp(endDate)
     });
@@ -67,16 +78,19 @@ const deleteObsoleteDesiderata = async (newStartDate, newEndDate) => {
     const q = query(desiderataRef);
     const querySnapshot = await getDocs(q);
 
-    const batch = writeBatch(db);
-    querySnapshot.forEach((doc) => {
-      const desiderata = doc.data();
-      if (isDesiderataObsolete(desiderata, newStartDate, newEndDate)) {
-        batch.delete(doc.ref);
-      }
-    });
+    // Firestore limite un batch à 500 opérations : on découpe par lots de 450
+    const toDelete = querySnapshot.docs.filter((d) =>
+      isDesiderataObsolete(d.data(), newStartDate, newEndDate)
+    );
 
-    await batch.commit();
-    logger.debug('Desiderata obsolètes supprimés');
+    const BATCH_LIMIT = 450;
+    for (let i = 0; i < toDelete.length; i += BATCH_LIMIT) {
+      const batch = writeBatch(db);
+      toDelete.slice(i, i + BATCH_LIMIT).forEach((d) => batch.delete(d.ref));
+      await batch.commit();
+    }
+
+    logger.debug(`Desiderata obsolètes supprimés: ${toDelete.length}`);
   } catch (error) {
     logger.error('Erreur lors de la suppression des desiderata obsolètes:', error);
     throw error;
@@ -317,10 +331,23 @@ export const publishPlanning = async (planningId) => {
     if (!user) {
       throw new Error('Utilisateur non authentifié');
     }
+
+    // Dé-publier les plannings précédemment publiés : un seul planning
+    // « publié » à la fois (évite toute ambiguïté côté médecins)
+    const publishedQuery = query(
+      collection(db, PLANNING_COLLECTION),
+      where('publishedAt', '!=', null)
+    );
+    const publishedSnapshot = await getDocs(publishedQuery);
+    const batch = writeBatch(db);
+    publishedSnapshot.docs
+      .filter((d) => d.id !== planningId && d.id !== PERIODE_SAISIE_DOC)
+      .forEach((d) => batch.update(d.ref, { publishedAt: deleteField() }));
+
     const planningRef = doc(db, PLANNING_COLLECTION, planningId);
-    await updateDoc(planningRef, {
-      publishedAt: Timestamp.now()
-    });
+    batch.update(planningRef, { publishedAt: Timestamp.now() });
+
+    await batch.commit();
   } catch (error) {
     logger.error('Erreur lors de la publication du planning:', error);
     throw error;
