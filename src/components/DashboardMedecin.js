@@ -1,10 +1,10 @@
 // src/components/DashboardMedecin.js
 import React, { useState, useEffect } from 'react';
 import { useHistory } from 'react-router-dom';
-import { ClipboardList, Calendar } from 'lucide-react';
+import { ClipboardList, CalendarDays, FileText } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { getDesiderataByUser } from '../services/planningService';
-import { AppHeader, ActionCard, Card, ErrorScreen, LoadingScreen } from './ui';
+import { AppHeader, ActionCard, Card, EmptyState, ErrorScreen, LoadingScreen } from './ui';
 import logger from '../utils/logger';
 
 function DashboardMedecin() {
@@ -58,62 +58,74 @@ function DashboardMedecin() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-ink-100">
       <AppHeader />
 
-      <main className="mx-auto max-w-7xl px-4 pb-8 pt-24">
-        {/* Carte de bienvenue */}
-        <Card className="mb-8">
-          <h1 className="mb-1 text-2xl font-bold text-gray-900 sm:text-3xl">
-            Bienvenue, Dr {profile?.nom}
+      <main className="mx-auto max-w-5xl px-4 pb-12 pt-24 sm:px-6 animate-fade-up">
+        {/* Bandeau de bienvenue */}
+        <div className="mb-8 overflow-hidden rounded-2xl border border-primary-100 bg-gradient-to-br from-primary-600 to-primary-800 p-6 text-white shadow-card sm:p-8">
+          <p className="text-sm font-medium text-primary-100">Bonjour 👋</p>
+          <h1 className="mt-1 text-2xl font-extrabold tracking-tight sm:text-3xl">
+            Dr {profile?.prenom} {profile?.nom}
           </h1>
-          <p className="text-gray-500">
-            Gérez vos gardes et consultez le planning depuis votre tableau de bord
+          <p className="mt-1 max-w-md text-sm text-primary-100">
+            Gérez vos gardes et consultez le planning publié depuis votre espace.
           </p>
-        </Card>
+        </div>
 
         {/* Actions principales */}
-        <Card className="mb-8">
-          <h2 className="mb-4 text-lg font-semibold text-gray-900">
-            Actions principales
-          </h2>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <ActionCard
-              tone="purple"
-              icon={<ClipboardList size={24} />}
-              title="Saisir desiderata"
-              description="Indiquez vos disponibilités"
-              onClick={() => history.push('/formulaire-desirata')}
-            />
-            <ActionCard
-              tone="green"
-              icon={<Calendar size={24} />}
-              title="Voir planning"
-              description="Consultez le planning publié"
-              onClick={() => history.push('/planning-visualisation')}
-            />
-          </div>
-        </Card>
+        <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-ink-500">
+          Actions principales
+        </h2>
+        <div className="mb-8 grid gap-4 sm:grid-cols-2">
+          <ActionCard
+            tone="blue"
+            icon={<ClipboardList size={22} />}
+            title="Saisir mes desiderata"
+            description="Indiquez vos disponibilités"
+            onClick={() => history.push('/formulaire-desirata')}
+          />
+          <ActionCard
+            tone="green"
+            icon={<CalendarDays size={22} />}
+            title="Voir le planning"
+            description="Consultez le planning publié"
+            onClick={() => history.push('/planning-visualisation')}
+          />
+        </div>
 
         {/* Derniers desiderata */}
-        <Card className="mx-auto max-w-3xl">
-          <h2 className="mb-4 text-lg font-semibold text-gray-900">
-            Derniers desiderata
+        <Card className="p-0">
+          <h2 className="border-b border-ink-100 px-6 py-4 text-sm font-bold uppercase tracking-wide text-ink-500">
+            Mes desiderata enregistrés
           </h2>
           {desiderata.length > 0 ? (
-            <ul className="flex flex-col gap-2">
+            <ul className="divide-y divide-ink-100">
               {desiderata.map((d, index) => (
                 <li
                   key={d.id || index}
-                  className="rounded-md bg-gray-50 p-3 text-sm text-gray-700"
+                  className="flex items-center gap-3 px-6 py-3.5 text-sm text-ink-700"
                 >
-                  Pour la période du {new Date(d.startDate).toLocaleDateString('fr-FR')} au{' '}
-                  {new Date(d.endDate).toLocaleDateString('fr-FR')}
+                  <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary-50 text-primary-600">
+                    <FileText size={17} />
+                  </span>
+                  Période du{' '}
+                  <span className="font-semibold text-ink-900">
+                    {new Date(d.startDate).toLocaleDateString('fr-FR')}
+                  </span>{' '}
+                  au{' '}
+                  <span className="font-semibold text-ink-900">
+                    {new Date(d.endDate).toLocaleDateString('fr-FR')}
+                  </span>
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="text-sm text-gray-500">Aucun desiderata saisi</p>
+            <EmptyState
+              icon={<ClipboardList size={24} />}
+              title="Aucun desiderata saisi"
+              description="Commencez par indiquer vos disponibilités pour la période en cours."
+            />
           )}
         </Card>
       </main>

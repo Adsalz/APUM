@@ -96,15 +96,18 @@ function Login() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-100 p-6">
-      <Card className="w-full max-w-sm p-0">
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-ink-100 p-6">
+      {/* Halo d'ambiance en arrière-plan */}
+      <div className="pointer-events-none absolute -top-32 left-1/2 h-96 w-[42rem] -translate-x-1/2 rounded-full bg-primary-200/40 blur-3xl" />
+
+      <Card className="relative w-full max-w-sm overflow-hidden p-0 shadow-elevated animate-fade-up">
         {/* En-tête */}
-        <div className="rounded-t-lg border-b border-gray-200 bg-primary-50 p-6 text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-primary-100">
-            <Calendar className="h-8 w-8 text-primary-600" aria-hidden="true" />
+        <div className="border-b border-ink-100 bg-gradient-to-br from-primary-600 to-primary-800 p-8 text-center text-white">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-white/15 backdrop-blur-sm ring-1 ring-white/25">
+            <Calendar className="h-8 w-8" aria-hidden="true" />
           </div>
-          <h1 className="mb-1 text-2xl font-bold text-primary-600">Planning APUM</h1>
-          <p className="text-sm text-gray-500">
+          <h1 className="text-2xl font-extrabold tracking-tight">Planning APUM</h1>
+          <p className="mt-1 text-sm text-primary-100">
             Connectez-vous pour accéder à votre espace
           </p>
         </div>
@@ -131,7 +134,7 @@ function Login() {
           <button
             type="button"
             onClick={() => setShowResetModal(true)}
-            className="mb-4 w-full text-center text-sm text-primary-600 hover:underline"
+            className="mb-4 w-full text-center text-sm font-semibold text-primary-600 hover:text-primary-700 hover:underline"
           >
             Mot de passe oublié ?
           </button>

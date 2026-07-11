@@ -1,7 +1,25 @@
 // src/components/WeeklyPattern.js
 import React, { useState } from 'react';
-import { Calendar, Copy, ChevronDown, ChevronUp } from 'lucide-react';
-import { Alert } from './ui';
+import { twMerge } from 'tailwind-merge';
+import { CalendarRange, Copy, ChevronDown, CalendarDays } from 'lucide-react';
+import { Alert, Button } from './ui';
+
+const jours = [
+  { id: '1', label: 'Lundi' },
+  { id: '2', label: 'Mardi' },
+  { id: '3', label: 'Mercredi' },
+  { id: '4', label: 'Jeudi' },
+  { id: '5', label: 'Vendredi' },
+  { id: '6', label: 'Samedi' },
+  { id: '0', label: 'Dimanche' }
+];
+
+const choiceStyles = {
+  Oui: 'border-success-300 bg-success-50 text-success-700 focus:ring-success-500/30',
+  Possible: 'border-warning-300 bg-warning-50 text-warning-700 focus:ring-warning-500/30',
+  Non: 'border-danger-300 bg-danger-50 text-danger-700 focus:ring-danger-500/30',
+  '': 'border-ink-200 bg-white text-ink-400 focus:ring-primary-500/25'
+};
 
 function WeeklyPattern({ creneaux, onApplyPattern, periodeSaisie }) {
   const [startDate, setStartDate] = useState('');
@@ -9,26 +27,10 @@ function WeeklyPattern({ creneaux, onApplyPattern, periodeSaisie }) {
   const [pattern, setPattern] = useState({});
   const [isExpanded, setIsExpanded] = useState(false);
   const [validationError, setValidationError] = useState('');
- 
-  const jours = [
-    { id: '1', label: 'Lundi' },
-    { id: '2', label: 'Mardi' },
-    { id: '3', label: 'Mercredi' },
-    { id: '4', label: 'Jeudi' },
-    { id: '5', label: 'Vendredi' },
-    { id: '6', label: 'Samedi' },
-    { id: '0', label: 'Dimanche' }
-  ];
 
   const handlePatternChange = (jour, creneau, value) => {
     setValidationError('');
-    setPattern(prev => ({
-      ...prev,
-      [jour]: {
-        ...(prev[jour] || {}),
-        [creneau]: value
-      }
-    }));
+    setPattern(prev => ({ ...prev, [jour]: { ...(prev[jour] || {}), [creneau]: value } }));
   };
 
   const handleSelectFullPeriod = () => {
@@ -40,275 +42,122 @@ function WeeklyPattern({ creneaux, onApplyPattern, periodeSaisie }) {
   };
 
   const handleApplyPattern = () => {
-    if (!startDate || !endDate) {
-      setValidationError('Veuillez sélectionner une période');
-      return;
-    }
-
-    if (Object.keys(pattern).length === 0) {
-      setValidationError('Veuillez définir au moins une préférence dans le pattern');
-      return;
-    }
-
+    if (!startDate || !endDate) {return setValidationError('Veuillez sélectionner une période');}
+    if (Object.keys(pattern).length === 0) {return setValidationError('Veuillez définir au moins une préférence dans le modèle');}
     setValidationError('');
     onApplyPattern(pattern, startDate, endDate);
   };
 
   return (
-    <div style={{
-      backgroundColor: 'white',
-      borderRadius: '8px',
-      boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-      width: '100%'
-    }}>
-      {/* En-tête avec bouton pour replier/déplier */}
+    <div className="overflow-hidden rounded-2xl border border-ink-100 bg-white shadow-card">
       <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        style={{
-          width: '100%',
-          padding: '1rem 1.5rem',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          border: 'none',
-          background: 'none',
-          cursor: 'pointer',
-          borderBottom: isExpanded ? '1px solid #E5E7EB' : 'none',
-          transition: 'background-color 0.2s',
-          borderRadius: '8px'
-        }}
+        type="button"
+        onClick={() => setIsExpanded(v => !v)}
+        className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left transition-colors hover:bg-ink-50"
+        aria-expanded={isExpanded}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <h3 style={{
-            fontSize: '1.125rem',
-            fontWeight: '600',
-            color: '#1F2937',
-            margin: 0
-          }}>
-           Pattern hebdomadaire
-          </h3>
-        </div>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          color: '#6B7280',
-          fontSize: '0.875rem',
-          gap: '0.5rem'
-        }}>
+        <span className="flex items-center gap-2.5">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-50 text-primary-600">
+            <CalendarDays size={16} />
+          </span>
+          <span className="font-bold text-ink-900">Modèle hebdomadaire</span>
+        </span>
+        <span className="flex items-center gap-1.5 text-sm font-medium text-ink-400">
           {isExpanded ? 'Replier' : 'Déplier'}
-          {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-        </div>
+          <ChevronDown size={18} className={twMerge('transition-transform', isExpanded && 'rotate-180')} />
+        </span>
       </button>
 
       {isExpanded && (
-        <div style={{ padding: '1.5rem' }}>
-          <div style={{ marginBottom: '1.5rem' }}>
-            <p style={{
-              fontSize: '0.875rem',
-              color: '#6B7280',
-              marginBottom: '1rem'
-            }}>
-             Définissez votre semaine type ci-dessous. Ce pattern sera appliqué automatiquement sur la période sélectionnée.
-            </p>
+        <div className="space-y-5 border-t border-ink-100 p-5">
+          <p className="text-sm text-ink-500">
+            Définissez votre semaine type ci-dessous. Ce modèle sera appliqué automatiquement sur la période sélectionnée.
+          </p>
 
-            {/* Table du pattern */}
-            <div style={{ 
-              overflowX: 'auto',
-              marginBottom: '1.5rem',
-              maxWidth: '100%'
-            }}>
-              <table style={{
-                width: '100%',
-                borderCollapse: 'collapse',
-                fontSize: '0.875rem',
-                minWidth: '600px'
-              }}>
-                <thead>
-                  <tr>
-                    <th style={{
-                      padding: '0.75rem',
-                      backgroundColor: '#F3F4F6',
-                      borderBottom: '1px solid #E5E7EB',
-                      textAlign: 'left',
-                      fontWeight: '600',
-                      minWidth: '100px'
-                    }}>
-                     Jour
+          <div className="overflow-x-auto rounded-xl border border-ink-100">
+            <table className="w-full min-w-[640px] border-collapse text-sm">
+              <thead>
+                <tr>
+                  <th className="border-b border-ink-100 bg-ink-50 px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wide text-ink-500">
+                    Jour
+                  </th>
+                  {creneaux.map(creneau => (
+                    <th key={creneau.id} className="border-b border-l border-ink-100 bg-ink-50 px-4 py-2.5 text-left">
+                      <div className="font-bold text-ink-800">{creneau.label}</div>
+                      <div className="text-xs font-medium text-ink-400">{creneau.hours}</div>
                     </th>
-                    {creneaux.map(creneau => (
-                      <th key={creneau.id} style={{
-                        padding: '0.75rem',
-                        backgroundColor: '#F3F4F6',
-                        borderBottom: '1px solid #E5E7EB',
-                        textAlign: 'left',
-                        fontWeight: '600'
-                      }}>
-                        <div>{creneau.label}</div>
-                        <div style={{ fontSize: '0.75rem', color: '#6B7280' }}>{creneau.hours}</div>
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {jours.map(jour => (
-                    <tr key={jour.id}>
-                      <td style={{
-                        padding: '0.75rem',
-                        borderBottom: '1px solid #E5E7EB',
-                        fontWeight: '500'
-                      }}>
-                        {jour.label}
-                      </td>
-                      {creneaux.map(creneau => (
-                        <td key={creneau.id} style={{
-                          padding: '0.75rem',
-                          borderBottom: '1px solid #E5E7EB'
-                        }}>
-                          {(!creneau.samediOnly || jour.id === '6') && (
-                            <select
-                              value={pattern[jour.id]?.[creneau.id] || ''}
-                              onChange={(e) => handlePatternChange(jour.id, creneau.id, e.target.value)}
-                              style={{
-                                width: '100%',
-                                padding: '0.5rem',
-                                border: '1px solid #D1D5DB',
-                                borderRadius: '0.375rem',
-                                backgroundColor: 'white'
-                              }}
-                            >
-                              <option value="">-</option>
-                              <option value="Oui">Oui</option>
-                              <option value="Possible">Possible</option>
-                              <option value="Non">Non</option>
-                            </select>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {jours.map((jour, idx) => (
+                  <tr key={jour.id} className={idx % 2 === 1 ? 'bg-ink-50/40' : 'bg-white'}>
+                    <td className="border-b border-ink-100 px-4 py-2 font-semibold text-ink-800">{jour.label}</td>
+                    {creneaux.map(creneau => {
+                      const value = pattern[jour.id]?.[creneau.id] || '';
+                      const disabled = creneau.samediOnly && jour.id !== '6';
+                      return (
+                        <td key={creneau.id} className="border-b border-l border-ink-100 px-3 py-2">
+                          {!disabled ? (
+                            <div className="relative">
+                              <select
+                                value={value}
+                                onChange={(e) => handlePatternChange(jour.id, creneau.id, e.target.value)}
+                                className={twMerge(
+                                  'w-full appearance-none rounded-lg border py-1.5 pl-2.5 pr-7 text-sm font-semibold shadow-sm transition-colors focus:outline-none focus:ring-2',
+                                  choiceStyles[value] || choiceStyles['']
+                                )}
+                              >
+                                <option value="">—</option>
+                                <option value="Oui">Oui</option>
+                                <option value="Possible">Possible</option>
+                                <option value="Non">Non</option>
+                              </select>
+                              <ChevronDown size={14} aria-hidden="true" className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 opacity-60" />
+                            </div>
+                          ) : (
+                            <span className="block text-center text-xs text-ink-300">—</span>
                           )}
                         </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Période */}
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <div className="flex-1">
+              <span className="mb-1 block text-xs text-ink-500">Du</span>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => { setValidationError(''); setStartDate(e.target.value); }}
+                className="w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
+              />
             </div>
-
-            {/* Sélection de la période */}
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '1rem',
-              marginBottom: '1.5rem'
-            }}>
-              <div style={{
-                display: 'flex',
-                flexWrap: 'wrap',
-                gap: '1rem',
-                marginBottom: '1rem'
-              }}>
-                <div style={{ minWidth: '140px', flex: 1 }}>
-                  <label style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: '500',
-                    color: '#374151',
-                    marginBottom: '0.5rem'
-                  }}>
-                   Du :
-                  </label>
-                  <input
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => {
-                      setValidationError('');
-                      setStartDate(e.target.value);
-                    }}
-                    style={{
-                      padding: '0.5rem',
-                      border: '1px solid #D1D5DB',
-                      borderRadius: '0.375rem',
-                      width: '100%'
-                    }}
-                  />
-                </div>
-                <div style={{ minWidth: '140px', flex: 1 }}>
-                  <label style={{
-                    display: 'block',
-                    fontSize: '0.875rem',
-                    fontWeight: '500',
-                    color: '#374151',
-                    marginBottom: '0.5rem'
-                  }}>
-                   Au :
-                  </label>
-                  <input
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => {
-                      setValidationError('');
-                      setEndDate(e.target.value);
-                    }}
-                    style={{
-                      padding: '0.5rem',
-                      border: '1px solid #D1D5DB',
-                      borderRadius: '0.375rem',
-                      width: '100%'
-                    }}
-                  />
-                </div>
-              </div>
-             
-              <button
-                onClick={handleSelectFullPeriod}
-                style={{
-                  padding: '0.75rem 1rem',
-                  backgroundColor: '#EBF5FF',
-                  border: '1px solid #2563EB',
-                  borderRadius: '0.375rem',
-                  color: '#2563EB',
-                  fontSize: '0.875rem',
-                  cursor: 'pointer',
-                  width: '100%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.5rem',
-                  fontWeight: '500',
-                  transition: 'all 0.2s'
-                }}
-                onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#DBEAFE'}
-                onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#EBF5FF'}
-              >
-                <Calendar size={16} />
-               Toute la période
-              </button>
+            <div className="flex-1">
+              <span className="mb-1 block text-xs text-ink-500">Au</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => { setValidationError(''); setEndDate(e.target.value); }}
+                className="w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
+              />
             </div>
+            <Button variant="secondary" icon={<CalendarRange size={16} />} onClick={handleSelectFullPeriod}>
+              Toute la période
+            </Button>
+          </div>
 
-            {/* Alerte de validation */}
-            {validationError && (
-              <Alert kind="warning" className="mb-4">
-                {validationError}
-              </Alert>
-            )}
+          {validationError && <Alert kind="warning">{validationError}</Alert>}
 
-            {/* Bouton d'application */}
-            <button
-              onClick={handleApplyPattern}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '0.5rem',
-                width: '100%',
-                padding: '0.75rem',
-                backgroundColor: '#2563EB',
-                color: 'white',
-                border: 'none',
-                borderRadius: '0.375rem',
-                fontWeight: '500',
-                cursor: 'pointer'
-              }}
-            >
-              <Copy size={18} />
-             Appliquer le pattern
-            </button>
+          <div className="flex justify-end">
+            <Button variant="primary" icon={<Copy size={16} />} onClick={handleApplyPattern}>
+              Appliquer le modèle
+            </Button>
           </div>
         </div>
       )}

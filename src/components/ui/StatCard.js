@@ -14,15 +14,15 @@ const tones = {
 /** Carte de statistique (icône + libellé + valeur). */
 function StatCard({ icon, label, tone = 'blue', children, className = '' }) {
   return (
-    <Card className={className}>
-      <div className="mb-4 flex items-center gap-3">
+    <Card className={twMerge('transition-shadow hover:shadow-elevated', className)}>
+      <div className="mb-3 flex items-center gap-3">
         <div
-          className={twMerge('rounded-lg p-3', tones[tone] || tones.blue)}
+          className={twMerge('flex h-11 w-11 items-center justify-center rounded-xl', tones[tone] || tones.blue)}
           aria-hidden="true"
         >
           {icon}
         </div>
-        <h2 className="text-lg font-semibold text-gray-900">{label}</h2>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-ink-500">{label}</h2>
       </div>
       {children}
     </Card>

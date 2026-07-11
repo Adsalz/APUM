@@ -15,7 +15,7 @@ const widths = {
  * - role="dialog" + aria-modal
  * - fermeture par Échap et clic sur l'arrière-plan
  * - verrouillage du scroll de la page
- * - focus initial sur le contenu
+ * - focus initial sur le contenu, animations d'entrée
  */
 function Modal({ open, onClose, title, size = 'md', children, footer = null }) {
   const panelRef = useRef(null);
@@ -35,7 +35,6 @@ function Modal({ open, onClose, title, size = 'md', children, footer = null }) {
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
 
-    // Focus initial dans la modale
     if (panelRef.current) {
       panelRef.current.focus();
     }
@@ -52,7 +51,7 @@ function Modal({ open, onClose, title, size = 'md', children, footer = null }) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-ink-950/50 p-4 backdrop-blur-sm animate-overlay-in"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) {
           onClose();
@@ -66,24 +65,24 @@ function Modal({ open, onClose, title, size = 'md', children, footer = null }) {
         aria-label={typeof title === 'string' ? title : undefined}
         tabIndex={-1}
         className={twMerge(
-          'flex max-h-[90vh] w-full flex-col rounded-lg bg-white shadow-xl outline-none',
+          'flex max-h-[90vh] w-full flex-col overflow-hidden rounded-2xl bg-white shadow-pop outline-none animate-scale-in',
           widths[size]
         )}
       >
-        <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-          <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
+        <div className="flex items-center justify-between gap-4 border-b border-ink-100 px-6 py-4">
+          <h2 className="text-lg font-bold text-ink-900">{title}</h2>
           <button
             type="button"
             onClick={onClose}
             aria-label="Fermer"
-            className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+            className="-mr-1 rounded-lg p-1.5 text-ink-400 transition-colors hover:bg-ink-100 hover:text-ink-600"
           >
             <X className="h-5 w-5" aria-hidden="true" />
           </button>
         </div>
-        <div className="overflow-y-auto px-6 py-4">{children}</div>
+        <div className="overflow-y-auto px-6 py-5">{children}</div>
         {footer && (
-          <div className="flex justify-end gap-3 border-t border-gray-200 px-6 py-4">
+          <div className="flex justify-end gap-3 border-t border-ink-100 bg-ink-50/60 px-6 py-4">
             {footer}
           </div>
         )}

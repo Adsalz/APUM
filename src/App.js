@@ -2,6 +2,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Route, Switch, Link } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
+import { ToastProvider } from './components/ui';
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './components/Login';
 import DashboardMedecin from './components/DashboardMedecin';
@@ -16,10 +17,14 @@ import GestionDesiderata from './components/GestionDesiderata';
 
 function NotFound() {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-gray-100 p-6 text-center">
-      <h1 className="text-3xl font-bold text-gray-900">Page introuvable</h1>
-      <p className="text-gray-600">La page demandée n'existe pas ou a été déplacée.</p>
-      <Link to="/" className="font-medium text-primary-600 hover:underline">
+    <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-ink-100 p-6 text-center">
+      <p className="text-6xl font-extrabold text-primary-600">404</p>
+      <h1 className="text-2xl font-bold text-ink-900">Page introuvable</h1>
+      <p className="text-ink-500">La page demandée n'existe pas ou a été déplacée.</p>
+      <Link
+        to="/"
+        className="mt-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-primary-700"
+      >
         Retour à l'accueil
       </Link>
     </div>
@@ -29,7 +34,8 @@ function NotFound() {
 function App() {
   return (
     <AuthProvider>
-      <Router>
+      <ToastProvider>
+        <Router>
         <Switch>
           <Route exact path="/" component={Login} />
 
@@ -83,8 +89,9 @@ function App() {
           />
 
           <Route component={NotFound} />
-        </Switch>
-      </Router>
+          </Switch>
+        </Router>
+      </ToastProvider>
     </AuthProvider>
   );
 }

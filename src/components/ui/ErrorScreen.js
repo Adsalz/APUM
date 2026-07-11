@@ -13,13 +13,13 @@ function ErrorScreen({ title = 'Une erreur est survenue', message, onRetry }) {
   const history = useHistory();
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-100 p-6">
-      <Card className="w-full max-w-md text-center">
-        <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-danger-100">
-          <AlertCircle className="h-6 w-6 text-danger-600" aria-hidden="true" />
+    <div className="flex min-h-screen items-center justify-center bg-ink-100 p-6">
+      <Card className="w-full max-w-md text-center animate-fade-up">
+        <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-danger-50">
+          <AlertCircle className="h-7 w-7 text-danger-500" aria-hidden="true" />
         </div>
-        <h1 className="mb-2 text-lg font-semibold text-gray-900">{title}</h1>
-        {message && <p className="mb-6 text-sm text-gray-600">{message}</p>}
+        <h1 className="mb-2 text-lg font-bold text-ink-900">{title}</h1>
+        {message && <p className="mb-6 text-sm text-ink-500">{message}</p>}
         <div className="flex justify-center gap-3">
           <Button variant="secondary" onClick={() => history.goBack()}>
             Retour

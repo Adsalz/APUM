@@ -23,7 +23,7 @@ function FormField({ label, error = '', hint = '', className = '', id: providedI
   return (
     <div className={twMerge('mb-4', className)}>
       {label && (
-        <label htmlFor={id} className="mb-1 block text-sm font-medium text-gray-700">
+        <label htmlFor={id} className="mb-1.5 block text-sm font-semibold text-ink-700">
           {label}
         </label>
       )}
@@ -32,15 +32,17 @@ function FormField({ label, error = '', hint = '', className = '', id: providedI
         aria-invalid={error ? 'true' : undefined}
         aria-describedby={error ? errorId : undefined}
         className={twMerge(
-          'w-full rounded-md border px-3 py-2 text-sm text-gray-800 placeholder-gray-400',
-          'focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500',
-          error ? 'border-danger-400' : 'border-gray-300'
+          'w-full rounded-lg border bg-white px-3 py-2.5 text-sm text-ink-900 placeholder-ink-400 shadow-sm',
+          'transition-colors focus:outline-none focus:ring-2',
+          error
+            ? 'border-danger-400 focus:border-danger-500 focus:ring-danger-500/25'
+            : 'border-ink-200 hover:border-ink-300 focus:border-primary-500 focus:ring-primary-500/25'
         )}
         {...inputProps}
       />
-      {hint && !error && <p className="mt-1 text-xs text-gray-500">{hint}</p>}
+      {hint && !error && <p className="mt-1.5 text-xs text-ink-500">{hint}</p>}
       {error && (
-        <p id={errorId} className="mt-1 text-sm text-danger-600">
+        <p id={errorId} className="mt-1.5 text-sm font-medium text-danger-600">
           {error}
         </p>
       )}

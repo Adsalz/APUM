@@ -3,28 +3,51 @@
 @tailwind utilities;
 
 /* ---------------------------------------------------------------------------
-   Base globale
-   Les écrans historiques portent leurs styles en inline ; on ne garde ici
-   que la base typographique, le fond, et les états de focus accessibles.
+   Fondation « Clinical Calm »
+   Base typographique, atmosphère et états de focus accessibles.
+   Les écrans portent leur mise en page via Tailwind + le design system (ui/).
 --------------------------------------------------------------------------- */
 
 @layer base {
   html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    scroll-behavior: smooth;
   }
 
   body {
-    @apply bg-gray-100 font-sans text-gray-800;
+    @apply bg-ink-100 font-sans text-ink-800;
     margin: 0;
     padding: 0;
+    /* Léger halo d'atmosphère plutôt qu'un aplat de gris */
+    background-image: radial-gradient(
+      1200px 600px at 100% -5%,
+      rgb(37 99 235 / 0.05),
+      transparent 60%
+    );
+    background-attachment: fixed;
   }
 
-  /* État de focus visible au clavier sur toute l'application */
+  /* Chiffres à chasse fixe : colonnes de dates/nombres bien alignées */
+  table,
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply text-ink-900;
+    letter-spacing: -0.011em;
+  }
+
+  /* Focus clavier visible et homogène sur toute l'application */
   :focus-visible {
-    outline: 2px solid theme('colors.primary.600');
-    outline-offset: 2px;
-    border-radius: 2px;
+    outline: none;
+    box-shadow: 0 0 0 3px rgb(37 99 235 / 0.35);
+    border-radius: 4px;
   }
 
   button {
@@ -37,10 +60,44 @@
   textarea {
     font-family: inherit;
   }
+
+  ::selection {
+    background: rgb(37 99 235 / 0.18);
+  }
+
+  /* Barres de défilement discrètes (WebKit) */
+  *::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: rgb(100 116 139 / 0.35);
+    border-radius: 999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  *::-webkit-scrollbar-thumb:hover {
+    background: rgb(100 116 139 / 0.55);
+    background-clip: content-box;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
 }
 
-/* Animation du spinner — référencée en inline (animation: 'spin …') par
-   plusieurs composants ; le @keyframes manquait, le spinner était statique. */
+/* Respect des préférences de mouvement réduit */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Spinner (référencé en inline par certains composants historiques) */
 @keyframes spin {
   to {
     transform: rotate(360deg);
