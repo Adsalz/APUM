@@ -1,8 +1,5 @@
 // src/components/FormulaireDesirata.js
 import React, { useState, useEffect, useCallback } from 'react';
-import { useHistory } from 'react-router-dom';
-import { auth } from '../firebase';
-import { getUser } from '../services/userService';
 import {
   addDesiderata,
   getPeriodeSaisie,
@@ -13,11 +10,11 @@ import { exportMedecinDesiderataToExcel } from '../services/excelExportService';
 import { estJourFerie } from '../utils/joursFeries';
 import logger from '../utils/logger';
 import {
-  Calendar,
-  ArrowLeft,
   Save,
   Download
 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { AppHeader, LoadingScreen, ErrorScreen, Alert, Button } from './ui';
 import QuickFill from './QuickFill';
 import WeeklyPattern from './WeeklyPattern';
 
@@ -41,14 +38,16 @@ function FormulaireDesirata() {
   const [nombreGardesMaxParSemaine, setNombreGardesMaxParSemaine] = useState(3);
   const [gardesGroupees, setGardesGroupees] = useState(false);
   const [renfortsAssocies, setRenfortsAssocies] = useState(false);
-  const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [existingDesiderataId, setExistingDesiderataId] = useState(null);
   const [isExporting, setIsExporting] = useState(false);
   const [exportMessage, setExportMessage] = useState('');
-  
-  const history = useHistory();
+  const [isSaving, setIsSaving] = useState(false);
+  const [feedback, setFeedback] = useState(null); // { kind: 'success'|'error', message }
+
+  const { profile } = useAuth();
+  const user = profile;
 
   // Génération des dates avec correction de fuseau horaire
   const generateDates = useCallback(() => {
@@ -71,40 +70,29 @@ function FormulaireDesirata() {
 
   // Effet pour charger les données initiales
   useEffect(() => {
+    if (!profile) {return;}
+
     const fetchData = async () => {
       try {
-        const authUser = auth.currentUser;
-        if (!authUser) {
-          history.push('/');
-          return;
-        }
+        const periode = await getPeriodeSaisie();
+        if (periode) {
+          setPeriodeSaisie(periode);
+          const userDesiderata = await getDesiderataByUser(profile.id);
+          const relevantDesiderata = userDesiderata.find(d =>
+            new Date(d.startDate) <= new Date(periode.endDate) &&
+            new Date(d.endDate) >= new Date(periode.startDate)
+          );
 
-        const userData = await getUser(authUser.uid);
-        if (userData && userData.role === 'medecin') {
-          setUser(userData);
-          const periode = await getPeriodeSaisie();
-          if (periode) {
-            setPeriodeSaisie(periode);
-            const userDesiderata = await getDesiderataByUser(userData.id);
-            const relevantDesiderata = userDesiderata.find(d => 
-              new Date(d.startDate) <= new Date(periode.endDate) && 
-              new Date(d.endDate) >= new Date(periode.startDate)
-            );
-            
-            if (relevantDesiderata) {
-              setExistingDesiderataId(relevantDesiderata.id);
-              setDesiderata(relevantDesiderata.desiderata || {});
-              setNombreGardesSouhaitees(relevantDesiderata.nombreGardesSouhaitees || 0);
-              setNombreGardesMaxParSemaine(relevantDesiderata.nombreGardesMaxParSemaine || 3);
-              setGardesGroupees(relevantDesiderata.gardesGroupees || false);
-              setRenfortsAssocies(relevantDesiderata.renfortsAssocies || false);
-            }
-          } else {
-            setError('Aucune période de saisie n\'a été définie par l\'administrateur.');
+          if (relevantDesiderata) {
+            setExistingDesiderataId(relevantDesiderata.id);
+            setDesiderata(relevantDesiderata.desiderata || {});
+            setNombreGardesSouhaitees(relevantDesiderata.nombreGardesSouhaitees || 0);
+            setNombreGardesMaxParSemaine(relevantDesiderata.nombreGardesMaxParSemaine || 3);
+            setGardesGroupees(relevantDesiderata.gardesGroupees || false);
+            setRenfortsAssocies(relevantDesiderata.renfortsAssocies || false);
           }
         } else {
-          setError('Utilisateur non autorisé');
-          history.push('/');
+          setError('Aucune période de saisie n\'a été définie par l\'administrateur.');
         }
       } catch (error) {
         logger.error('Erreur lors de la récupération des données:', error);
@@ -115,7 +103,14 @@ function FormulaireDesirata() {
     };
 
     fetchData();
-  }, [history]);
+  }, [profile]);
+
+  // Masquage automatique du message de feedback après 5 secondes
+  useEffect(() => {
+    if (!feedback) {return undefined;}
+    const timer = setTimeout(() => setFeedback(null), 5000);
+    return () => clearTimeout(timer);
+  }, [feedback]);
 
   // Gestion des changements de desiderata
   const handleDesiderataChange = (date, creneau, value) => {
@@ -195,10 +190,17 @@ function FormulaireDesirata() {
     });
   };
 
+  // Affichage d'un message de feedback en haut du contenu principal
+  const showFeedback = (kind, message) => {
+    setFeedback({ kind, message });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   // Soumission du formulaire
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (user) {
+    if (user && !isSaving) {
+      setIsSaving(true);
       try {
         if (!periodeSaisie || !periodeSaisie.startDate || !periodeSaisie.endDate) {
           throw new Error('Période de saisie non définie');
@@ -216,15 +218,19 @@ function FormulaireDesirata() {
 
         if (existingDesiderataId) {
           await updateDesiderata(existingDesiderataId, desiderataData);
-          alert('Desiderata mis à jour avec succès!');
+          showFeedback('success', 'Desiderata mis à jour avec succès !');
         } else {
-          await addDesiderata(user.id, desiderataData);
-          alert('Desiderata soumis avec succès!');
+          const newId = await addDesiderata(user.id, desiderataData);
+          if (newId) {
+            setExistingDesiderataId(newId);
+          }
+          showFeedback('success', 'Desiderata soumis avec succès !');
         }
-        history.push('/dashboard-medecin');
       } catch (error) {
         logger.error('Erreur lors de la soumission des desiderata:', error);
-        setError('Une erreur est survenue lors de la soumission des desiderata: ' + error.message);
+        showFeedback('error', 'Une erreur est survenue lors de la soumission des desiderata : ' + error.message);
+      } finally {
+        setIsSaving(false);
       }
     }
   };
@@ -281,61 +287,11 @@ function FormulaireDesirata() {
 
   // États de chargement et d'erreur
   if (loading) {
-    return (
-      <div style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#f3f4f6'
-      }}>
-        Chargement...
-      </div>
-    );
+    return <LoadingScreen />;
   }
 
   if (error) {
-    return (
-      <div style={{
-        minHeight: '100vh',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#f3f4f6',
-        padding: '1rem'
-      }}>
-        <div style={{
-          backgroundColor: 'white',
-          padding: '2rem',
-          borderRadius: '0.5rem',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-          maxWidth: '500px',
-          width: '100%',
-          textAlign: 'center'
-        }}>
-          <h2 style={{ color: '#DC2626', marginBottom: '1rem' }}>Erreur</h2>
-          <p style={{ color: '#4B5563', marginBottom: '1.5rem' }}>{error}</p>
-          <button
-            onClick={() => history.push('/dashboard-medecin')}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              padding: '0.5rem 1rem',
-              backgroundColor: '#2563EB',
-              color: 'white',
-              borderRadius: '0.375rem',
-              border: 'none',
-              cursor: 'pointer'
-            }}
-          >
-            <ArrowLeft size={18} />
-            Retour au tableau de bord
-          </button>
-        </div>
-      </div>
-    );
+    return <ErrorScreen message={error} />;
   }
 
   const dates = generateDates();
@@ -349,110 +305,45 @@ function FormulaireDesirata() {
       overflowX: 'hidden'
     }}>
       {/* Menu fixe en haut */}
-      <nav style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        backgroundColor: 'rgba(255, 255, 255, 0.95)',
-        borderBottom: '1px solid #e5e7eb',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-        zIndex: 40,
-        width: '100%'
-      }}>
-        <div style={{
-          maxWidth: '1280px',
-          margin: '0 auto',
-          padding: '1rem',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '1rem'
-          }}>
-            <button
-              onClick={() => history.push('/dashboard-medecin')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                color: '#4B5563',
-                border: 'none',
-                background: 'none',
-                cursor: 'pointer',
-                padding: '0.5rem'
-              }}
-            >
-              <ArrowLeft size={20} />
-              Retour
-            </button>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              color: '#2563EB',
-              fontWeight: 'bold'
-            }}>
-              <Calendar size={24} />
-              <span>Saisie des desiderata</span>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-            <button
+      <AppHeader
+        backTo="/dashboard-medecin"
+        actions={
+          <>
+            <Button
+              variant="secondary"
               onClick={handleExportExcel}
-              disabled={isExporting}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.5rem 1rem',
-                backgroundColor: isExporting ? '#9CA3AF' : '#059669',
-                color: 'white',
-                borderRadius: '0.375rem',
-                border: 'none',
-                cursor: isExporting ? 'not-allowed' : 'pointer',
-                fontWeight: '500'
-              }}
+              loading={isExporting}
+              icon={<Download size={18} />}
               title="Exporter mes desiderata vers Excel"
             >
-              <Download size={18} />
               {isExporting ? 'Export...' : 'Exporter Excel'}
-            </button>
-
-            <button
+            </Button>
+            <Button
+              variant="success"
               onClick={handleSubmit}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.5rem 1rem',
-                backgroundColor: '#2563EB',
-                color: 'white',
-                borderRadius: '0.375rem',
-                border: 'none',
-                cursor: 'pointer',
-                fontWeight: '500'
-              }}
+              loading={isSaving}
+              icon={<Save size={18} />}
             >
-              <Save size={18} />
               Enregistrer
-            </button>
-          </div>
-        </div>
-      </nav>
+            </Button>
+          </>
+        }
+      />
 
       {/* Contenu principal */}
       <main style={{
         margin: '0 auto',
-        paddingTop: '5rem',
+        paddingTop: '6rem',
         width: '100%',
         maxWidth: '1280px',
         boxSizing: 'border-box'
       }}>
+        {/* Message de succès/erreur de sauvegarde */}
+        {feedback && (
+          <Alert kind={feedback.kind} className="mb-4">
+            {feedback.message}
+          </Alert>
+        )}
         {/* Message de succès/erreur pour l'export */}
         {exportMessage && (
           <div style={{

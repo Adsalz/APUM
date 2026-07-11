@@ -1,12 +1,14 @@
 // src/components/WeeklyPattern.js
 import React, { useState } from 'react';
 import { Calendar, Copy, ChevronDown, ChevronUp } from 'lucide-react';
+import { Alert } from './ui';
 
 function WeeklyPattern({ creneaux, onApplyPattern, periodeSaisie }) {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [pattern, setPattern] = useState({});
   const [isExpanded, setIsExpanded] = useState(false);
+  const [validationError, setValidationError] = useState('');
  
   const jours = [
     { id: '1', label: 'Lundi' },
@@ -19,6 +21,7 @@ function WeeklyPattern({ creneaux, onApplyPattern, periodeSaisie }) {
   ];
 
   const handlePatternChange = (jour, creneau, value) => {
+    setValidationError('');
     setPattern(prev => ({
       ...prev,
       [jour]: {
@@ -30,6 +33,7 @@ function WeeklyPattern({ creneaux, onApplyPattern, periodeSaisie }) {
 
   const handleSelectFullPeriod = () => {
     if (periodeSaisie) {
+      setValidationError('');
       setStartDate(periodeSaisie.startDate.split('T')[0]);
       setEndDate(periodeSaisie.endDate.split('T')[0]);
     }
@@ -37,15 +41,16 @@ function WeeklyPattern({ creneaux, onApplyPattern, periodeSaisie }) {
 
   const handleApplyPattern = () => {
     if (!startDate || !endDate) {
-      alert('Veuillez sélectionner une période');
+      setValidationError('Veuillez sélectionner une période');
       return;
     }
 
     if (Object.keys(pattern).length === 0) {
-      alert('Veuillez définir au moins une préférence dans le pattern');
+      setValidationError('Veuillez définir au moins une préférence dans le pattern');
       return;
     }
 
+    setValidationError('');
     onApplyPattern(pattern, startDate, endDate);
   };
 
@@ -211,7 +216,10 @@ function WeeklyPattern({ creneaux, onApplyPattern, periodeSaisie }) {
                   <input
                     type="date"
                     value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
+                    onChange={(e) => {
+                      setValidationError('');
+                      setStartDate(e.target.value);
+                    }}
                     style={{
                       padding: '0.5rem',
                       border: '1px solid #D1D5DB',
@@ -233,7 +241,10 @@ function WeeklyPattern({ creneaux, onApplyPattern, periodeSaisie }) {
                   <input
                     type="date"
                     value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
+                    onChange={(e) => {
+                      setValidationError('');
+                      setEndDate(e.target.value);
+                    }}
                     style={{
                       padding: '0.5rem',
                       border: '1px solid #D1D5DB',
@@ -269,6 +280,13 @@ function WeeklyPattern({ creneaux, onApplyPattern, periodeSaisie }) {
                Toute la période
               </button>
             </div>
+
+            {/* Alerte de validation */}
+            {validationError && (
+              <Alert kind="warning" className="mb-4">
+                {validationError}
+              </Alert>
+            )}
 
             {/* Bouton d'application */}
             <button

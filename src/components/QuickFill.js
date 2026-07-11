@@ -1,6 +1,7 @@
 // src/components/QuickFill.js
 import React, { useState } from 'react';
 import { Upload, ChevronDown, ChevronUp, Calendar } from 'lucide-react';
+import { Alert } from './ui';
 
 function QuickFill({ creneaux, onApply, periodeSaisie }) {
   const [selectedCreneaux, setSelectedCreneaux] = useState({});
@@ -9,6 +10,7 @@ function QuickFill({ creneaux, onApply, periodeSaisie }) {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [isExpanded, setIsExpanded] = useState(false);
+  const [validationError, setValidationError] = useState('');
 
   const jours = [
     { id: '1', label: 'Lundi' },
@@ -22,12 +24,14 @@ function QuickFill({ creneaux, onApply, periodeSaisie }) {
 
   const handleSelectFullPeriod = () => {
     if (periodeSaisie) {
+      setValidationError('');
       setStartDate(periodeSaisie.startDate.split('T')[0]);
       setEndDate(periodeSaisie.endDate.split('T')[0]);
     }
   };
 
   const toggleAllCreneaux = () => {
+    setValidationError('');
     const allSelected = creneaux.every(creneau => selectedCreneaux[creneau.id]);
     const newSelectedCreneaux = {};
     creneaux.forEach(creneau => {
@@ -37,6 +41,7 @@ function QuickFill({ creneaux, onApply, periodeSaisie }) {
   };
 
   const toggleAllJours = () => {
+    setValidationError('');
     const allSelected = jours.every(jour => selectedJours[jour.id]);
     const newSelectedJours = {};
     jours.forEach(jour => {
@@ -47,36 +52,37 @@ function QuickFill({ creneaux, onApply, periodeSaisie }) {
 
   const handleApply = () => {
     if (!selectedDispo) {
-      alert('Veuillez sélectionner une disponibilité');
+      setValidationError('Veuillez sélectionner une disponibilité');
       return;
     }
-  
+
     if (!startDate || !endDate) {
-      alert('Veuillez sélectionner une période');
+      setValidationError('Veuillez sélectionner une période');
       return;
     }
-  
+
     const selectedCreneauxArray = Object.entries(selectedCreneaux)
       .filter(([_, isSelected]) => isSelected)
       .map(([creneauId]) => creneauId);
-  
+
     const selectedJoursArray = Object.entries(selectedJours)
       .filter(([_, isSelected]) => isSelected)
       .map(([jourId]) => {
         // Converti correctement les IDs de jours
         return jourId;
       });
-  
+
     if (selectedCreneauxArray.length === 0) {
-      alert('Veuillez sélectionner au moins un créneau');
+      setValidationError('Veuillez sélectionner au moins un créneau');
       return;
     }
-  
+
     if (selectedJoursArray.length === 0) {
-      alert('Veuillez sélectionner au moins un jour');
+      setValidationError('Veuillez sélectionner au moins un jour');
       return;
     }
-  
+
+    setValidationError('');
     onApply({
       creneaux: selectedCreneauxArray,
       jours: selectedJoursArray,
@@ -168,7 +174,10 @@ function QuickFill({ creneaux, onApply, periodeSaisie }) {
                     <input
                       type="date"
                       value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
+                      onChange={(e) => {
+                        setValidationError('');
+                        setStartDate(e.target.value);
+                      }}
                       style={{
                         padding: '0.5rem',
                         border: '1px solid #D1D5DB',
@@ -189,7 +198,10 @@ function QuickFill({ creneaux, onApply, periodeSaisie }) {
                     <input
                       type="date"
                       value={endDate}
-                      onChange={(e) => setEndDate(e.target.value)}
+                      onChange={(e) => {
+                        setValidationError('');
+                        setEndDate(e.target.value);
+                      }}
                       style={{
                         padding: '0.5rem',
                         border: '1px solid #D1D5DB',
@@ -283,6 +295,7 @@ function QuickFill({ creneaux, onApply, periodeSaisie }) {
                       type="checkbox"
                       checked={selectedCreneaux[creneau.id] || false}
                       onChange={() => {
+                        setValidationError('');
                         setSelectedCreneaux(prev => ({
                           ...prev,
                           [creneau.id]: !prev[creneau.id]
@@ -363,6 +376,7 @@ function QuickFill({ creneaux, onApply, periodeSaisie }) {
                       type="checkbox"
                       checked={selectedJours[jour.id] || false}
                       onChange={() => {
+                        setValidationError('');
                         setSelectedJours(prev => ({
                           ...prev,
                           [jour.id]: !prev[jour.id]
@@ -393,7 +407,10 @@ function QuickFill({ creneaux, onApply, periodeSaisie }) {
               </label>
               <select
                 value={selectedDispo}
-                onChange={(e) => setSelectedDispo(e.target.value)}
+                onChange={(e) => {
+                  setValidationError('');
+                  setSelectedDispo(e.target.value);
+                }}
                 style={{
                   width: '100%',
                   padding: '0.5rem',
@@ -408,6 +425,13 @@ function QuickFill({ creneaux, onApply, periodeSaisie }) {
                 <option value="Non">Non</option>
               </select>
             </div>
+
+            {/* Alerte de validation */}
+            {validationError && (
+              <Alert kind="warning" className="mb-4">
+                {validationError}
+              </Alert>
+            )}
 
             {/* Bouton d'application */}
             <button

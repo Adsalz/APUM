@@ -1,8 +1,7 @@
 // src/components/FormulaireDesiderataAdmin.js
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useHistory } from 'react-router-dom';
-import { auth } from '../firebase';
-import { getUser, getMedecins } from '../services/userService';
+import { getMedecins } from '../services/userService';
 import {
   addDesiderata,
   getPeriodeSaisie,
@@ -13,13 +12,13 @@ import { estJourFerie } from '../utils/joursFeries';
 import logger from '../utils/logger';
 import {
   Calendar,
-  ArrowLeft,
   Save,
-  UserCog,
   Upload
 } from 'lucide-react';
 import QuickFill from './QuickFill';
 import WeeklyPattern from './WeeklyPattern';
+import { AppHeader, LoadingScreen, ErrorScreen, Alert, Button, Modal } from './ui';
+import { useAuth } from '../contexts/AuthContext';
 
 const creneaux = [
   { id: 'QUART_1', label: '1er QUART', hours: '1h - 7h', medecins: 2 },
@@ -41,16 +40,37 @@ function FormulaireDesiderataAdmin() {
   const [nombreGardesMaxParSemaine, setNombreGardesMaxParSemaine] = useState(3);
   const [gardesGroupees, setGardesGroupees] = useState(false);
   const [renfortsAssocies, setRenfortsAssocies] = useState(false);
-  const [user, setUser] = useState(null);
   const [medecins, setMedecins] = useState([]);
   const [selectedMedecinId, setSelectedMedecinId] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [existingDesiderataId, setExistingDesiderataId] = useState(null);
-  const [importMessage, setImportMessage] = useState(null);
-  const [importError, setImportError] = useState(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [feedback, setFeedback] = useState(null); // { kind, message }
+  const [pendingImport, setPendingImport] = useState(null);
 
+  const feedbackTimerRef = useRef(null);
   const history = useHistory();
+  const { profile } = useAuth();
+
+  // Affichage d'un message de feedback en haut du contenu (auto-masqué après 5 s)
+  const showFeedback = useCallback((kind, message) => {
+    setFeedback({ kind, message });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (feedbackTimerRef.current) {
+      clearTimeout(feedbackTimerRef.current);
+    }
+    feedbackTimerRef.current = setTimeout(() => setFeedback(null), 5000);
+  }, []);
+
+  // Nettoyage du timer de feedback au démontage
+  useEffect(() => {
+    return () => {
+      if (feedbackTimerRef.current) {
+        clearTimeout(feedbackTimerRef.current);
+      }
+    };
+  }, []);
 
   // Génération des dates avec correction de fuseau horaire
   const generateDates = useCallback(() => {
@@ -77,29 +97,15 @@ function FormulaireDesiderataAdmin() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const authUser = auth.currentUser;
-        if (!authUser) {
-          history.push('/');
-          return;
-        }
+        // Charger la liste des médecins
+        const medecinsList = await getMedecins();
+        setMedecins(medecinsList);
 
-        const userData = await getUser(authUser.uid);
-        if (userData && userData.role === 'admin') {
-          setUser(userData);
-
-          // Charger la liste des médecins
-          const medecinsList = await getMedecins();
-          setMedecins(medecinsList);
-
-          const periode = await getPeriodeSaisie();
-          if (periode) {
-            setPeriodeSaisie(periode);
-          } else {
-            setError('Aucune période de saisie n\'a été définie.');
-          }
+        const periode = await getPeriodeSaisie();
+        if (periode) {
+          setPeriodeSaisie(periode);
         } else {
-          setError('Utilisateur non autorisé');
-          history.push('/');
+          setError('Aucune période de saisie n\'a été définie.');
         }
       } catch (error) {
         logger.error('Erreur lors de la récupération des données:', error);
@@ -110,7 +116,7 @@ function FormulaireDesiderataAdmin() {
     };
 
     fetchData();
-  }, [history]);
+  }, []);
 
   // Effet pour charger les desiderata existants du médecin sélectionné
   useEffect(() => {
@@ -231,6 +237,17 @@ function FormulaireDesiderataAdmin() {
     });
   };
 
+  // Application des données importées (directement ou après confirmation)
+  const applyImportedData = (importedData) => {
+    setDesiderata(importedData.desiderata || {});
+    setNombreGardesSouhaitees(importedData.nombreGardesSouhaitees || 0);
+    setNombreGardesMaxParSemaine(importedData.nombreGardesMaxParSemaine || 3);
+    setGardesGroupees(importedData.gardesGroupees || false);
+    setRenfortsAssocies(importedData.renfortsAssocies || false);
+
+    showFeedback('success', `Desiderata importés avec succès ! ${Object.keys(importedData.desiderata).length} jours chargés.`);
+  };
+
   // Gestion de l'import de fichier JSON
   const handleFileImport = async (event) => {
     const file = event.target.files[0];
@@ -240,15 +257,15 @@ function FormulaireDesiderataAdmin() {
 
     // Vérifier qu'un médecin est sélectionné
     if (!selectedMedecinId) {
-      setImportError('Veuillez d\'abord sélectionner un médecin');
-      setTimeout(() => setImportError(null), 5000);
+      showFeedback('warning', 'Veuillez d\'abord sélectionner un médecin');
+      event.target.value = '';
       return;
     }
 
     // Vérifier l'extension du fichier
     if (!file.name.endsWith('.json')) {
-      setImportError('Le fichier doit être au format JSON');
-      setTimeout(() => setImportError(null), 5000);
+      showFeedback('error', 'Le fichier doit être au format JSON');
+      event.target.value = '';
       return;
     }
 
@@ -258,42 +275,41 @@ function FormulaireDesiderataAdmin() {
 
       // Valider la structure du JSON
       if (!importedData.desiderata || typeof importedData.desiderata !== 'object') {
-        setImportError('Structure JSON invalide: le champ "desiderata" est manquant');
-        setTimeout(() => setImportError(null), 5000);
+        showFeedback('error', 'Structure JSON invalide: le champ "desiderata" est manquant');
+        event.target.value = '';
         return;
       }
 
-      // Vérifier si des desiderata existent déjà
+      // Réinitialiser l'input file (le contenu est déjà lu)
+      event.target.value = '';
+
+      // Si des desiderata existent déjà, demander confirmation avant de remplacer
       if (existingDesiderataId) {
-        const confirmation = window.confirm(
-          'Ce médecin a déjà des desiderata saisis. Voulez-vous les remplacer par les données importées ?'
-        );
-        if (!confirmation) {
-          event.target.value = ''; // Réinitialiser l'input file
-          return;
-        }
+        setPendingImport(importedData);
+        return;
       }
 
       // Importer les données
-      setDesiderata(importedData.desiderata || {});
-      setNombreGardesSouhaitees(importedData.nombreGardesSouhaitees || 0);
-      setNombreGardesMaxParSemaine(importedData.nombreGardesMaxParSemaine || 3);
-      setGardesGroupees(importedData.gardesGroupees || false);
-      setRenfortsAssocies(importedData.renfortsAssocies || false);
-
-      setImportMessage(`✓ Desiderata importés avec succès ! ${Object.keys(importedData.desiderata).length} jours chargés.`);
-      setImportError(null);
-      setTimeout(() => setImportMessage(null), 5000);
-
-      // Réinitialiser l'input file
-      event.target.value = '';
+      applyImportedData(importedData);
 
     } catch (error) {
       logger.error('Erreur lors de l\'import du fichier:', error);
-      setImportError('Erreur lors de la lecture du fichier JSON: ' + error.message);
-      setTimeout(() => setImportError(null), 5000);
+      showFeedback('error', 'Erreur lors de la lecture du fichier JSON: ' + error.message);
       event.target.value = '';
     }
+  };
+
+  // Confirmation / annulation du remplacement des desiderata importés
+  const handleConfirmImport = () => {
+    if (pendingImport) {
+      applyImportedData(pendingImport);
+    }
+    setPendingImport(null);
+  };
+
+  const handleCancelImport = () => {
+    // Comme avant : on garde les desiderata existants, rien n'est importé
+    setPendingImport(null);
   };
 
   // Soumission du formulaire
@@ -301,11 +317,12 @@ function FormulaireDesiderataAdmin() {
     e.preventDefault();
 
     if (!selectedMedecinId) {
-      alert('Veuillez sélectionner un médecin');
+      showFeedback('warning', 'Veuillez sélectionner un médecin');
       return;
     }
 
-    if (user) {
+    if (profile && !isSaving) {
+      setIsSaving(true);
       try {
         if (!periodeSaisie || !periodeSaisie.startDate || !periodeSaisie.endDate) {
           throw new Error('Période de saisie non définie');
@@ -323,15 +340,17 @@ function FormulaireDesiderataAdmin() {
 
         if (existingDesiderataId) {
           await updateDesiderata(existingDesiderataId, desiderataData);
-          alert('Desiderata mis à jour avec succès!');
+          showFeedback('success', 'Desiderata mis à jour avec succès !');
         } else {
           await addDesiderata(selectedMedecinId, desiderataData);
-          alert('Desiderata soumis avec succès!');
+          showFeedback('success', 'Desiderata soumis avec succès !');
         }
-        history.push('/dashboard-admin');
+        // Laisser le temps de voir le message avant de revenir au tableau de bord
+        setTimeout(() => history.push('/dashboard-admin'), 1500);
       } catch (error) {
         logger.error('Erreur lors de la soumission des desiderata:', error);
-        setError('Une erreur est survenue lors de la soumission des desiderata: ' + error.message);
+        setIsSaving(false);
+        showFeedback('error', 'Une erreur est survenue lors de la soumission des desiderata: ' + error.message);
       }
     }
   };
@@ -358,61 +377,11 @@ function FormulaireDesiderataAdmin() {
 
   // États de chargement et d'erreur
   if (loading) {
-    return (
-      <div style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#f3f4f6'
-      }}>
-        Chargement...
-      </div>
-    );
+    return <LoadingScreen />;
   }
 
   if (error) {
-    return (
-      <div style={{
-        minHeight: '100vh',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#f3f4f6',
-        padding: '1rem'
-      }}>
-        <div style={{
-          backgroundColor: 'white',
-          padding: '2rem',
-          borderRadius: '0.5rem',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-          maxWidth: '500px',
-          width: '100%',
-          textAlign: 'center'
-        }}>
-          <h2 style={{ color: '#DC2626', marginBottom: '1rem' }}>Erreur</h2>
-          <p style={{ color: '#4B5563', marginBottom: '1.5rem' }}>{error}</p>
-          <button
-            onClick={() => history.push('/dashboard-admin')}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              padding: '0.5rem 1rem',
-              backgroundColor: '#2563EB',
-              color: 'white',
-              borderRadius: '0.375rem',
-              border: 'none',
-              cursor: 'pointer'
-            }}
-          >
-            <ArrowLeft size={18} />
-            Retour au tableau de bord
-          </button>
-        </div>
-      </div>
-    );
+    return <ErrorScreen message={error} />;
   }
 
   const dates = generateDates();
@@ -426,90 +395,74 @@ function FormulaireDesiderataAdmin() {
       overflowX: 'hidden'
     }}>
       {/* Menu fixe en haut */}
-      <nav style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        backgroundColor: 'rgba(255, 255, 255, 0.95)',
-        borderBottom: '1px solid #e5e7eb',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-        zIndex: 40,
-        width: '100%'
-      }}>
-        <div style={{
-          maxWidth: '1280px',
-          margin: '0 auto',
-          padding: '1rem',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '1rem'
-          }}>
-            <button
-              onClick={() => history.push('/dashboard-admin')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                color: '#4B5563',
-                border: 'none',
-                background: 'none',
-                cursor: 'pointer',
-                padding: '0.5rem'
-              }}
+      <AppHeader
+        backTo="/dashboard-admin"
+        actions={
+          <>
+            <label
+              htmlFor="file-upload"
+              className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
             >
-              <ArrowLeft size={20} />
-              Retour
-            </button>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              color: '#2563EB',
-              fontWeight: 'bold'
-            }}>
-              <UserCog size={24} />
-              <span>Saisie des desiderata (Admin)</span>
-            </div>
-          </div>
-
-          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-            <button
+              <Upload size={18} aria-hidden="true" />
+              <span className="hidden sm:inline">Importer JSON</span>
+            </label>
+            <input
+              id="file-upload"
+              type="file"
+              accept=".json"
+              onChange={handleFileImport}
+              className="hidden"
+            />
+            <Button
+              variant="primary"
+              icon={<Save size={18} aria-hidden="true" />}
               onClick={handleSubmit}
               disabled={!selectedMedecinId}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.5rem 1rem',
-                backgroundColor: selectedMedecinId ? '#2563EB' : '#9CA3AF',
-                color: 'white',
-                borderRadius: '0.375rem',
-                border: 'none',
-                cursor: selectedMedecinId ? 'pointer' : 'not-allowed',
-                fontWeight: '500'
-              }}
+              loading={isSaving}
             >
-              <Save size={18} />
               Enregistrer
-            </button>
-          </div>
-        </div>
-      </nav>
+            </Button>
+          </>
+        }
+      />
+
+      {/* Modale de confirmation du remplacement des desiderata importés */}
+      <Modal
+        open={!!pendingImport}
+        onClose={handleCancelImport}
+        title="Remplacer les desiderata ?"
+        size="sm"
+        footer={
+          <>
+            <Button variant="secondary" onClick={handleCancelImport}>
+              Annuler
+            </Button>
+            <Button variant="primary" onClick={handleConfirmImport}>
+              Confirmer
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-gray-600">
+          Ce médecin a déjà des desiderata saisis. Voulez-vous les remplacer par les données importées ?
+        </p>
+      </Modal>
 
       {/* Contenu principal */}
       <main style={{
         margin: '0 auto',
-        paddingTop: '5rem',
+        paddingTop: '6rem',
         width: '100%',
         maxWidth: '1280px',
         boxSizing: 'border-box'
       }}>
+        {/* Message de feedback */}
+        {feedback && (
+          <Alert kind={feedback.kind} className="mb-4">
+            {feedback.message}
+          </Alert>
+        )}
+
         {/* Sélection du médecin */}
         <div style={{
           backgroundColor: 'white',
@@ -554,77 +507,13 @@ function FormulaireDesiderataAdmin() {
                   '✓ Ce médecin a déjà saisi des desiderata. Vous pouvez les modifier.' :
                   'Aucun desiderata existant pour ce médecin.'}
               </p>
-
-              {/* Bouton d'import */}
-              <div style={{ marginTop: '1rem' }}>
-                <label
-                  htmlFor="file-upload"
-                  style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    padding: '0.75rem 1rem',
-                    backgroundColor: '#8B5CF6',
-                    color: 'white',
-                    borderRadius: '0.375rem',
-                    cursor: 'pointer',
-                    fontSize: '0.875rem',
-                    fontWeight: '500',
-                    transition: 'background-color 0.2s'
-                  }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.backgroundColor = '#7C3AED';
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.backgroundColor = '#8B5CF6';
-                  }}
-                >
-                  <Upload size={18} />
-                  Importer un fichier JSON
-                </label>
-                <input
-                  id="file-upload"
-                  type="file"
-                  accept=".json"
-                  onChange={handleFileImport}
-                  style={{ display: 'none' }}
-                />
-                <p style={{
-                  marginTop: '0.5rem',
-                  fontSize: '0.75rem',
-                  color: '#6B7280'
-                }}>
-                  Format attendu : fichier JSON contenant les desiderata du médecin
-                </p>
-              </div>
-
-              {/* Messages d'import */}
-              {importMessage && (
-                <div style={{
-                  marginTop: '1rem',
-                  padding: '0.75rem',
-                  backgroundColor: '#D1FAE5',
-                  border: '1px solid #059669',
-                  borderRadius: '0.375rem',
-                  color: '#059669',
-                  fontSize: '0.875rem'
-                }}>
-                  {importMessage}
-                </div>
-              )}
-              {importError && (
-                <div style={{
-                  marginTop: '1rem',
-                  padding: '0.75rem',
-                  backgroundColor: '#FEE2E2',
-                  border: '1px solid #DC2626',
-                  borderRadius: '0.375rem',
-                  color: '#DC2626',
-                  fontSize: '0.875rem'
-                }}>
-                  {importError}
-                </div>
-              )}
+              <p style={{
+                marginTop: '0.5rem',
+                fontSize: '0.75rem',
+                color: '#6B7280'
+              }}>
+                Vous pouvez importer un fichier JSON contenant les desiderata du médecin via le bouton « Importer JSON » en haut de page.
+              </p>
             </div>
           )}
         </div>
