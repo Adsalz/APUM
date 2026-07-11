@@ -10,6 +10,7 @@ import {
   updateDesiderata
 } from '../services/planningService';
 import { exportMedecinDesiderataToExcel } from '../services/excelExportService';
+import { estJourFerie } from '../utils/joursFeries';
 import logger from '../utils/logger';
 import {
   Calendar,
@@ -31,10 +32,6 @@ const creneaux = [
 
 const options = ['Oui', 'Possible', 'Non'];
 
-const joursFeries = [
-  '2024-01-01', '2024-04-01', '2024-05-01', '2024-05-08', '2024-05-09',
-  '2024-05-20', '2024-07-14', '2024-08-15', '2024-11-01', '2024-11-11', '2024-12-25'
-];
 
 function FormulaireDesirata() {
   // États
@@ -268,7 +265,7 @@ function FormulaireDesirata() {
   const isWeekendOrHoliday = (date) => {
     const day = date.getDay();
     const formattedDate = date.toISOString().split('T')[0];
-    return day === 0 || day === 6 || joursFeries.includes(formattedDate);
+    return day === 0 || day === 6 || estJourFerie(formattedDate);
   };
 
   const formatDate = (date) => {

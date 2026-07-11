@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, Mail, Send, Check, AlertTriangle } from 'lucide-react';
 import { collection, addDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase';
+import { EMAIL_FROM } from '../services/emailService';
 import logger from '../utils/logger';
 
 const TestEmailModal = ({ isOpen, onClose }) => {
@@ -35,7 +36,7 @@ const TestEmailModal = ({ isOpen, onClose }) => {
           text: testMessage,
           html: htmlMessage
         },
-        from: 'adriensalles@gmail.com',
+        from: EMAIL_FROM,
         metadata: {
           type: 'test_email',
           sentAt: Timestamp.now()

@@ -277,12 +277,14 @@ export const getLatestPlanning = async () => {
     if (!user) {
       throw new Error('Utilisateur non authentifié');
     }
-    const q = query(collection(db, PLANNING_COLLECTION), orderBy('startDate', 'desc'), limit(1));
+    // Le document 'periode_saisie' vit dans la même collection et possède aussi
+    // un startDate : on l'exclut explicitement pour ne pas le confondre avec un planning.
+    const q = query(collection(db, PLANNING_COLLECTION), orderBy('startDate', 'desc'), limit(5));
     const querySnapshot = await getDocs(q);
-    if (querySnapshot.empty) {
+    const latestDoc = querySnapshot.docs.find((d) => d.id !== PERIODE_SAISIE_DOC);
+    if (!latestDoc) {
       return null;
     }
-    const latestDoc = querySnapshot.docs[0];
     const data = latestDoc.data();
     return { 
       id: latestDoc.id, 

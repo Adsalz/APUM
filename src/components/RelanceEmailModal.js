@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, Mail, Send, AlertTriangle, Check } from 'lucide-react';
-import { envoyerRelancesEnMasse, getMedecinsSansDesiderata } from '../services/emailService';
+import { envoyerRelancesEnMasse, getMedecinsSansDesiderata, APP_URL } from '../services/emailService';
 import logger from '../utils/logger';
 
 const RelanceEmailModal = ({ 
@@ -81,7 +81,7 @@ const RelanceEmailModal = ({
 Nous vous rappelons qu'il est important de saisir vos desiderata de planning dans les plus brefs délais.
 
 Vous pouvez accéder à l'interface de saisie via le lien suivant :
-https://apum-8cfa4.web.app/formulaire-desirata
+${APP_URL}/formulaire-desirata
 
 Merci de votre collaboration.
 

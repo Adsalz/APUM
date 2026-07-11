@@ -69,19 +69,6 @@ export const logoutUser = async () => {
   }
 };
 
-export const checkUserRole = async (uid, allowedRoles) => {
-  try {
-    const user = await getUser(uid);
-    if (user && allowedRoles.includes(user.role)) {
-      return true;
-    }
-    return false;
-  } catch (error) {
-    logger.error('Erreur lors de la vérification du rôle:', error);
-    return false;
-  }
-};
-
 export const updateUserPassword = async (newPassword) => {
   try {
     const user = auth.currentUser;
