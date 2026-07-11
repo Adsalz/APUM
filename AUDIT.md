@@ -47,10 +47,11 @@ trouvé**, **ce qui a été corrigé** et **ce qui reste à faire**.
 | Dépendances lourdes jamais importées : `xlsx`, `pdf-lib`, `pdfmake` | ✅ Supprimées |
 | Code mort : `ChangePassword.js`, `DefinitionPeriode.js` (non routés), `checkUserRole` | ✅ Supprimés |
 | Erreurs d'export affichées dans la **bannière verte de succès** (GestionDesiderata) | ✅ Corrigé — bannière d'erreur distincte |
-| `deleteObsoleteDesiderata` : batch unique sans gestion de la limite Firestore (500 op.) ; suppression en cascade non transactionnelle | ⏳ À faire |
-| Plusieurs plannings peuvent être « publiés » simultanément (`publishPlanning` ne dé-publie pas les précédents) | ⏳ À faire |
+| `deleteObsoleteDesiderata` : batch unique sans gestion de la limite Firestore (500 op.) | ✅ Corrigé — découpage en lots de 450 |
+| Plusieurs plannings peuvent être « publiés » simultanément (`publishPlanning` ne dé-publie pas les précédents) | ✅ Corrigé — un seul planning publié à la fois |
 | Dates gérées à la main partout (mélange UTC/local, risque de décalage d'un jour) — pas de librairie de dates | ⏳ À faire (date-fns recommandé) |
-| Validation d'entrées absente dans les services (`setPeriodeSaisie` sans `start < end`, emails non validés…) | ⏳ À faire |
+| Validation d'entrées absente dans les services | ✅ Partiel — `setPeriodeSaisie` valide format et `début <= fin` · ⏳ emails et payloads desiderata |
+| Double-submit possible sur les sauvegardes (formulaires desiderata, période) | ✅ Corrigé — états `isSaving` + boutons `loading` |
 | Stack datée : React 17, react-router v5, `ReactDOM.render` déprécié | ⏳ À faire (migration React 18 + router v6) |
 
 ## 3. Design / UX
@@ -58,12 +59,12 @@ trouvé**, **ce qui a été corrigé** et **ce qui reste à faire**.
 | Constat | Statut |
 |---|---|
 | 3 systèmes de style concurrents (~656 styles inline, CSS global Bootstrap-like ~95 % mort, Tailwind non fonctionnel) | ✅ Socle posé — thème Tailwind (`tailwind.config.js`), `index.css` purgé (749 → ~50 lignes), design system `src/components/ui/` (Button, Card, Modal, Alert, FormField, Spinner, LoadingScreen, ErrorScreen, AppHeader, ActionCard, StatCard) |
-| Écrans réécrits avec le design system | ✅ Login, Dashboard admin, Dashboard médecin |
+| Écrans réécrits/harmonisés avec le design system | ✅ Login, dashboards, GestionUtilisateurs, formulaires desiderata, QuickFill/WeeklyPattern, PlanningVisualisation, GestionPeriodeSaisie, GestionDesiderata, GestionPlanning |
 | Spinner statique (le `@keyframes spin` n'existait nulle part) | ✅ Corrigé globalement |
 | Accessibilité : zéro `aria-*`, labels non associés, aucun `:focus` visible, contrastes insuffisants sur boutons désactivés | ✅ Sur le socle et les écrans réécrits (labels associés, `role="dialog"`, focus-visible global, contrastes) · ⏳ écrans restants |
-| Modales : 5 implémentations divergentes, pas d'Échap ni clic-extérieur ni verrouillage du scroll | ✅ Composant `Modal` unifié disponible · ⏳ adoption dans les écrans restants |
-| 16 `alert()`/`confirm()` natifs (validation, succès de sauvegarde…) | ⏳ À remplacer par `Alert`/`Modal` (composants prêts) |
-| Navbar recopiée 8 fois avec variations | ✅ `AppHeader` partagé · ⏳ adoption dans les écrans restants |
+| Modales : 5 implémentations divergentes, pas d'Échap ni clic-extérieur ni verrouillage du scroll | ✅ Composant `Modal` unifié, adopté pour les confirmations (suppression utilisateur, import JSON) · ⏳ modales email/export restantes |
+| 16 `alert()`/`confirm()` natifs (validation, succès de sauvegarde…) | ✅ Tous remplacés par `Alert`/`Modal` (0 restant) |
+| Navbar recopiée 8 fois avec variations | ✅ `AppHeader` adopté sur tous les écrans |
 | `FormulaireDesirata` (759 l.) ≈ `FormulaireDesiderataAdmin` (938 l.) : ~430 lignes dupliquées | ⏳ À fusionner |
 | Aucune protection contre la perte de saisie non sauvegardée dans les formulaires | ⏳ À faire |
 | Responsive : quasi aucune media query ; grands tableaux utilisables uniquement en scroll horizontal | ⏳ À faire |
@@ -101,11 +102,12 @@ trouvé**, **ce qui a été corrigé** et **ce qui reste à faire**.
 
 ## Feuille de route suggérée (prochaines itérations)
 
-1. Remplacer les 16 `alert()/confirm()` par les composants `Alert`/`Modal`.
-2. Adopter `AppHeader`/`LoadingScreen`/`ErrorScreen` sur les écrans restants
-   (GestionUtilisateurs, GestionDesiderata, formulaires, planning).
-3. Fusionner `FormulaireDesirata` et `FormulaireDesiderataAdmin`.
+1. ~~Remplacer les 16 `alert()/confirm()`~~ ✅ Fait.
+2. ~~Adopter `AppHeader`/`LoadingScreen`/`ErrorScreen` sur les écrans restants~~ ✅ Fait.
+3. Fusionner `FormulaireDesirata` et `FormulaireDesiderataAdmin` (~430 lignes communes).
 4. Introduire date-fns et fiabiliser tous les calculs de dates (UTC/local).
-5. Dé-publication automatique des anciens plannings + validation d'entrées.
+5. ~~Dé-publication automatique des anciens plannings~~ ✅ Fait · valider emails et payloads desiderata.
 6. Migration React 18 / react-router v6 / code-splitting (bundle 590 kB).
 7. Purge de l'historique git + rotation du mot de passe Gmail (🔴 prioritaire).
+8. Garde de navigation sur formulaire modifié non sauvegardé ; passe responsive
+   sur les grands tableaux ; moderniser les modales email/export restantes.
