@@ -8,6 +8,7 @@ import DesiderataStatus from './DesiderataStatus';
 import RelanceEmailModal from './RelanceEmailModal';
 import { getMedecinsSansDesiderata } from '../services/emailService';
 import { exportDesiderataToExcel } from '../services/excelExportService';
+import { Alert } from './ui';
 import logger from '../utils/logger';
 
 function GestionDesiderata() {
@@ -19,6 +20,7 @@ function GestionDesiderata() {
   const [statusFilter, setStatusFilter] = useState('tous');
   const [showRelanceModal, setShowRelanceModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
   const [isExporting, setIsExporting] = useState(false);
   const history = useHistory();
 
@@ -99,7 +101,8 @@ function GestionDesiderata() {
     try {
       const periode = await getPeriodeSaisie();
       if (!periode) {
-        setSuccessMessage('Erreur: Aucune période de saisie définie');
+        setErrorMessage('Aucune période de saisie définie');
+        setTimeout(() => setErrorMessage(''), 5000);
         return;
       }
 
@@ -108,8 +111,8 @@ function GestionDesiderata() {
       setTimeout(() => setSuccessMessage(''), 5000);
     } catch (error) {
       logger.error('Erreur lors de l\'export Excel:', error);
-      setSuccessMessage('Erreur lors de l\'export Excel');
-      setTimeout(() => setSuccessMessage(''), 5000);
+      setErrorMessage('Erreur lors de l\'export Excel');
+      setTimeout(() => setErrorMessage(''), 5000);
     } finally {
       setIsExporting(false);
     }
@@ -291,22 +294,16 @@ function GestionDesiderata() {
           </div>
         </div>
 
-        {/* Message de succès */}
+        {/* Messages de feedback */}
         {successMessage && (
-          <div style={{
-            backgroundColor: '#F0FDF4',
-            border: '1px solid #D1FAE5',
-            borderRadius: '0.5rem',
-            padding: '1rem',
-            marginBottom: '1rem',
-            color: '#059669',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}>
-            <Mail size={20} />
+          <Alert kind="success" className="mb-4">
             {successMessage}
-          </div>
+          </Alert>
+        )}
+        {errorMessage && (
+          <Alert kind="error" className="mb-4">
+            {errorMessage}
+          </Alert>
         )}
 
         {/* Filtres et recherche */}
