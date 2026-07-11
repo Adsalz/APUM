@@ -1,8 +1,7 @@
 // src/components/planning/GestionPlanning.js
 import React, { useState, useEffect } from 'react';
 import { useHistory } from 'react-router-dom';
-import { auth } from '../../firebase';
-import { getUser, getMedecins } from '../../services/userService';
+import { getMedecins } from '../../services/userService';
 import {
   getLatestPlanning,
   savePlanning,
@@ -15,6 +14,7 @@ import {
 import { genererPlanning, creneaux } from '../../utils/planningGenerator';
 import { genererPlanningPriorite } from '../../utils/planningGeneratorPriorite';
 import { AlertTriangle, Check } from 'lucide-react';
+import { LoadingScreen } from '../ui';
 import logger from '../../utils/logger';
 
 // Import des sous-composants
@@ -59,22 +59,10 @@ function GestionPlanning({ _isAdmin = true }) {
   const history = useHistory();
 
   // Effet pour charger les données initiales
+  // (auth + rôle admin garantis par ProtectedRoute)
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const authUser = auth.currentUser;
-        if (!authUser) {
-          history.push('/');
-          return;
-        }
-
-        const userData = await getUser(authUser.uid);
-        if (!userData || userData.role !== 'admin') {
-          setError('Accès non autorisé');
-          history.push('/');
-          return;
-        }
-
         // Chargement des données de base
         const [periode, medecinsList, latestPlan, publishedPlan] = await Promise.all([
           getPeriodeSaisie(),
@@ -114,7 +102,7 @@ function GestionPlanning({ _isAdmin = true }) {
     };
 
     fetchData();
-  }, [history]);
+  }, []);
 
   // Gestion des notifications
   const showNotification = (message, isError = false) => {
@@ -250,32 +238,7 @@ function GestionPlanning({ _isAdmin = true }) {
   };
 
   if (loading) {
-    return (
-      <div style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#f3f4f6'
-      }}>
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: '1rem'
-        }}>
-          <div style={{
-            width: '2rem',
-            height: '2rem',
-            border: '2px solid #E5E7EB',
-            borderTop: '2px solid #2563EB',
-            borderRadius: '50%',
-            animation: 'spin 1s linear infinite'
-          }} />
-          <p style={{ color: '#6B7280' }}>Chargement...</p>
-        </div>
-      </div>
-    );
+    return <LoadingScreen message="Chargement du planning…" />;
   }
 
   return (

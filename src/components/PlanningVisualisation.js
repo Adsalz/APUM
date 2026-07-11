@@ -1,15 +1,11 @@
 // src/components/PlanningVisualisation.js
 import React, { useState, useEffect } from 'react';
-import { useHistory } from 'react-router-dom';
-import { auth } from '../firebase';
-import { getUser, getMedecins } from '../services/userService';
+import { getMedecins } from '../services/userService';
 import {
   getPublishedPlanning,
   getPeriodeSaisie
 } from '../services/planningService';
 import {
-  Calendar,
-  ArrowLeft,
   Download,
   Filter,
   ChevronDown,
@@ -18,6 +14,8 @@ import {
   EyeOff
 } from 'lucide-react';
 import { createEvents } from 'ics';
+import { AppHeader, LoadingScreen, ErrorScreen, Alert, Button } from './ui';
+import { useAuth } from '../contexts/AuthContext';
 import logger from '../utils/logger';
 
 const creneaux = [
@@ -33,39 +31,26 @@ function PlanningVisualisation() {
   // États
   const [planning, setPlanning] = useState(null);
   const [medecins, setMedecins] = useState([]);
-  const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [icsError, setIcsError] = useState(null);
   const [viewMode, setViewMode] = useState('all'); // 'all' ou 'personal'
   const [showFilters, setShowFilters] = useState(false);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [periodeSaisie, setPeriodeSaisie] = useState(null); // eslint-disable-line no-unused-vars
 
-  const history = useHistory();
+  // Auth garanti par ProtectedRoute (profil + rôle disponibles au montage)
+  const { profile, role } = useAuth();
 
   // Effets
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const authUser = auth.currentUser;
-        if (!authUser) {
-          history.push('/');
-          return;
-        }
- 
-        const userData = await getUser(authUser.uid);
-        if (!userData || userData.role !== 'medecin') {
-          setError('Accès non autorisé');
-          history.push('/');
-          return;
-        }
- 
         // Charger tous les médecins
         const allMedecins = await getMedecins();
         setMedecins(allMedecins);
-        setUser(userData);
- 
+
         const periode = await getPeriodeSaisie();
         if (!periode) {
           setError('Aucune période de saisie n\'a été définie');
@@ -88,9 +73,9 @@ function PlanningVisualisation() {
         setLoading(false);
       }
     };
- 
+
     fetchData();
-  }, [history]);
+  }, []);
 
   const exportToICS = () => {
     if (!planning || !planning.planning) {return;}
@@ -102,7 +87,7 @@ function PlanningVisualisation() {
       creneaux.forEach(creneau => {
         if (planning.planning[date][creneau.id]) {
           planning.planning[date][creneau.id].forEach((medecinId, _index) => {
-            if (medecinId === user.id) {
+            if (medecinId === profile.id) {
               const startDate = new Date(date);
               const endDate = new Date(date);
               let startHour, endHour;
@@ -138,10 +123,11 @@ function PlanningVisualisation() {
       });
     });
 
-    createEvents(events, (error, value) => {
-      if (error) {
-        logger.error(error);
-        alert('Une erreur est survenue lors de la création du fichier ICS');
+    createEvents(events, (icsErr, value) => {
+      if (icsErr) {
+        logger.error(icsErr);
+        setIcsError('Une erreur est survenue lors de la création du fichier ICS');
+        setTimeout(() => setIcsError(null), 5000);
         return;
       }
       const blob = new Blob([value], { type: 'text/calendar;charset=utf-8' });
@@ -168,8 +154,8 @@ function PlanningVisualisation() {
   };
 
   const getMedecinName = (medecinId) => {
-    if (medecinId === user.id) {
-      return `Dr. ${user.prenom} ${user.nom}`;
+    if (medecinId === profile.id) {
+      return `Dr. ${profile.prenom} ${profile.nom}`;
     }
     const medecin = medecins.find(m => m.id === medecinId);
     return medecin ? `Dr. ${medecin.prenom} ${medecin.nom}` : 'Médecin non trouvé';
@@ -177,61 +163,11 @@ function PlanningVisualisation() {
 
   // Rendu conditionnel pour chargement et erreurs
   if (loading) {
-    return (
-      <div style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#f3f4f6'
-      }}>
-        Chargement...
-      </div>
-    );
+    return <LoadingScreen />;
   }
 
   if (error) {
-    return (
-      <div style={{
-        minHeight: '100vh',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#f3f4f6',
-        padding: '1rem'
-      }}>
-        <div style={{
-          backgroundColor: 'white',
-          padding: '2rem',
-          borderRadius: '0.5rem',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-          maxWidth: '500px',
-          width: '100%',
-          textAlign: 'center'
-        }}>
-          <h2 style={{ color: '#DC2626', marginBottom: '1rem' }}>Erreur</h2>
-          <p style={{ color: '#4B5563', marginBottom: '1.5rem' }}>{error}</p>
-          <button
-            onClick={() => history.push('/dashboard-medecin')}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              padding: '0.5rem 1rem',
-              backgroundColor: '#2563EB',
-              color: 'white',
-              borderRadius: '0.375rem',
-              border: 'none',
-              cursor: 'pointer'
-            }}
-          >
-            <ArrowLeft size={18} />
-            Retour au tableau de bord
-          </button>
-        </div>
-      </div>
-    );
+    return <ErrorScreen message={error} />;
   }
 
   if (!planning || !planning.planning) {
@@ -256,95 +192,37 @@ function PlanningVisualisation() {
   return (
     <div style={{ backgroundColor: '#f3f4f6', minHeight: '100vh' }}>
       {/* Menu fixe en haut */}
-      <nav style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        backgroundColor: 'rgba(255, 255, 255, 0.95)',
-        borderBottom: '1px solid #e5e7eb',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-        zIndex: 40
-      }}>
-        <div style={{
-          maxWidth: '1280px',
-          margin: '0 auto',
-          padding: '1rem',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '1rem'
-          }}>
-            <button
-              onClick={() => history.push('/dashboard-medecin')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                color: '#4B5563',
-                border: 'none',
-                background: 'none',
-                cursor: 'pointer',
-                padding: '0.5rem'
-              }}
-            >
-              <ArrowLeft size={20} />
-              Retour
-            </button>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              color: '#2563EB',
-              fontWeight: 'bold'
-            }}>
-              <Calendar size={24} />
-              <span>Planning des gardes</span>
-            </div>
-          </div>
-
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '1rem'
-          }}>
-            <button
-              onClick={exportToICS}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.5rem 1rem',
-                backgroundColor: '#2563EB',
-                color: 'white',
-                borderRadius: '0.375rem',
-                border: 'none',
-                cursor: 'pointer',
-                fontSize: '0.875rem'
-              }}
-            >
-              <Download size={18} />
-              Exporter (ICS)
-            </button>
-          </div>
-        </div>
-      </nav>
+      <AppHeader
+        backTo={role === 'admin' ? '/dashboard-admin' : '/dashboard-medecin'}
+        actions={
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<Download size={16} />}
+            onClick={exportToICS}
+          >
+            Exporter (ICS)
+          </Button>
+        }
+      />
 
       {/* Contenu principal */}
       <main style={{
         maxWidth: '100%',
         margin: '0 auto',
-        padding: '2rem',
-        marginTop: '80px', // Espace spécifique après le bandeau
-        height: 'calc(100vh - 80px)', // Ajusté pour la nouvelle marge
+        padding: '6rem 2rem 2rem', // 6rem en haut : espace sous la navbar fixe (uniforme avec les autres écrans)
+        height: '100vh', // padding inclus (box-sizing: border-box) : zone visible = 100vh - 6rem - 2rem
         display: 'flex',
         flexDirection: 'column',
         gap: '1.5rem'
       }}>
+
+        {/* Erreur d'export ICS (auto-masquée après 5 s) */}
+        {icsError && (
+          <Alert kind="error" className="mb-4">
+            {icsError}
+          </Alert>
+        )}
 
         {/* Section des filtres */}
         <div style={{

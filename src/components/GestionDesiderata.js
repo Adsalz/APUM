@@ -1,14 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useHistory } from 'react-router-dom';
-import { auth } from '../firebase';
-import { getUser, getMedecins } from '../services/userService';
+import { getMedecins } from '../services/userService';
 import { getDesiderataStatus, getPeriodeSaisie } from '../services/planningService';
-import { ArrowLeft, ClipboardList, Search, Mail, Download } from 'lucide-react';
+import { Search, Mail, Download } from 'lucide-react';
 import DesiderataStatus from './DesiderataStatus';
 import RelanceEmailModal from './RelanceEmailModal';
 import { getMedecinsSansDesiderata } from '../services/emailService';
 import { exportDesiderataToExcel } from '../services/excelExportService';
-import { Alert } from './ui';
+import { AppHeader, LoadingScreen, ErrorScreen, Alert } from './ui';
 import logger from '../utils/logger';
 
 function GestionDesiderata() {
@@ -22,24 +20,11 @@ function GestionDesiderata() {
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [isExporting, setIsExporting] = useState(false);
-  const history = useHistory();
 
+  // Auth/rôle admin garantis par ProtectedRoute : on charge uniquement les données
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const authUser = auth.currentUser;
-        if (!authUser) {
-          history.push('/');
-          return;
-        }
-
-        const userData = await getUser(authUser.uid);
-        if (!userData || userData.role !== 'admin') {
-          setError('Utilisateur non autorisé');
-          history.push('/');
-          return;
-        }
-
         const medecinsList = await getMedecins();
         setMedecins(medecinsList);
 
@@ -55,7 +40,7 @@ function GestionDesiderata() {
     };
 
     fetchData();
-  }, [history]);
+  }, []);
 
   const getFilteredMedecins = () => {
     if (!medecins) {return [];}
@@ -119,105 +104,17 @@ function GestionDesiderata() {
   };
 
   if (loading) {
-    return (
-      <div style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#f3f4f6'
-      }}>
-        Chargement...
-      </div>
-    );
+    return <LoadingScreen />;
   }
 
   if (error) {
-    return (
-      <div style={{
-        minHeight: '100vh',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#f3f4f6',
-        padding: '1rem'
-      }}>
-        <div style={{
-          backgroundColor: 'white',
-          padding: '2rem',
-          borderRadius: '0.5rem',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-          maxWidth: '500px',
-          width: '100%',
-          textAlign: 'center'
-        }}>
-          <h2 style={{ color: '#DC2626', marginBottom: '1rem' }}>Erreur</h2>
-          <p style={{ color: '#4B5563', marginBottom: '1.5rem' }}>{error}</p>
-        </div>
-      </div>
-    );
+    return <ErrorScreen message={error} />;
   }
 
   return (
     <div style={{ backgroundColor: '#f3f4f6', minHeight: '100vh' }}>
       {/* Menu fixe en haut */}
-      <nav style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        backgroundColor: 'rgba(255, 255, 255, 0.95)',
-        borderBottom: '1px solid #e5e7eb',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-        zIndex: 40
-      }}>
-        <div style={{
-          maxWidth: '1280px',
-          margin: '0 auto',
-          padding: '1rem',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            color: '#D97706',
-            fontWeight: 'bold',
-            fontSize: '1.25rem'
-          }}>
-            <ClipboardList size={24} />
-            <span>État des Desiderata</span>
-          </div>
-
-          <button
-            onClick={() => history.push('/dashboard-admin')}
-            style={{
-              padding: '0.5rem 1rem',
-              color: '#4B5563',
-              backgroundColor: '#F3F4F6',
-              border: '1px solid #E5E7EB',
-              borderRadius: '0.375rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              cursor: 'pointer',
-              transition: 'all 0.2s'
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.backgroundColor = '#E5E7EB';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.backgroundColor = '#F3F4F6';
-            }}
-          >
-            <ArrowLeft size={18} />
-            Retour
-          </button>
-        </div>
-      </nav>
+      <AppHeader backTo="/dashboard-admin" />
 
       {/* Contenu principal */}
       <main style={{

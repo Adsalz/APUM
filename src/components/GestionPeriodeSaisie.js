@@ -1,49 +1,38 @@
 // src/components/GestionPeriodeSaisie.js
 import React, { useState, useEffect } from 'react';
-import { useHistory } from 'react-router-dom';
-import { auth } from '../firebase';
-import { getUser } from '../services/userService';
 import { setPeriodeSaisie, getPeriodeSaisie } from '../services/planningService';
-import { ArrowLeft, Calendar, Save, AlertTriangle, Check } from 'lucide-react';
+import { Save, AlertTriangle, Check } from 'lucide-react';
+import { AppHeader, LoadingScreen, Button } from './ui';
 import logger from '../utils/logger';
 
 function GestionPeriodeSaisie() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(null);
-  const history = useHistory();
 
+  // Auth/rôle garantis par ProtectedRoute : on charge uniquement la période
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged(async (authUser) => {
-      if (authUser) {
-        try {
-          const userData = await getUser(authUser.uid);
-          if (userData.role !== 'admin') {
-            setError('Accès non autorisé');
-            history.push('/');
-          } else {
-            setCurrentUser(userData);
-            const periode = await getPeriodeSaisie();
-            if (periode) {
-              setStartDate(periode.startDate.split('T')[0]);
-              setEndDate(periode.endDate.split('T')[0]);
-            }
-          }
-        } catch (error) {
-          logger.error('Erreur lors de la récupération des données utilisateur:', error);
-          setError('Erreur lors de la récupération des données utilisateur');
+    const fetchPeriode = async () => {
+      try {
+        const periode = await getPeriodeSaisie();
+        if (periode) {
+          setStartDate(periode.startDate.split('T')[0]);
+          setEndDate(periode.endDate.split('T')[0]);
         }
-      } else {
-        history.push('/');
+      } catch (error) {
+        logger.error('Erreur lors du chargement de la période de saisie:', error);
+        setError('Erreur lors du chargement de la période de saisie');
+        setTimeout(() => setError(null), 5000);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
-    });
+    };
 
-    return () => unsubscribe();
-  }, [history]);
+    fetchPeriode();
+  }, []);
 
   const showNotification = (message, isError = false) => {
     if (isError) {
@@ -57,147 +46,40 @@ function GestionPeriodeSaisie() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (isSaving) {return;} // anti double-submit
+    setIsSaving(true);
     try {
       await setPeriodeSaisie(startDate, endDate);
       showNotification('Période de saisie mise à jour avec succès! Les desiderata obsolètes ont été supprimés.');
     } catch (error) {
       logger.error('Erreur lors de la mise à jour de la période de saisie:', error);
       showNotification('Une erreur est survenue lors de la mise à jour de la période de saisie', true);
+    } finally {
+      setIsSaving(false);
     }
   };
 
   if (loading) {
-    return (
-      <div style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#f3f4f6'
-      }}>
-        Chargement...
-      </div>
-    );
-  }
-
-  if (error && !currentUser) {
-    return (
-      <div style={{
-        minHeight: '100vh',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#f3f4f6',
-        padding: '1rem'
-      }}>
-        <div style={{
-          backgroundColor: 'white',
-          padding: '2rem',
-          borderRadius: '0.5rem',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-          maxWidth: '500px',
-          width: '100%',
-          textAlign: 'center'
-        }}>
-          <h2 style={{ color: '#DC2626', marginBottom: '1rem' }}>Erreur</h2>
-          <p style={{ color: '#4B5563', marginBottom: '1.5rem' }}>{error}</p>
-          <button
-            onClick={() => history.push('/dashboard-admin')}
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              padding: '0.5rem 1rem',
-              backgroundColor: '#2563EB',
-              color: 'white',
-              borderRadius: '0.375rem',
-              border: 'none',
-              cursor: 'pointer'
-            }}
-          >
-            <ArrowLeft size={18} />
-            Retour au tableau de bord
-          </button>
-        </div>
-      </div>
-    );
+    return <LoadingScreen />;
   }
 
   return (
     <div style={{ backgroundColor: '#f3f4f6', minHeight: '100vh' }}>
       {/* Menu fixe en haut */}
-      <nav style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        backgroundColor: 'rgba(255, 255, 255, 0.95)',
-        borderBottom: '1px solid #e5e7eb',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-        zIndex: 40
-      }}>
-        <div style={{
-          maxWidth: '1280px',
-          margin: '0 auto',
-          padding: '1rem',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '1rem'
-          }}>
-            <button
-              onClick={() => history.push('/dashboard-admin')}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                color: '#4B5563',
-                border: 'none',
-                background: 'none',
-                cursor: 'pointer',
-                padding: '0.5rem'
-              }}
-            >
-              <ArrowLeft size={20} />
-              Retour
-            </button>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              color: '#2563EB',
-              fontWeight: 'bold'
-            }}>
-              <Calendar size={24} />
-              <span>Période de saisie</span>
-            </div>
-          </div>
-
-          <button
+      <AppHeader
+        backTo="/dashboard-admin"
+        actions={
+          <Button
+            variant="primary"
+            size="sm"
+            icon={<Save size={16} />}
+            loading={isSaving}
             onClick={handleSubmit}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              padding: '0.5rem 1rem',
-              backgroundColor: '#2563EB',
-              color: 'white',
-              borderRadius: '0.375rem',
-              border: 'none',
-              cursor: 'pointer',
-              fontWeight: '500'
-            }}
           >
-            <Save size={18} />
             Enregistrer
-          </button>
-        </div>
-      </nav>
+          </Button>
+        }
+      />
 
       {/* Notifications */}
       {error && (
