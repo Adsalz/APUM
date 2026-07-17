@@ -25,7 +25,9 @@ desiderata-*.json
 desiderata.txt
 desiderata_individuels/
 Desideratas papiers/
-DESIDERATA*.xlsx
+# Aucun classeur/données ne doit être versionné (exports générés, données médicales)
+*.xlsx
+*.xls
 
 # Système / IDE
 .DS_Store

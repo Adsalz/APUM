@@ -4,7 +4,6 @@ import { twMerge } from 'tailwind-merge';
 import { getMedecins } from '../services/userService';
 import { getPublishedPlanning, getPeriodeSaisie } from '../services/planningService';
 import { Download, SlidersHorizontal, Eye, User, CalendarX } from 'lucide-react';
-import { createEvents } from 'ics';
 import {
   AppHeader,
   LoadingScreen,
@@ -70,7 +69,7 @@ function PlanningVisualisation() {
     return () => { cancelled = true; };
   }, []);
 
-  const exportToICS = () => {
+  const exportToICS = async () => {
     if (!planning || !planning.planning) {return;}
     const events = [];
     const sortedDates = Object.keys(planning.planning).sort((a, b) => new Date(a) - new Date(b));
@@ -116,6 +115,8 @@ function PlanningVisualisation() {
       return;
     }
 
+    // ics chargé à la demande pour alléger le bundle initial.
+    const { createEvents } = await import('ics');
     createEvents(events, (icsErr, value) => {
       if (icsErr) {
         logger.error(icsErr);

@@ -1,7 +1,7 @@
 // src/components/FormulaireDesiderataAdmin.js
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { twMerge } from 'tailwind-merge';
-import { useHistory, Prompt } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { getMedecins } from '../services/userService';
 import {
   addDesiderata,
@@ -38,6 +38,7 @@ import {
 } from './ui';
 import { useAuth } from '../contexts/AuthContext';
 import useUnsavedChangesWarning from '../hooks/useUnsavedChangesWarning';
+import useBlockNavigation from '../hooks/useBlockNavigation';
 import { CRENEAUX as creneaux, CHOIX_DISPONIBILITE } from '../constants/creneaux';
 
 const options = CHOIX_DISPONIBILITE;
@@ -70,12 +71,17 @@ function FormulaireDesiderataAdmin() {
   const [pendingMedecinId, setPendingMedecinId] = useState(null);
 
   const fileInputRef = useRef(null);
-  const history = useHistory();
+  const navigate = useNavigate();
   const { profile } = useAuth();
   const toast = useToast();
 
   // Avertit avant fermeture/rechargement de l'onglet si saisie non enregistrée.
   useUnsavedChangesWarning(isDirty);
+  // Bloque la navigation interne (liens, retour) tant que la saisie n'est pas enregistrée.
+  useBlockNavigation(
+    isDirty,
+    'Vous avez des modifications non enregistrées. Voulez-vous vraiment quitter cette page ?'
+  );
 
   // Génération des dates avec correction de fuseau horaire
   const generateDates = useCallback(() => {
@@ -381,7 +387,7 @@ function FormulaireDesiderataAdmin() {
         // Plus de modifications en attente → ne pas bloquer la navigation.
         setIsDirty(false);
         // Laisser le temps de voir le message avant de revenir au tableau de bord
-        setTimeout(() => history.push('/dashboard-admin'), 1500);
+        setTimeout(() => navigate('/dashboard-admin'), 1500);
       } catch (error) {
         logger.error('Erreur lors de la soumission des desiderata:', error);
         setIsSaving(false);
@@ -428,10 +434,6 @@ function FormulaireDesiderataAdmin() {
 
   return (
     <div className="min-h-screen bg-ink-100">
-      <Prompt
-        when={isDirty}
-        message="Vous avez des modifications non enregistrées. Voulez-vous vraiment quitter cette page ?"
-      />
       {/* Menu fixe en haut */}
       <AppHeader
         backTo="/dashboard-admin"

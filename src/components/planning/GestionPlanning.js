@@ -1,6 +1,6 @@
 // src/components/planning/GestionPlanning.js
 import React, { useState, useEffect } from 'react';
-import { useHistory } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { getMedecins } from '../../services/userService';
 import {
   getLatestPlanning,
@@ -58,7 +58,7 @@ function GestionPlanning() {
   // Navigation en attente d'une confirmation d'abandon des modifications.
   const [pendingBack, setPendingBack] = useState(false);
 
-  const history = useHistory();
+  const navigate = useNavigate();
 
   // Avertit avant de quitter/recharger l'onglet si des modifications sont en cours.
   useUnsavedChangesWarning(editMode && modified);
@@ -255,7 +255,7 @@ function GestionPlanning() {
       setShowDiscardChanges(true);
       return;
     }
-    history.push('/dashboard-admin');
+    navigate('/dashboard-admin');
   };
 
   if (loading) {
@@ -364,7 +364,7 @@ function GestionPlanning() {
           setEditMode(false);
           if (pendingBack) {
             setPendingBack(false);
-            history.push('/dashboard-admin');
+            navigate('/dashboard-admin');
           }
         }}
       />

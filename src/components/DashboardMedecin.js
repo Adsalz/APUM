@@ -1,6 +1,6 @@
 // src/components/DashboardMedecin.js
 import React, { useState, useEffect } from 'react';
-import { useHistory } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { ClipboardList, CalendarDays, FileText } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { getDesiderataByUser } from '../services/planningService';
@@ -12,7 +12,7 @@ function DashboardMedecin() {
   const [desiderata, setDesiderata] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const history = useHistory();
+  const navigate = useNavigate();
 
   useEffect(() => {
     let cancelled = false;
@@ -83,14 +83,14 @@ function DashboardMedecin() {
             icon={<ClipboardList size={22} />}
             title="Saisir mes desiderata"
             description="Indiquez vos disponibilités"
-            onClick={() => history.push('/formulaire-desirata')}
+            onClick={() => navigate('/formulaire-desirata')}
           />
           <ActionCard
             tone="green"
             icon={<CalendarDays size={22} />}
             title="Voir le planning"
             description="Consultez le planning publié"
-            onClick={() => history.push('/planning-visualisation')}
+            onClick={() => navigate('/planning-visualisation')}
           />
         </div>
 

@@ -25,8 +25,8 @@ import {
 } from './ui';
 import QuickFill from './QuickFill';
 import WeeklyPattern from './WeeklyPattern';
-import { Prompt } from 'react-router-dom';
 import useUnsavedChangesWarning from '../hooks/useUnsavedChangesWarning';
+import useBlockNavigation from '../hooks/useBlockNavigation';
 import { CRENEAUX as creneaux, CHOIX_DISPONIBILITE } from '../constants/creneaux';
 
 const options = CHOIX_DISPONIBILITE;
@@ -59,6 +59,11 @@ function FormulaireDesirata() {
 
   // Avertit avant fermeture/rechargement de l'onglet si saisie non enregistrée.
   useUnsavedChangesWarning(isDirty);
+  // Bloque la navigation interne (liens, retour) tant que la saisie n'est pas enregistrée.
+  useBlockNavigation(
+    isDirty,
+    'Vous avez des modifications non enregistrées. Voulez-vous vraiment quitter cette page ?'
+  );
 
   const generateDates = useCallback(() => {
     if (!periodeSaisie) {return [];}
@@ -277,10 +282,6 @@ function FormulaireDesirata() {
 
   return (
     <div className="min-h-screen bg-ink-100">
-      <Prompt
-        when={isDirty}
-        message="Vous avez des modifications non enregistrées. Voulez-vous vraiment quitter cette page ?"
-      />
       <AppHeader
         backTo="/dashboard-medecin"
         actions={

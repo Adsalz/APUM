@@ -1,6 +1,6 @@
 // src/components/Login.js
 import React, { useState } from 'react';
-import { useHistory, Redirect } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { Calendar } from 'lucide-react';
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { auth } from '../firebase';
@@ -25,7 +25,7 @@ function Login() {
   const [resetSuccess, setResetSuccess] = useState('');
   const [resetLoading, setResetLoading] = useState(false);
 
-  const history = useHistory();
+  const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -44,9 +44,9 @@ function Login() {
       }
 
       if (user.role === 'medecin') {
-        history.push('/dashboard-medecin');
+        navigate('/dashboard-medecin');
       } else if (user.role === 'admin') {
-        history.push('/dashboard-admin');
+        navigate('/dashboard-admin');
       } else {
         setError('Rôle utilisateur non reconnu');
         setIsLoading(false);
@@ -91,7 +91,7 @@ function Login() {
   // Utilisateur déjà connecté : renvoi direct vers son tableau de bord
   if (!authLoading && firebaseUser && role) {
     return (
-      <Redirect to={role === 'admin' ? '/dashboard-admin' : '/dashboard-medecin'} />
+      <Navigate to={role === 'admin' ? '/dashboard-admin' : '/dashboard-medecin'} replace />
     );
   }
 
