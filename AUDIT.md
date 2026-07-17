@@ -178,7 +178,9 @@ Deuxième passe (« rendre l'app la plus pro possible »). Vérifié à chaque �
 - Suppression du compte Firebase Auth à la révocation d'un utilisateur
   (nécessite une Cloud Function ; aujourd'hui seul le doc Firestore est supprimé).
 - Création d'utilisateur atomique (Cloud Function transactionnelle Auth + doc).
-- Migration react-router v6 + code-splitting des libs d'export (bundle ~595 kB).
+- ~~Migration react-router v6 + code-splitting~~ ✅ Fait (vague 3) : router v6
+  (createBrowserRouter, useNavigate, useBlocker), lazy-loading par route et
+  imports dynamiques exceljs/jspdf/ics → **bundle initial 595 kB → 190 kB gzip**.
 - Fusion des deux formulaires desiderata (~300 lignes communes restantes).
 - Fiabilisation complète des dates (date-fns / UTC) ; génération de planning en
   Web Worker (aujourd'hui synchrone sur le thread principal).
