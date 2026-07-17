@@ -19,9 +19,7 @@ const PublishPlanningModal = ({
         ? 'Cette action mettra à jour le planning publié. Les médecins verront les changements immédiatement.'
         : 'Cette action publiera le planning et le rendra visible pour tous les médecins.'}
       icon={Upload}
-      iconColor="#059669"
-      iconBgColor="#ECFDF5"
-      confirmButtonColor="#059669"
+      tone="success"
       confirmLabel="Confirmer la publication"
     />
   );

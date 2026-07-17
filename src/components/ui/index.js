@@ -1,0 +1,18 @@
+// src/components/ui/index.js — point d'entrée du design system
+export { default as Alert } from './Alert';
+export { default as AppHeader } from './AppHeader';
+export { default as ActionCard } from './ActionCard';
+export { default as Badge } from './Badge';
+export { default as Button } from './Button';
+export { default as Card } from './Card';
+export { default as Checkbox } from './Checkbox';
+export { default as EmptyState } from './EmptyState';
+export { default as ErrorScreen } from './ErrorScreen';
+export { default as FormField } from './FormField';
+export { default as LoadingScreen } from './LoadingScreen';
+export { default as Modal } from './Modal';
+export { default as Select } from './Select';
+export { default as SegmentedControl } from './SegmentedControl';
+export { default as Spinner } from './Spinner';
+export { default as StatCard } from './StatCard';
+export { ToastProvider, useToast } from './Toast';

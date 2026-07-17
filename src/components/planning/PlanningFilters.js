@@ -2,6 +2,11 @@
 import React from 'react';
 import { Filter, ChevronDown, ChevronUp, List, Grid } from 'lucide-react';
 import MedecinSearchSelect from './components/MedecinSearchSelect';
+import { Card, Select, SegmentedControl } from '../ui';
+
+const inputClass =
+  'w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm text-ink-800 shadow-sm ' +
+  'transition-colors hover:border-ink-300 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/25';
 
 const PlanningFilters = ({
   showFilters,
@@ -18,112 +23,53 @@ const PlanningFilters = ({
   creneaux
 }) => {
   return (
-    <div style={{
-      backgroundColor: 'white',
-      borderRadius: '0.5rem',
-      marginBottom: '1.5rem',
-      boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-    }}>
+    <Card className="mb-6 overflow-visible p-0">
       <button
+        type="button"
         onClick={onToggleFilters}
-        style={{
-          width: '100%',
-          padding: '1rem 1.5rem',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          border: 'none',
-          background: 'none',
-          cursor: 'pointer',
-          borderRadius: '0.5rem'
-        }}
+        className="flex w-full items-center justify-between rounded-2xl px-6 py-4 text-left transition-colors hover:bg-ink-50"
       >
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem',
-          color: '#374151'
-        }}>
-          <Filter size={20} />
-          <span style={{ fontWeight: '500' }}>Filtres et recherche</span>
-        </div>
-        {showFilters ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+        <span className="flex items-center gap-2 font-semibold text-ink-800">
+          <Filter size={20} aria-hidden="true" className="text-ink-400" />
+          Filtres et recherche
+        </span>
+        {showFilters
+          ? <ChevronUp size={20} aria-hidden="true" className="text-ink-400" />
+          : <ChevronDown size={20} aria-hidden="true" className="text-ink-400" />}
       </button>
 
       {showFilters && (
-        <div style={{
-          padding: '1rem 1.5rem',
-          borderTop: '1px solid #E5E7EB'
-        }}>
-          <div style={{
-            display: 'grid',
-            gap: '1rem',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))'
-          }}>
+        <div className="border-t border-ink-100 px-6 py-5">
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
             {/* Filtre par période */}
             <div>
-              <label style={{
-                display: 'block',
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                color: '#374151',
-                marginBottom: '0.5rem'
-              }}>
+              <label className="mb-2 block text-sm font-semibold text-ink-700">
                 Période
               </label>
-              <div style={{
-                display: 'flex',
-                gap: '0.5rem'
-              }}>
+              <div className="flex gap-2">
                 <input
                   type="date"
                   value={dateFilter.start}
                   onChange={(e) => onDateFilterChange({ ...dateFilter, start: e.target.value })}
-                  style={{
-                    flex: 1,
-                    padding: '0.5rem',
-                    borderRadius: '0.375rem',
-                    border: '1px solid #D1D5DB',
-                    fontSize: '0.875rem'
-                  }}
+                  className={inputClass}
                 />
                 <input
                   type="date"
                   value={dateFilter.end}
                   onChange={(e) => onDateFilterChange({ ...dateFilter, end: e.target.value })}
-                  style={{
-                    flex: 1,
-                    padding: '0.5rem',
-                    borderRadius: '0.375rem',
-                    border: '1px solid #D1D5DB',
-                    fontSize: '0.875rem'
-                  }}
+                  className={inputClass}
                 />
               </div>
             </div>
 
             {/* Filtre par créneau */}
             <div>
-              <label style={{
-                display: 'block',
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                color: '#374151',
-                marginBottom: '0.5rem'
-              }}>
+              <label className="mb-2 block text-sm font-semibold text-ink-700">
                 Créneau
               </label>
-              <select
+              <Select
                 value={creneauFilter}
                 onChange={(e) => onCreneauFilterChange(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.5rem',
-                  borderRadius: '0.375rem',
-                  border: '1px solid #D1D5DB',
-                  backgroundColor: 'white',
-                  fontSize: '0.875rem'
-                }}
               >
                 <option value="all">Tous les créneaux</option>
                 {creneaux.map(creneau => (
@@ -131,19 +77,13 @@ const PlanningFilters = ({
                     {creneau.label} ({creneau.hours})
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
 
             {/* Filtre par médecin */}
             <div>
-              <label style={{
-                display: 'block',
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                color: '#374151',
-                marginBottom: '0.5rem'
-              }}>
-    Médecin
+              <label className="mb-2 block text-sm font-semibold text-ink-700">
+                Médecin
               </label>
               <MedecinSearchSelect
                 medecins={medecins}
@@ -155,55 +95,22 @@ const PlanningFilters = ({
 
             {/* Sélecteur de vue */}
             <div>
-              <label style={{
-                display: 'block',
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                color: '#374151',
-                marginBottom: '0.5rem'
-              }}>
-                Mode d'affichage
+              <label className="mb-2 block text-sm font-semibold text-ink-700">
+                Mode d&apos;affichage
               </label>
-              <div style={{
-                display: 'flex',
-                gap: '0.5rem',
-                backgroundColor: '#F3F4F6',
-                padding: '0.25rem',
-                borderRadius: '0.375rem',
-                width: 'fit-content'
-              }}>
-                <button
-                  onClick={() => onViewModeChange('list')}
-                  style={{
-                    padding: '0.5rem',
-                    borderRadius: '0.25rem',
-                    border: 'none',
-                    backgroundColor: viewMode === 'list' ? 'white' : 'transparent',
-                    boxShadow: viewMode === 'list' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <List size={20} color={viewMode === 'list' ? '#2563EB' : '#6B7280'} />
-                </button>
-                <button
-                  onClick={() => onViewModeChange('grid')}
-                  style={{
-                    padding: '0.5rem',
-                    borderRadius: '0.25rem',
-                    border: 'none',
-                    backgroundColor: viewMode === 'grid' ? 'white' : 'transparent',
-                    boxShadow: viewMode === 'grid' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <Grid size={20} color={viewMode === 'grid' ? '#2563EB' : '#6B7280'} />
-                </button>
-              </div>
+              <SegmentedControl
+                value={viewMode}
+                onChange={onViewModeChange}
+                options={[
+                  { value: 'list', label: 'Liste', icon: <List size={16} aria-hidden="true" /> },
+                  { value: 'grid', label: 'Grille', icon: <Grid size={16} aria-hidden="true" /> },
+                ]}
+              />
             </div>
           </div>
         </div>
       )}
-    </div>
+    </Card>
   );
 };
 

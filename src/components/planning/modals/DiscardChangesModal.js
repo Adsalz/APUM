@@ -16,9 +16,7 @@ const DiscardChangesModal = ({
       title="Changements non sauvegardés"
       message="Vous avez des modifications non sauvegardées. Voulez-vous vraiment quitter le mode édition ? Les changements seront perdus."
       icon={AlertTriangle}
-      iconColor="#DC2626"
-      iconBgColor="#FEE2E2"
-      confirmButtonColor="#DC2626"
+      tone="danger"
       confirmLabel="Abandonner les changements"
       cancelLabel="Continuer l'édition"
     />

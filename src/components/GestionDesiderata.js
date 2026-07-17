@@ -1,13 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { useHistory } from 'react-router-dom';
-import { auth } from '../firebase';
-import { getUser, getMedecins } from '../services/userService';
+import { getMedecins } from '../services/userService';
 import { getDesiderataStatus, getPeriodeSaisie } from '../services/planningService';
-import { ArrowLeft, ClipboardList, Search, Mail, Download } from 'lucide-react';
+import { Search, Mail, Download } from 'lucide-react';
 import DesiderataStatus from './DesiderataStatus';
 import RelanceEmailModal from './RelanceEmailModal';
 import { getMedecinsSansDesiderata } from '../services/emailService';
 import { exportDesiderataToExcel } from '../services/excelExportService';
+import {
+  AppHeader,
+  LoadingScreen,
+  ErrorScreen,
+  Button,
+  Card,
+  SegmentedControl,
+  EmptyState,
+  useToast,
+} from './ui';
 import logger from '../utils/logger';
 
 function GestionDesiderata() {
@@ -18,26 +26,13 @@ function GestionDesiderata() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('tous');
   const [showRelanceModal, setShowRelanceModal] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
   const [isExporting, setIsExporting] = useState(false);
-  const history = useHistory();
+  const toast = useToast();
 
+  // Auth/rôle admin garantis par ProtectedRoute : on charge uniquement les données
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const authUser = auth.currentUser;
-        if (!authUser) {
-          history.push('/');
-          return;
-        }
-
-        const userData = await getUser(authUser.uid);
-        if (!userData || userData.role !== 'admin') {
-          setError('Utilisateur non autorisé');
-          history.push('/');
-          return;
-        }
-
         const medecinsList = await getMedecins();
         setMedecins(medecinsList);
 
@@ -53,7 +48,7 @@ function GestionDesiderata() {
     };
 
     fetchData();
-  }, [history]);
+  }, []);
 
   const getFilteredMedecins = () => {
     if (!medecins) {return [];}
@@ -63,7 +58,7 @@ function GestionDesiderata() {
     // Filtre par recherche
     if (searchTerm) {
       const search = searchTerm.toLowerCase();
-      filtered = filtered.filter(medecin => 
+      filtered = filtered.filter(medecin =>
         `${medecin.prenom} ${medecin.nom}`.toLowerCase().includes(search)
       );
     }
@@ -72,7 +67,7 @@ function GestionDesiderata() {
     if (statusFilter !== 'tous') {
       filtered = filtered.filter(medecin => {
         const medecinDesiderata = desiderataStatus?.find(d => d.userId === medecin.id);
-        
+
         switch (statusFilter) {
         case 'complet':
           return medecinDesiderata && Object.keys(medecinDesiderata.desiderata || {}).length > 0;
@@ -88,8 +83,7 @@ function GestionDesiderata() {
   };
 
   const handleRelanceSuccess = (resultats) => {
-    setSuccessMessage(`${resultats.succes} email(s) de relance envoyé(s) avec succès !`);
-    setTimeout(() => setSuccessMessage(''), 5000); // Masquer après 5 secondes
+    toast.success(`${resultats.succes} email(s) de relance envoyé(s) avec succès !`);
   };
 
   const medecinsSansDesiderata = getMedecinsSansDesiderata(medecins, desiderataStatus || []);
@@ -99,338 +93,115 @@ function GestionDesiderata() {
     try {
       const periode = await getPeriodeSaisie();
       if (!periode) {
-        setSuccessMessage('Erreur: Aucune période de saisie définie');
+        toast.error('Aucune période de saisie définie');
         return;
       }
 
       const result = await exportDesiderataToExcel(medecins, desiderataStatus || [], periode);
-      setSuccessMessage(result.message);
-      setTimeout(() => setSuccessMessage(''), 5000);
+      toast.success(result.message);
     } catch (error) {
       logger.error('Erreur lors de l\'export Excel:', error);
-      setSuccessMessage('Erreur lors de l\'export Excel');
-      setTimeout(() => setSuccessMessage(''), 5000);
+      toast.error('Erreur lors de l\'export Excel');
     } finally {
       setIsExporting(false);
     }
   };
 
   if (loading) {
-    return (
-      <div style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#f3f4f6'
-      }}>
-        Chargement...
-      </div>
-    );
+    return <LoadingScreen />;
   }
 
   if (error) {
-    return (
-      <div style={{
-        minHeight: '100vh',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        backgroundColor: '#f3f4f6',
-        padding: '1rem'
-      }}>
-        <div style={{
-          backgroundColor: 'white',
-          padding: '2rem',
-          borderRadius: '0.5rem',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-          maxWidth: '500px',
-          width: '100%',
-          textAlign: 'center'
-        }}>
-          <h2 style={{ color: '#DC2626', marginBottom: '1rem' }}>Erreur</h2>
-          <p style={{ color: '#4B5563', marginBottom: '1.5rem' }}>{error}</p>
-        </div>
-      </div>
-    );
+    return <ErrorScreen message={error} />;
   }
 
   return (
-    <div style={{ backgroundColor: '#f3f4f6', minHeight: '100vh' }}>
+    <div className="min-h-screen bg-ink-100">
       {/* Menu fixe en haut */}
-      <nav style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        backgroundColor: 'rgba(255, 255, 255, 0.95)',
-        borderBottom: '1px solid #e5e7eb',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-        zIndex: 40
-      }}>
-        <div style={{
-          maxWidth: '1280px',
-          margin: '0 auto',
-          padding: '1rem',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            color: '#D97706',
-            fontWeight: 'bold',
-            fontSize: '1.25rem'
-          }}>
-            <ClipboardList size={24} />
-            <span>État des Desiderata</span>
-          </div>
-
-          <button
-            onClick={() => history.push('/dashboard-admin')}
-            style={{
-              padding: '0.5rem 1rem',
-              color: '#4B5563',
-              backgroundColor: '#F3F4F6',
-              border: '1px solid #E5E7EB',
-              borderRadius: '0.375rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              cursor: 'pointer',
-              transition: 'all 0.2s'
-            }}
-            onMouseOver={(e) => {
-              e.currentTarget.style.backgroundColor = '#E5E7EB';
-            }}
-            onMouseOut={(e) => {
-              e.currentTarget.style.backgroundColor = '#F3F4F6';
-            }}
-          >
-            <ArrowLeft size={18} />
-            Retour
-          </button>
-        </div>
-      </nav>
+      <AppHeader backTo="/dashboard-admin" />
 
       {/* Contenu principal */}
-      <main style={{
-        maxWidth: '1280px',
-        margin: '0 auto',
-        padding: '6rem 1rem 2rem'
-      }}>
-        {/* En-tête de la page */}
-        <div style={{
-          backgroundColor: 'white',
-          borderRadius: '0.5rem',
-          padding: '1.5rem',
-          marginBottom: '2rem',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-        }}>
-          <h1 style={{
-            fontSize: '1.5rem',
-            fontWeight: 'bold',
-            color: '#1F2937',
-            marginBottom: '0.5rem'
-          }}>
-            Suivi des Desiderata
-          </h1>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-            <div>
-              <p style={{ color: '#6B7280' }}>
-                Visualisez l'état de saisie des desiderata pour chaque médecin
-              </p>
-            </div>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button
-                onClick={handleExportExcel}
-                disabled={isExporting || medecins.length === 0}
-                style={{
-                  padding: '0.75rem 1rem',
-                  backgroundColor: isExporting ? '#9CA3AF' : '#059669',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '0.375rem',
-                  cursor: isExporting || medecins.length === 0 ? 'not-allowed' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  fontSize: '0.875rem',
-                  fontWeight: '500'
-                }}
-                title="Exporter tous les desiderata vers Excel"
-              >
-                <Download size={16} />
-                {isExporting ? 'Export...' : 'Exporter Excel'}
-              </button>
-              <button
-                onClick={() => setShowRelanceModal(true)}
-                disabled={medecinsSansDesiderata.length === 0}
-                style={{
-                  padding: '0.75rem 1rem',
-                  backgroundColor: medecinsSansDesiderata.length > 0 ? '#DC2626' : '#9CA3AF',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '0.375rem',
-                  cursor: medecinsSansDesiderata.length > 0 ? 'pointer' : 'not-allowed',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  fontSize: '0.875rem',
-                  fontWeight: '500'
-                }}
-                title={medecinsSansDesiderata.length === 0 ? 'Tous les médecins ont saisi leurs desiderata' : 'Envoyer des relances par email'}
-              >
-                <Mail size={16} />
-                Relancer par email ({medecinsSansDesiderata.length})
-              </button>
-            </div>
+      <main className="mx-auto max-w-7xl px-4 pb-12 pt-24 sm:px-6 animate-fade-up">
+        {/* En-tête de la page + actions */}
+        <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-extrabold tracking-tight text-ink-900 sm:text-3xl">
+              Suivi des desiderata
+            </h1>
+            <p className="mt-1 text-sm text-ink-500">
+              Visualisez l'état de saisie des desiderata pour chaque médecin.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="success"
+              icon={<Download size={16} />}
+              loading={isExporting}
+              disabled={isExporting || medecins.length === 0}
+              onClick={handleExportExcel}
+              title="Exporter tous les desiderata vers Excel"
+            >
+              Exporter Excel
+            </Button>
+            <Button
+              variant="danger"
+              icon={<Mail size={16} />}
+              disabled={medecinsSansDesiderata.length === 0}
+              onClick={() => setShowRelanceModal(true)}
+              title={medecinsSansDesiderata.length === 0 ? 'Tous les médecins ont saisi leurs desiderata' : 'Envoyer des relances par email'}
+            >
+              Relancer par email ({medecinsSansDesiderata.length})
+            </Button>
           </div>
         </div>
 
-        {/* Message de succès */}
-        {successMessage && (
-          <div style={{
-            backgroundColor: '#F0FDF4',
-            border: '1px solid #D1FAE5',
-            borderRadius: '0.5rem',
-            padding: '1rem',
-            marginBottom: '1rem',
-            color: '#059669',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-          }}>
-            <Mail size={20} />
-            {successMessage}
-          </div>
-        )}
-
         {/* Filtres et recherche */}
-        <div style={{
-          backgroundColor: 'white',
-          borderRadius: '0.5rem',
-          padding: '1.5rem',
-          marginBottom: '2rem',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-        }}>
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '1rem'
-          }}>
+        <Card className="mb-5 p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             {/* Barre de recherche */}
-            <div style={{
-              position: 'relative'
-            }}>
+            <div className="relative sm:max-w-md sm:flex-1">
+              <Search
+                size={18}
+                aria-hidden="true"
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-400"
+              />
               <input
                 type="text"
                 placeholder="Rechercher un médecin..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.75rem 1rem 0.75rem 2.5rem',
-                  borderRadius: '0.375rem',
-                  border: '1px solid #E5E7EB',
-                  fontSize: '0.875rem',
-                  color: '#1F2937',
-                  backgroundColor: '#F9FAFB'
-                }}
-              />
-              <Search 
-                size={18} 
-                style={{
-                  position: 'absolute',
-                  left: '0.75rem',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  color: '#9CA3AF'
-                }}
+                className="w-full rounded-lg border border-ink-200 bg-white py-2 pl-10 pr-3 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
               />
             </div>
 
             {/* Filtres par statut */}
-            <div style={{
-              display: 'flex',
-              gap: '0.5rem',
-              flexWrap: 'wrap'
-            }}>
-              <button
-                onClick={() => setStatusFilter('tous')}
-                style={{
-                  padding: '0.5rem 1rem',
-                  borderRadius: '0.375rem',
-                  border: '1px solid #E5E7EB',
-                  backgroundColor: statusFilter === 'tous' ? '#2563EB' : '#F9FAFB',
-                  color: statusFilter === 'tous' ? 'white' : '#4B5563',
-                  fontSize: '0.875rem',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
-                }}
-              >
-                Tous
-              </button>
-              <button
-                onClick={() => setStatusFilter('complet')}
-                style={{
-                  padding: '0.5rem 1rem',
-                  borderRadius: '0.375rem',
-                  border: '1px solid #E5E7EB',
-                  backgroundColor: statusFilter === 'complet' ? '#059669' : '#F9FAFB',
-                  color: statusFilter === 'complet' ? 'white' : '#4B5563',
-                  fontSize: '0.875rem',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
-                }}
-              >
-                Complet
-              </button>
-              <button
-                onClick={() => setStatusFilter('non_saisi')}
-                style={{
-                  padding: '0.5rem 1rem',
-                  borderRadius: '0.375rem',
-                  border: '1px solid #E5E7EB',
-                  backgroundColor: statusFilter === 'non_saisi' ? '#DC2626' : '#F9FAFB',
-                  color: statusFilter === 'non_saisi' ? 'white' : '#4B5563',
-                  fontSize: '0.875rem',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s'
-                }}
-              >
-                Non saisi
-              </button>
-            </div>
+            <SegmentedControl
+              value={statusFilter}
+              onChange={setStatusFilter}
+              options={[
+                { value: 'tous', label: 'Tous' },
+                { value: 'complet', label: 'Complet' },
+                { value: 'non_saisi', label: 'Non saisi' },
+              ]}
+            />
           </div>
-        </div>
+        </Card>
 
         {/* Liste des médecins et leur statut */}
-        <div style={{
-          backgroundColor: 'white',
-          borderRadius: '0.5rem',
-          padding: '1.5rem',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-        }}>
-          {medecins.length > 0 && (
-            <DesiderataStatus 
-              medecins={getFilteredMedecins()}
-              desiderata={desiderataStatus || []}
+        {getFilteredMedecins().length > 0 ? (
+          <DesiderataStatus
+            medecins={getFilteredMedecins()}
+            desiderata={desiderataStatus || []}
+          />
+        ) : (
+          <Card className="p-0">
+            <EmptyState
+              icon={<Search size={26} />}
+              title="Aucun médecin trouvé"
+              description="Aucun médecin ne correspond aux critères de recherche."
             />
-          )}
-          {getFilteredMedecins().length === 0 && (
-            <div style={{
-              textAlign: 'center',
-              padding: '2rem',
-              color: '#6B7280'
-            }}>
-              Aucun médecin ne correspond aux critères de recherche
-            </div>
-          )}
-        </div>
+          </Card>
+        )}
       </main>
 
       {/* Modals */}
@@ -441,7 +212,7 @@ function GestionDesiderata() {
         desiderataStatus={desiderataStatus || []}
         onSuccess={handleRelanceSuccess}
       />
-      
+
     </div>
   );
 }

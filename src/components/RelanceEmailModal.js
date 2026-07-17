@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
-import { X, Mail, Send, AlertTriangle, Check } from 'lucide-react';
-import { envoyerRelancesEnMasse, getMedecinsSansDesiderata } from '../services/emailService';
+import { Send } from 'lucide-react';
+import { envoyerRelancesEnMasse, getMedecinsSansDesiderata, APP_URL } from '../services/emailService';
 import logger from '../utils/logger';
+import { Modal, Button, FormField, Alert, Checkbox, Spinner } from './ui';
 
-const RelanceEmailModal = ({ 
-  isOpen, 
-  onClose, 
-  medecins, 
+const RelanceEmailModal = ({
+  isOpen,
+  onClose,
+  medecins,
   desiderataStatus,
-  onSuccess 
+  onSuccess
 }) => {
   const [step, setStep] = useState(1); // 1: Sélection, 2: Personnalisation, 3: Envoi, 4: Résultat
   const [selectedMedecins, setSelectedMedecins] = useState([]);
@@ -31,8 +32,8 @@ const RelanceEmailModal = ({
   };
 
   const handleMedecinToggle = (medecinId) => {
-    setSelectedMedecins(prev => 
-      prev.includes(medecinId) 
+    setSelectedMedecins(prev =>
+      prev.includes(medecinId)
         ? prev.filter(id => id !== medecinId)
         : [...prev, medecinId]
     );
@@ -43,7 +44,7 @@ const RelanceEmailModal = ({
     setStep(3);
 
     try {
-      const medecinsCibles = medecinsSansDesiderata.filter(m => 
+      const medecinsCibles = medecinsSansDesiderata.filter(m =>
         selectedMedecins.includes(m.id)
       );
 
@@ -81,382 +82,170 @@ const RelanceEmailModal = ({
 Nous vous rappelons qu'il est important de saisir vos desiderata de planning dans les plus brefs délais.
 
 Vous pouvez accéder à l'interface de saisie via le lien suivant :
-https://apum-8cfa4.web.app/formulaire-desirata
+${APP_URL}/formulaire-desirata
 
 Merci de votre collaboration.
 
 L'équipe APUM`;
 
+  let footer = null;
+  if (step === 1) {
+    footer = (
+      <>
+        <Button variant="secondary" onClick={resetModal}>
+          Annuler
+        </Button>
+        <Button onClick={() => setStep(2)} disabled={selectedMedecins.length === 0}>
+          Suivant
+        </Button>
+      </>
+    );
+  } else if (step === 2) {
+    footer = (
+      <>
+        <Button variant="secondary" onClick={() => setStep(1)}>
+          Retour
+        </Button>
+        <Button variant="danger" icon={<Send size={16} />} onClick={handleEnvoyerRelances}>
+          Envoyer les relances
+        </Button>
+      </>
+    );
+  } else if (step === 4) {
+    footer = (
+      <Button onClick={resetModal}>
+        Fermer
+      </Button>
+    );
+  }
+
   return (
-    <div style={{
-      position: 'fixed',
-      inset: 0,
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 50,
-      padding: '1rem'
-    }}>
-      <div style={{
-        backgroundColor: 'white',
-        borderRadius: '0.5rem',
-        boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
-        width: '100%',
-        maxWidth: '600px',
-        maxHeight: '90vh',
-        overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column'
-      }}>
-        {/* En-tête */}
-        <div style={{
-          padding: '1.5rem',
-          borderBottom: '1px solid #E5E7EB',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Mail size={24} style={{ color: '#2563EB' }} />
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', color: '#1F2937', margin: 0 }}>
-              Relance par Email
-            </h2>
+    <Modal
+      open
+      onClose={resetModal}
+      title="Relance par Email"
+      size="lg"
+      footer={footer}
+    >
+      {/* Étape 1: Sélection des médecins */}
+      {step === 1 && (
+        <div>
+          <div className="mb-5">
+            <h3 className="text-base font-semibold text-ink-900">
+              Sélection des médecins à relancer
+            </h3>
+            <p className="mt-1 text-sm text-ink-500">
+              {medecinsSansDesiderata.length} médecin(s) n'ont pas encore saisi leurs desiderata
+            </p>
           </div>
-          <button
-            onClick={resetModal}
-            style={{
-              padding: '0.5rem',
-              color: '#6B7280',
-              backgroundColor: 'transparent',
-              border: 'none',
-              borderRadius: '0.25rem',
-              cursor: 'pointer'
-            }}
-          >
-            <X size={20} />
-          </button>
-        </div>
 
-        {/* Contenu */}
-        <div style={{
-          flex: 1,
-          overflow: 'auto',
-          padding: '1.5rem'
-        }}>
-          {/* Étape 1: Sélection des médecins */}
-          {step === 1 && (
+          {medecinsSansDesiderata.length === 0 ? (
+            <Alert kind="success">
+              Tous les médecins ont saisi leurs desiderata !
+            </Alert>
+          ) : (
             <div>
-              <div style={{ marginBottom: '1.5rem' }}>
-                <h3 style={{ fontSize: '1.1rem', fontWeight: '600', marginBottom: '0.5rem' }}>
-                  Sélection des médecins à relancer
-                </h3>
-                <p style={{ color: '#6B7280', fontSize: '0.875rem' }}>
-                  {medecinsSansDesiderata.length} médecin(s) n'ont pas encore saisi leurs desiderata
-                </p>
+              <div className="mb-3">
+                <Button variant="secondary" size="sm" onClick={handleSelectAll}>
+                  {selectedMedecins.length === medecinsSansDesiderata.length
+                    ? 'Désélectionner tout'
+                    : 'Sélectionner tout'}
+                </Button>
               </div>
 
-              {medecinsSansDesiderata.length === 0 ? (
-                <div style={{
-                  textAlign: 'center',
-                  padding: '2rem',
-                  color: '#059669',
-                  backgroundColor: '#F0FDF4',
-                  borderRadius: '0.5rem'
-                }}>
-                  <Check size={48} style={{ margin: '0 auto 1rem' }} />
-                  <p>Tous les médecins ont saisi leurs desiderata !</p>
-                </div>
-              ) : (
-                <div>
-                  <div style={{ marginBottom: '1rem' }}>
-                    <button
-                      onClick={handleSelectAll}
-                      style={{
-                        padding: '0.5rem 1rem',
-                        backgroundColor: '#F3F4F6',
-                        border: '1px solid #D1D5DB',
-                        borderRadius: '0.375rem',
-                        fontSize: '0.875rem',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      {selectedMedecins.length === medecinsSansDesiderata.length ? 'Désélectionner tout' : 'Sélectionner tout'}
-                    </button>
-                  </div>
-
-                  <div style={{
-                    border: '1px solid #E5E7EB',
-                    borderRadius: '0.375rem',
-                    maxHeight: '300px',
-                    overflow: 'auto'
-                  }}>
-                    {medecinsSansDesiderata.map(medecin => (
-                      <label
-                        key={medecin.id}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          padding: '0.75rem 1rem',
-                          borderBottom: '1px solid #F3F4F6',
-                          cursor: 'pointer'
-                        }}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedMedecins.includes(medecin.id)}
-                          onChange={() => handleMedecinToggle(medecin.id)}
-                          style={{ marginRight: '0.75rem' }}
-                        />
-                        <div>
-                          <div style={{ fontWeight: '500' }}>
-                            Dr {medecin.prenom} {medecin.nom}
-                          </div>
-                          <div style={{ fontSize: '0.875rem', color: '#6B7280' }}>
-                            {medecin.email}
-                          </div>
-                        </div>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Étape 2: Personnalisation du message */}
-          {step === 2 && (
-            <div>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: '600', marginBottom: '1rem' }}>
-                Personnalisation du message
-              </h3>
-              <p style={{ color: '#6B7280', fontSize: '0.875rem', marginBottom: '1rem' }}>
-                {selectedMedecins.length} médecin(s) sélectionné(s)
-              </p>
-
-              <div style={{ marginBottom: '1rem' }}>
-                <label style={{
-                  display: 'block',
-                  fontSize: '0.875rem',
-                  fontWeight: '500',
-                  marginBottom: '0.5rem'
-                }}>
-                  Sujet de l'email
-                </label>
-                <input
-                  type="text"
-                  value={subject}
-                  onChange={(e) => setSubject(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    border: '1px solid #D1D5DB',
-                    borderRadius: '0.375rem',
-                    fontSize: '0.875rem'
-                  }}
-                />
+              <div className="max-h-72 divide-y divide-ink-100 overflow-auto rounded-lg border border-ink-200">
+                {medecinsSansDesiderata.map(medecin => (
+                  <Checkbox
+                    key={medecin.id}
+                    checked={selectedMedecins.includes(medecin.id)}
+                    onChange={() => handleMedecinToggle(medecin.id)}
+                    label={`Dr ${medecin.prenom} ${medecin.nom}`}
+                    description={medecin.email}
+                    className="m-0 rounded-none px-4 py-3 hover:bg-ink-50"
+                  />
+                ))}
               </div>
-
-              <div style={{ marginBottom: '1rem' }}>
-                <label style={{
-                  display: 'block',
-                  fontSize: '0.875rem',
-                  fontWeight: '500',
-                  marginBottom: '0.5rem'
-                }}>
-                  Message personnalisé (optionnel)
-                </label>
-                <textarea
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  placeholder={defaultMessage}
-                  rows={8}
-                  style={{
-                    width: '100%',
-                    padding: '0.75rem',
-                    border: '1px solid #D1D5DB',
-                    borderRadius: '0.375rem',
-                    fontSize: '0.875rem',
-                    resize: 'vertical'
-                  }}
-                />
-                <p style={{ fontSize: '0.75rem', color: '#6B7280', marginTop: '0.25rem' }}>
-                  Laissez vide pour utiliser le message par défaut
-                </p>
-              </div>
-            </div>
-          )}
-
-          {/* Étape 3: Envoi en cours */}
-          {step === 3 && (
-            <div style={{ textAlign: 'center', padding: '2rem' }}>
-              <div style={{
-                width: '48px',
-                height: '48px',
-                border: '4px solid #F3F4F6',
-                borderTop: '4px solid #2563EB',
-                borderRadius: '50%',
-                animation: 'spin 1s linear infinite',
-                margin: '0 auto 1rem'
-              }} />
-              <h3 style={{ marginBottom: '0.5rem' }}>Envoi des relances en cours...</h3>
-              <p style={{ color: '#6B7280' }}>Veuillez patienter</p>
-            </div>
-          )}
-
-          {/* Étape 4: Résultats */}
-          {step === 4 && resultats && (
-            <div>
-              <h3 style={{ fontSize: '1.1rem', fontWeight: '600', marginBottom: '1rem' }}>
-                Résultats de l'envoi
-              </h3>
-
-              <div style={{
-                backgroundColor: resultats.succes > 0 ? '#F0FDF4' : '#FEF2F2',
-                border: `1px solid ${resultats.succes > 0 ? '#D1FAE5' : '#FECACA'}`,
-                borderRadius: '0.5rem',
-                padding: '1rem',
-                marginBottom: '1rem'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                  {resultats.succes > 0 ? (
-                    <Check size={20} style={{ color: '#059669' }} />
-                  ) : (
-                    <AlertTriangle size={20} style={{ color: '#DC2626' }} />
-                  )}
-                  <span style={{ fontWeight: '600' }}>
-                    {resultats.succes} email(s) envoyé(s), {resultats.echecs} échec(s)
-                  </span>
-                </div>
-              </div>
-
-              {resultats.erreurs.length > 0 && (
-                <div>
-                  <h4 style={{ fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.5rem', color: '#DC2626' }}>
-                    Erreurs rencontrées :
-                  </h4>
-                  <div style={{
-                    backgroundColor: '#FEF2F2',
-                    border: '1px solid #FECACA',
-                    borderRadius: '0.375rem',
-                    padding: '0.75rem',
-                    maxHeight: '150px',
-                    overflow: 'auto'
-                  }}>
-                    {resultats.erreurs.map((erreur, index) => (
-                      <div key={index} style={{ fontSize: '0.875rem', marginBottom: '0.25rem' }}>
-                        <strong>{erreur.medecin}:</strong> {erreur.erreur}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           )}
         </div>
+      )}
 
-        {/* Boutons d'action */}
-        <div style={{
-          padding: '1.5rem',
-          borderTop: '1px solid #E5E7EB',
-          display: 'flex',
-          justifyContent: 'flex-end',
-          gap: '0.75rem'
-        }}>
-          {step === 1 && (
-            <>
-              <button
-                onClick={resetModal}
-                style={{
-                  padding: '0.5rem 1rem',
-                  backgroundColor: '#F3F4F6',
-                  color: '#4B5563',
-                  border: '1px solid #D1D5DB',
-                  borderRadius: '0.375rem',
-                  cursor: 'pointer'
-                }}
-              >
-                Annuler
-              </button>
-              <button
-                onClick={() => setStep(2)}
-                disabled={selectedMedecins.length === 0}
-                style={{
-                  padding: '0.5rem 1rem',
-                  backgroundColor: selectedMedecins.length > 0 ? '#2563EB' : '#9CA3AF',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '0.375rem',
-                  cursor: selectedMedecins.length > 0 ? 'pointer' : 'not-allowed'
-                }}
-              >
-                Suivant
-              </button>
-            </>
-          )}
+      {/* Étape 2: Personnalisation du message */}
+      {step === 2 && (
+        <div>
+          <h3 className="text-base font-semibold text-ink-900">
+            Personnalisation du message
+          </h3>
+          <p className="mb-4 mt-1 text-sm text-ink-500">
+            {selectedMedecins.length} médecin(s) sélectionné(s)
+          </p>
 
-          {step === 2 && (
-            <>
-              <button
-                onClick={() => setStep(1)}
-                style={{
-                  padding: '0.5rem 1rem',
-                  backgroundColor: '#F3F4F6',
-                  color: '#4B5563',
-                  border: '1px solid #D1D5DB',
-                  borderRadius: '0.375rem',
-                  cursor: 'pointer'
-                }}
-              >
-                Retour
-              </button>
-              <button
-                onClick={handleEnvoyerRelances}
-                style={{
-                  padding: '0.5rem 1rem',
-                  backgroundColor: '#DC2626',
-                  color: 'white',
-                  border: 'none',
-                  borderRadius: '0.375rem',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem'
-                }}
-              >
-                <Send size={16} />
-                Envoyer les relances
-              </button>
-            </>
-          )}
+          <FormField
+            label="Sujet de l'email"
+            type="text"
+            value={subject}
+            onChange={(e) => setSubject(e.target.value)}
+          />
 
-          {step === 4 && (
-            <button
-              onClick={resetModal}
-              style={{
-                padding: '0.5rem 1rem',
-                backgroundColor: '#2563EB',
-                color: 'white',
-                border: 'none',
-                borderRadius: '0.375rem',
-                cursor: 'pointer'
-              }}
+          <div>
+            <label
+              htmlFor="relance-message"
+              className="mb-1.5 block text-sm font-semibold text-ink-700"
             >
-              Fermer
-            </button>
+              Message personnalisé (optionnel)
+            </label>
+            <textarea
+              id="relance-message"
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder={defaultMessage}
+              rows={8}
+              className="w-full resize-y rounded-lg border border-ink-200 bg-white px-3 py-2.5 text-sm text-ink-900 placeholder-ink-400 shadow-sm transition-colors hover:border-ink-300 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
+            />
+            <p className="mt-1.5 text-xs text-ink-500">
+              Laissez vide pour utiliser le message par défaut
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Étape 3: Envoi en cours */}
+      {step === 3 && (
+        <div className="flex flex-col items-center justify-center py-10 text-center">
+          <Spinner size="lg" className="text-primary-600" />
+          <h3 className="mt-4 font-semibold text-ink-900">Envoi des relances en cours...</h3>
+          <p className="mt-1 text-sm text-ink-500">Veuillez patienter</p>
+        </div>
+      )}
+
+      {/* Étape 4: Résultats */}
+      {step === 4 && resultats && (
+        <div>
+          <h3 className="mb-4 text-base font-semibold text-ink-900">
+            Résultats de l'envoi
+          </h3>
+
+          <Alert kind={resultats.succes > 0 ? 'success' : 'error'} className="mb-4">
+            {resultats.succes} email(s) envoyé(s), {resultats.echecs} échec(s)
+          </Alert>
+
+          {resultats.erreurs.length > 0 && (
+            <div>
+              <h4 className="mb-2 text-sm font-semibold text-danger-600">
+                Erreurs rencontrées :
+              </h4>
+              <div className="max-h-40 overflow-auto rounded-lg border border-danger-200 bg-danger-50 p-3">
+                {resultats.erreurs.map((erreur, index) => (
+                  <div key={index} className="mb-1 text-sm text-danger-800">
+                    <strong className="font-semibold">{erreur.medecin} :</strong> {erreur.erreur}
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
         </div>
-      </div>
-
-      <style>
-        {`
-          @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-          }
-        `}
-      </style>
-    </div>
+      )}
+    </Modal>
   );
 };
 

@@ -1,45 +1,66 @@
 // src/components/planning/PlanningTable.js
 import React from 'react';
-import { 
-  sortMedecinsByPreference, 
-  getPreferenceStyle, 
-  getMedecinPreference 
+import {
+  sortMedecinsByPreference,
+  getPreferenceStyle,
+  getMedecinPreference
 } from '../../utils/planningUtils';
+import { Select } from '../ui';
+
+// Classes de pastille sémantiques dérivées de la préférence (présentation)
+const preferencePill = (preference) => {
+  switch (preference) {
+  case 'Oui':
+    return 'bg-success-50 text-success-700 ring-success-200';
+  case 'Possible':
+    return 'bg-warning-50 text-warning-700 ring-warning-200';
+  case 'Non':
+    return 'bg-danger-50 text-danger-700 ring-danger-200';
+  default:
+    return 'bg-primary-50 text-primary-700 ring-primary-200';
+  }
+};
+
+// Teinte de fond de cellule dérivée de la préférence (présentation)
+const preferenceCellBg = (preference) => {
+  switch (preference) {
+  case 'Oui':
+    return 'bg-success-50';
+  case 'Possible':
+    return 'bg-warning-50';
+  case 'Non':
+    return 'bg-danger-50';
+  default:
+    return '';
+  }
+};
 
 // Composant pour le sélecteur de médecin
 // Modifiez la partie MedecinSelect comme suit :
-const MedecinSelect = ({ 
-  date, 
-  creneauId, 
-  index, 
-  currentValue, 
-  medecins, 
-  desiderata, 
+const MedecinSelect = ({
+  date,
+  creneauId,
+  index,
+  currentValue,
+  medecins,
+  desiderata,
   selectedMedecin, // On garde ce paramètre pour l'affichage des infos mais pas pour le filtrage
-  onChange 
+  onChange
 }) => {
   // Trier les médecins selon leurs préférences
   const sortedMedecins = sortMedecinsByPreference(medecins, desiderata, date, creneauId);
-  
+
   return (
-    <select
+    <Select
       value={currentValue || ''}
       onChange={(e) => onChange(date, creneauId, index, e.target.value)}
-      style={{
-        width: '100%',
-        padding: '0.5rem',
-        borderRadius: '0.375rem',
-        border: '1px solid #D1D5DB',
-        backgroundColor: 'white',
-        fontSize: '0.875rem'
-      }}
     >
       <option value="">Non assigné</option>
       {sortedMedecins.all.map(medecin => {
         const preference = getMedecinPreference(desiderata, medecin.id, date, creneauId);
         const style = getPreferenceStyle(preference);
         const isSelected = medecin.id === selectedMedecin;
-            
+
         return (
           <option
             key={medecin.id}
@@ -55,25 +76,16 @@ const MedecinSelect = ({
           </option>
         );
       })}
-    </select>
+    </Select>
   );
 };
 
 // Composant pour l'affichage des préférences
 const PreferenceIndicator = ({ preference }) => {
   if (!preference) {return null;}
-  
-  const style = getPreferenceStyle(preference);
+
   return (
-    <div style={{
-      position: 'absolute',
-      top: '0.25rem',
-      right: '0.25rem',
-      padding: '0.25rem 0.5rem',
-      borderRadius: '0.25rem',
-      fontSize: '0.75rem',
-      ...style
-    }}>
+    <div className={`absolute right-2 top-2 rounded-lg px-2 py-0.5 text-xs font-semibold ring-1 ring-inset ${preferencePill(preference)}`}>
       {preference}
     </div>
   );
@@ -110,7 +122,7 @@ const PlanningTable = ({
     if (!planning || !planning.planning) {return [];}
 
     return Object.keys(planning.planning)
-      .filter(date => 
+      .filter(date =>
         (!dateFilter.start || date >= dateFilter.start) &&
         (!dateFilter.end || date <= dateFilter.end)
       )
@@ -119,184 +131,135 @@ const PlanningTable = ({
 
   // Filtrer les créneaux selon les critères
   const getFilteredCreneaux = () => {
-    return creneauFilter === 'all' 
-      ? creneaux 
+    return creneauFilter === 'all'
+      ? creneaux
       : creneaux.filter(c => c.id === creneauFilter);
   };
 
+  const headerCellClass =
+    'border-b border-ink-100 bg-ink-50 px-4 py-3 text-left align-top';
+  const headerLabelClass =
+    'text-xs font-bold uppercase tracking-wide text-ink-500';
+
   return (
-    <div style={{
-      backgroundColor: 'white',
-      borderRadius: '0.5rem',
-      boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-      overflowX: 'auto',
-      width: '100%',        // Ajout de width 100%
-      maxWidth: '100vw',    // Utilisation de la largeur de la vue
-      margin: '0 auto'      // Centrage
-    }}>
-      <table style={{
-        width: '100%',
-        borderCollapse: 'collapse',
-        fontSize: '0.875rem',
-        tableLayout: 'fixed'    // Ajout de table-layout fixed
-      }}>
-        <colgroup>
-          <col style={{ width: '120px' }} />{getFilteredCreneaux().map((creneau, index) => (
-            <col key={index} style={{ width: `${100 / getFilteredCreneaux().length}%` }} />
-          ))}
-        </colgroup>
-        <thead>
-          <tr>
-            <th style={{
-              padding: '1rem',
-              backgroundColor: 'white',
-              borderBottom: '1px solid #E5E7EB',
-              textAlign: 'left',
-              fontWeight: '600',
-              position: 'sticky',
-              left: 0,
-              zIndex: 10
-            }}>
-              Date
-            </th>
-            {getFilteredCreneaux().map(creneau => (
-              <th key={creneau.id} style={{
-                padding: '1rem',
-                backgroundColor: '#F9FAFB',
-                borderBottom: '1px solid #E5E7EB',
-                textAlign: 'left',
-                fontWeight: '600',
-                minWidth: '200px'
-              }}>
-                <div>{creneau.label}</div>
-                <div style={{
-                  fontSize: '0.75rem',
-                  color: '#6B7280',
-                  fontWeight: 'normal'
-                }}>
-                  {creneau.hours}
-                </div>
-                <div style={{
-                  fontSize: '0.75rem',
-                  color: '#6B7280',
-                  fontWeight: 'normal'
-                }}>
-                  {creneau.medecins} médecin{creneau.medecins > 1 ? 's' : ''}
-                </div>
-              </th>
+    <div className="overflow-hidden rounded-2xl border border-ink-100 bg-white shadow-card">
+      <div className="w-full overflow-x-auto">
+        <table className="w-full table-fixed border-collapse text-sm">
+          <colgroup>
+            <col style={{ width: '120px' }} />{getFilteredCreneaux().map((creneau, index) => (
+              <col key={index} style={{ width: `${100 / getFilteredCreneaux().length}%` }} />
             ))}
-          </tr>
-        </thead>
-        <tbody>
-          {getFilteredDates().map(date => (
-            <tr key={date} style={{
-              backgroundColor: isWeekend(date) ? '#F9FAFB' : 'white'
-            }}>
-              <td style={{
-                padding: '1rem',
-                borderBottom: '1px solid #E5E7EB',
-                fontWeight: '500',
-                position: 'sticky',
-                left: 0,
-                backgroundColor: isWeekend(date) ? '#F9FAFB' : 'white',
-                zIndex: 10
-              }}>
-                {formatDate(date)}
-              </td>
+          </colgroup>
+          <thead>
+            <tr>
+              <th className={`${headerCellClass} sticky left-0 z-10`}>
+                <span className={headerLabelClass}>Date</span>
+              </th>
               {getFilteredCreneaux().map(creneau => (
-                <td key={`${date}-${creneau.id}`} style={{
-                  padding: '1rem',
-                  borderBottom: '1px solid #E5E7EB',
-                  position: 'relative',
-                  backgroundColor: selectedMedecin !== 'all' ? 
-                    (() => {
-                      const preference = getMedecinPreference(
-                        desiderata,
-                        selectedMedecin,
-                        date,
-                        creneau.id
-                      );
-                      return preference ? getPreferenceStyle(preference).backgroundColor : 'transparent';
-                    })() : 'transparent'
-                }}>
-                  {(!creneau.samediOnly || new Date(date).getDay() === 6) && (
-                    <>
-                      {selectedMedecin !== 'all' && (
-                        <PreferenceIndicator 
-                          preference={getMedecinPreference(
-                            desiderata,
-                            selectedMedecin,
-                            date,
-                            creneau.id
-                          )}
-                        />
-                      )}
-                      <div style={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '0.5rem'
-                      }}>
-                        {Array.from({ length: creneau.medecins }).map((_, index) => (
-                          <div key={index}>
-                            {editMode ? (
-                              <MedecinSelect
-                                date={date}
-                                creneauId={creneau.id}
-                                index={index}
-                                currentValue={planning.planning[date]?.[creneau.id]?.[index]}
-                                medecins={medecins}
-                                desiderata={desiderata}
-                                selectedMedecin={selectedMedecin}
-                                onChange={onMedecinChange}
-                              />
-                            ) : (
-                              <div style={{
-                                padding: '0.5rem',
-                                backgroundColor: '#F3F4F6',
-                                borderRadius: '0.375rem',
-                                fontSize: '0.875rem'
-                              }}>
-                                {planning.planning[date]?.[creneau.id]?.[index] ? (
-                                  (() => {
-                                    const medecinId = planning.planning[date][creneau.id][index];
-                                    const medecin = medecins.find(m => m.id === medecinId);
-                                    const preference = getMedecinPreference(
-                                      desiderata,
-                                      medecinId,
-                                      date,
-                                      creneau.id
-                                    );
-                                    const style = getPreferenceStyle(preference);
-                                    const isSelected = medecinId === selectedMedecin;
-                                      
-                                    return (
-                                      <span style={{
-                                        ...style,
-                                        fontWeight: isSelected ? 'bold' : 'normal'
-                                      }}>
-                                          Dr. {medecin ? 
-                                          `${medecin.prenom} ${medecin.nom}` : 
-                                          'Médecin non trouvé'}
-                                        {isSelected ? ' ★' : ''}
-                                      </span>
-                                    );
-                                  })()
-                                ) : (
-                                  'Non assigné'
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </td>
+                <th key={creneau.id} className={`${headerCellClass} min-w-[200px]`}>
+                  <div className={headerLabelClass}>{creneau.label}</div>
+                  <div className="mt-0.5 text-[0.7rem] font-normal text-ink-400">
+                    {creneau.hours}
+                  </div>
+                  <div className="text-[0.7rem] font-normal text-ink-400">
+                    {creneau.medecins} médecin{creneau.medecins > 1 ? 's' : ''}
+                  </div>
+                </th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {getFilteredDates().map(date => {
+              const weekend = isWeekend(date);
+              return (
+                <tr key={date} className={weekend ? 'bg-primary-50/40' : 'bg-white'}>
+                  <td
+                    className={`sticky left-0 z-10 border-b border-ink-100 px-4 py-3 font-semibold text-ink-800 ${weekend ? 'bg-primary-50' : 'bg-white'}`}
+                  >
+                    {formatDate(date)}
+                  </td>
+                  {getFilteredCreneaux().map(creneau => {
+                    const selPreference = selectedMedecin !== 'all'
+                      ? getMedecinPreference(desiderata, selectedMedecin, date, creneau.id)
+                      : '';
+                    const selBg = selectedMedecin !== 'all' ? preferenceCellBg(selPreference) : '';
+                    const cellBg = selBg || (weekend ? 'bg-primary-50/40' : '');
+
+                    return (
+                      <td
+                        key={`${date}-${creneau.id}`}
+                        className={`relative border-b border-ink-100 px-4 py-3 align-top ${cellBg}`}
+                      >
+                        {(!creneau.samediOnly || new Date(date).getDay() === 6) && (
+                          <>
+                            {selectedMedecin !== 'all' && (
+                              <PreferenceIndicator
+                                preference={getMedecinPreference(
+                                  desiderata,
+                                  selectedMedecin,
+                                  date,
+                                  creneau.id
+                                )}
+                              />
+                            )}
+                            <div className="flex flex-col gap-1.5">
+                              {Array.from({ length: creneau.medecins }).map((_, index) => (
+                                <div key={index}>
+                                  {editMode ? (
+                                    <MedecinSelect
+                                      date={date}
+                                      creneauId={creneau.id}
+                                      index={index}
+                                      currentValue={planning.planning[date]?.[creneau.id]?.[index]}
+                                      medecins={medecins}
+                                      desiderata={desiderata}
+                                      selectedMedecin={selectedMedecin}
+                                      onChange={onMedecinChange}
+                                    />
+                                  ) : (
+                                    planning.planning[date]?.[creneau.id]?.[index] ? (
+                                      (() => {
+                                        const medecinId = planning.planning[date][creneau.id][index];
+                                        const medecin = medecins.find(m => m.id === medecinId);
+                                        const preference = getMedecinPreference(
+                                          desiderata,
+                                          medecinId,
+                                          date,
+                                          creneau.id
+                                        );
+                                        const isSelected = medecinId === selectedMedecin;
+
+                                        return (
+                                          <span
+                                            className={`inline-flex rounded-lg px-2 py-1 text-xs font-semibold ring-1 ring-inset ${preferencePill(preference)} ${isSelected ? 'font-bold ring-2' : ''}`}
+                                          >
+                                              Dr. {medecin ?
+                                              `${medecin.prenom} ${medecin.nom}` :
+                                              'Médecin non trouvé'}
+                                            {isSelected ? ' ★' : ''}
+                                          </span>
+                                        );
+                                      })()
+                                    ) : (
+                                      <span className="inline-flex rounded-lg bg-ink-50 px-2 py-1 text-xs font-medium text-ink-400 ring-1 ring-inset ring-ink-100">
+                                        Non assigné
+                                      </span>
+                                    )
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          </>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 };

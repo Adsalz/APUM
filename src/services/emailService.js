@@ -5,6 +5,10 @@ import logger from '../utils/logger';
 // Collection pour stocker les demandes d'emails à envoyer
 const EMAIL_QUEUE_COLLECTION = 'email_queue';
 
+// Configuration externalisée (plus d'adresse personnelle ni d'URL en dur dans le code)
+export const EMAIL_FROM = process.env.REACT_APP_EMAIL_FROM || 'noreply@apum.fr';
+export const APP_URL = process.env.REACT_APP_PUBLIC_URL || 'https://apum-8cfa4.web.app';
+
 /**
  * Envoie une relance par email à un médecin
  * @param {Object} medecin - Les données du médecin
@@ -19,7 +23,7 @@ Bonjour Dr ${medecin.nom},
 Nous vous rappelons qu'il est important de saisir vos desiderata de planning dans les plus brefs délais.
 
 Vous pouvez accéder à l'interface de saisie via le lien suivant :
-https://apum-8cfa4.web.app/formulaire-desirata
+${APP_URL}/formulaire-desirata
 
 Merci de votre collaboration.
 
@@ -34,7 +38,7 @@ L'équipe APUM
         text: defaultMessage,
         html: defaultMessage.replace(/\n/g, '<br>')
       },
-      from: 'adriensalles@gmail.com',
+      from: EMAIL_FROM,
       metadata: {
         type: 'relance_desiderata',
         medecinId: medecin.id,

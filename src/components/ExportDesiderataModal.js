@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Download, Search } from 'lucide-react';
 import { jsPDF } from 'jspdf';
+import { Modal, Button, Checkbox } from './ui';
 
 function ExportDesiderataModal({
   isOpen,
@@ -190,207 +191,80 @@ function ExportDesiderataModal({
   if (!isOpen) {return null;}
 
   return (
-    <div style={{
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 50
-    }}>
-      <div style={{
-        backgroundColor: 'white',
-        borderRadius: '0.5rem',
-        padding: '2rem',
-        width: '90%',
-        maxWidth: '600px',
-        position: 'relative'
-      }}>
-        <button
-          onClick={onClose}
-          style={{
-            position: 'absolute',
-            top: '1rem',
-            right: '1rem',
-            padding: '0.5rem',
-            border: 'none',
-            background: 'none',
-            cursor: 'pointer'
-          }}
-        >
-          <X size={20} color="#6B7280" />
-        </button>
-
-        <h2 style={{
-          fontSize: '1.5rem',
-          fontWeight: 'bold',
-          color: '#111827',
-          marginBottom: '1.5rem',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.5rem'
-        }}>
-          <Download size={24} />
-          Exporter les desiderata
-        </h2>
-
-        <div style={{ marginBottom: '1rem' }}>
-          {/* Barre de recherche */}
-          <div style={{
-            position: 'relative',
-            marginBottom: '1rem'
-          }}>
-            <div style={{
-              position: 'absolute',
-              left: '0.75rem',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              color: '#6B7280'
-            }}>
-              <Search size={20} />
-            </div>
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Rechercher un médecin..."
-              style={{
-                width: '100%',
-                padding: '0.75rem',
-                paddingLeft: '2.5rem',
-                borderRadius: '0.375rem',
-                border: '1px solid #D1D5DB',
-                fontSize: '0.875rem'
-              }}
-            />
-            {searchTerm && (
-              <button
-                onClick={() => setSearchTerm('')}
-                style={{
-                  position: 'absolute',
-                  right: '0.75rem',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  background: 'none',
-                  border: 'none',
-                  padding: '0.25rem',
-                  cursor: 'pointer',
-                  color: '#6B7280'
-                }}
-              >
-                <X size={16} />
-              </button>
-            )}
-          </div>
-
-          {/* Sélection en masse */}
-          <label style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            marginBottom: '1rem',
-            padding: '0.5rem',
-            backgroundColor: '#F3F4F6',
-            borderRadius: '0.375rem',
-            cursor: 'pointer'
-          }}>
-            <input
-              type="checkbox"
-              checked={selectAll}
-              onChange={toggleSelectAll}
-              style={{ width: 'auto' }}
-            />
-            <span style={{ fontWeight: '500' }}>Sélectionner tous les médecins</span>
-          </label>
-
-          {/* Liste des médecins filtrée */}
-          <div style={{
-            maxHeight: '300px',
-            overflowY: 'auto',
-            border: '1px solid #E5E7EB',
-            borderRadius: '0.375rem',
-            padding: '0.5rem'
-          }}>
-            {filteredMedecins.length > 0 ? (
-              filteredMedecins.map(medecin => (
-                <label
-                  key={medecin.id}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    padding: '0.5rem',
-                    cursor: 'pointer',
-                    borderRadius: '0.25rem',
-                    transition: 'background-color 0.2s'
-                  }}
-                  onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#F3F4F6'}
-                  onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedMedecins[medecin.id] || false}
-                    onChange={() => toggleMedecin(medecin.id)}
-                    style={{ width: 'auto' }}
-                  />
-                  <span>Dr. {medecin.prenom} {medecin.nom}</span>
-                </label>
-              ))
-            ) : (
-              <div style={{
-                padding: '1rem',
-                textAlign: 'center',
-                color: '#6B7280'
-              }}>
-                Aucun médecin trouvé
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div style={{
-          marginTop: '2rem',
-          display: 'flex',
-          justifyContent: 'flex-end',
-          gap: '1rem'
-        }}>
-          <button
-            onClick={onClose}
-            style={{
-              padding: '0.5rem 1rem',
-              border: '1px solid #D1D5DB',
-              borderRadius: '0.375rem',
-              backgroundColor: 'white',
-              color: '#374151'
-            }}
-          >
+    <Modal
+      open
+      onClose={onClose}
+      title="Exporter les desiderata"
+      size="lg"
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>
             Annuler
-          </button>
-          <button
+          </Button>
+          <Button
             onClick={generatePDF}
             disabled={Object.values(selectedMedecins).filter(Boolean).length === 0}
-            style={{
-              padding: '0.5rem 1rem',
-              backgroundColor: Object.values(selectedMedecins).filter(Boolean).length === 0 ? '#9CA3AF' : '#2563EB',
-              color: 'white',
-              border: 'none',
-              borderRadius: '0.375rem',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.5rem',
-              cursor: Object.values(selectedMedecins).filter(Boolean).length === 0 ? 'not-allowed' : 'pointer'
-            }}
+            icon={<Download size={18} />}
           >
-            <Download size={18} />
             Exporter en PDF
+          </Button>
+        </>
+      }
+    >
+      {/* Barre de recherche */}
+      <div className="relative mb-4">
+        <Search
+          size={18}
+          aria-hidden="true"
+          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-400"
+        />
+        <input
+          type="text"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          placeholder="Rechercher un médecin..."
+          className="w-full rounded-lg border border-ink-200 bg-white py-2.5 pl-10 pr-10 text-sm text-ink-900 placeholder-ink-400 shadow-sm transition-colors hover:border-ink-300 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
+        />
+        {searchTerm && (
+          <button
+            type="button"
+            onClick={() => setSearchTerm('')}
+            aria-label="Effacer la recherche"
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded-md p-1 text-ink-400 transition-colors hover:bg-ink-100 hover:text-ink-600"
+          >
+            <X size={16} aria-hidden="true" />
           </button>
-        </div>
+        )}
       </div>
-    </div>
+
+      {/* Sélection en masse */}
+      <div className="mb-3 rounded-lg bg-ink-50 px-3 py-2.5">
+        <Checkbox
+          checked={selectAll}
+          onChange={toggleSelectAll}
+          label="Sélectionner tous les médecins"
+        />
+      </div>
+
+      {/* Liste des médecins filtrée */}
+      <div className="max-h-72 space-y-0.5 overflow-y-auto rounded-lg border border-ink-200 p-2">
+        {filteredMedecins.length > 0 ? (
+          filteredMedecins.map(medecin => (
+            <Checkbox
+              key={medecin.id}
+              checked={selectedMedecins[medecin.id] || false}
+              onChange={() => toggleMedecin(medecin.id)}
+              label={`Dr. ${medecin.prenom} ${medecin.nom}`}
+              className="m-0 rounded-lg px-2.5 py-2 hover:bg-ink-50"
+            />
+          ))
+        ) : (
+          <div className="px-4 py-8 text-center text-sm text-ink-500">
+            Aucun médecin trouvé
+          </div>
+        )}
+      </div>
+    </Modal>
   );
 }
 

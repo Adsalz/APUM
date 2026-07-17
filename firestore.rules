@@ -1,46 +1,74 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Règles pour les utilisateurs
+
+    // ---------- Fonctions utilitaires ----------
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function currentUser() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && currentUser().role == 'admin';
+    }
+
+    function isMedecin() {
+      return isSignedIn() && currentUser().role == 'medecin';
+    }
+
+    // ---------- Utilisateurs ----------
     match /users/{userId} {
-      // Permettre à chaque utilisateur de lire/écrire son propre document
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-      
-      // Permettre aux admins de lire/écrire tous les utilisateurs
-      allow read, write: if request.auth != null && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
-      
-      // Permettre aux médecins de lire les autres utilisateurs (pour l'interface)
-      allow read: if request.auth != null && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'medecin';
+      // Lecture : soi-même, les admins, et les médecins (annuaire nécessaire à l'interface)
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin() || isMedecin());
+
+      // Création / suppression : admins uniquement
+      allow create, delete: if isAdmin();
+
+      // Mise à jour : admin, ou l'utilisateur lui-même SANS pouvoir modifier son rôle
+      // (empêche l'escalade de privilèges medecin -> admin)
+      allow update: if isAdmin() ||
+        (isSignedIn() && request.auth.uid == userId &&
+         request.resource.data.role == resource.data.role);
     }
 
-    // Règles pour la collection des desiderata
-    match /desiderata/{document=**} {
-      allow read, write: if request.auth != null && (
-        (resource == null && request.resource.data.userId == request.auth.uid) ||
-        (resource != null && resource.data.userId == request.auth.uid) ||
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
-      );
+    // ---------- Desiderata ----------
+    match /desiderata/{desiderataId} {
+      // Lecture : le propriétaire ou un admin
+      allow read: if isSignedIn() &&
+        (resource.data.userId == request.auth.uid || isAdmin());
+
+      // Création : pour soi-même uniquement (ou admin pour n'importe qui)
+      allow create: if isSignedIn() &&
+        (request.resource.data.userId == request.auth.uid || isAdmin());
+
+      // Mise à jour : le propriétaire, sans pouvoir réattribuer le document
+      // à un autre médecin (userId immuable), ou un admin
+      allow update: if isAdmin() ||
+        (isSignedIn() && resource.data.userId == request.auth.uid &&
+         request.resource.data.userId == resource.data.userId);
+
+      // Suppression : le propriétaire ou un admin
+      allow delete: if isAdmin() ||
+        (isSignedIn() && resource.data.userId == request.auth.uid);
     }
 
-    // Règles pour la collection du planning
-    match /planning/{document=**} {
-      allow read, write: if request.auth != null && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
-      allow read: if request.auth != null && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'medecin';
+    // ---------- Planning ----------
+    match /planning/{planningId} {
+      // Écriture : admins uniquement
+      allow write: if isAdmin();
+      // Lecture : tout utilisateur authentifié avec un rôle reconnu
+      allow read: if isAdmin() || isMedecin();
     }
 
-    // Règles pour la queue d'emails - AUTORISER L'ÉCRITURE POUR LES ADMINS
-    match /email_queue/{document=**} {
-      allow write: if request.auth != null && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
-      allow read: if request.auth != null && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    // ---------- Queue d'emails ----------
+    match /email_queue/{emailId} {
+      allow read, write: if isAdmin();
     }
 
-    // Règles par défaut - refuser tout le reste
+    // ---------- Par défaut : tout refuser ----------
     match /{document=**} {
       allow read, write: if false;
     }

@@ -1,6 +1,18 @@
 // src/components/QuickFill.js
 import React, { useState } from 'react';
-import { Upload, ChevronDown, ChevronUp, Calendar } from 'lucide-react';
+import { twMerge } from 'tailwind-merge';
+import { Zap, ChevronDown, CalendarRange, Wand2 } from 'lucide-react';
+import { Alert, Button, Checkbox, Select } from './ui';
+
+const jours = [
+  { id: '1', label: 'Lundi' },
+  { id: '2', label: 'Mardi' },
+  { id: '3', label: 'Mercredi' },
+  { id: '4', label: 'Jeudi' },
+  { id: '5', label: 'Vendredi' },
+  { id: '6', label: 'Samedi' },
+  { id: '0', label: 'Dimanche' }
+];
 
 function QuickFill({ creneaux, onApply, periodeSaisie }) {
   const [selectedCreneaux, setSelectedCreneaux] = useState({});
@@ -9,427 +21,167 @@ function QuickFill({ creneaux, onApply, periodeSaisie }) {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [isExpanded, setIsExpanded] = useState(false);
-
-  const jours = [
-    { id: '1', label: 'Lundi' },
-    { id: '2', label: 'Mardi' },
-    { id: '3', label: 'Mercredi' },
-    { id: '4', label: 'Jeudi' },
-    { id: '5', label: 'Vendredi' },
-    { id: '6', label: 'Samedi' },
-    { id: '0', label: 'Dimanche' }
-  ];
+  const [validationError, setValidationError] = useState('');
 
   const handleSelectFullPeriod = () => {
     if (periodeSaisie) {
+      setValidationError('');
       setStartDate(periodeSaisie.startDate.split('T')[0]);
       setEndDate(periodeSaisie.endDate.split('T')[0]);
     }
   };
 
+  const allCreneaux = creneaux.every(c => selectedCreneaux[c.id]);
+  const allJours = jours.every(j => selectedJours[j.id]);
+
   const toggleAllCreneaux = () => {
-    const allSelected = creneaux.every(creneau => selectedCreneaux[creneau.id]);
-    const newSelectedCreneaux = {};
-    creneaux.forEach(creneau => {
-      newSelectedCreneaux[creneau.id] = !allSelected;
-    });
-    setSelectedCreneaux(newSelectedCreneaux);
+    setValidationError('');
+    const next = {};
+    creneaux.forEach(c => { next[c.id] = !allCreneaux; });
+    setSelectedCreneaux(next);
   };
 
   const toggleAllJours = () => {
-    const allSelected = jours.every(jour => selectedJours[jour.id]);
-    const newSelectedJours = {};
-    jours.forEach(jour => {
-      newSelectedJours[jour.id] = !allSelected;
-    });
-    setSelectedJours(newSelectedJours);
+    setValidationError('');
+    const next = {};
+    jours.forEach(j => { next[j.id] = !allJours; });
+    setSelectedJours(next);
   };
 
   const handleApply = () => {
-    if (!selectedDispo) {
-      alert('Veuillez sélectionner une disponibilité');
-      return;
-    }
-  
-    if (!startDate || !endDate) {
-      alert('Veuillez sélectionner une période');
-      return;
-    }
-  
-    const selectedCreneauxArray = Object.entries(selectedCreneaux)
-      .filter(([_, isSelected]) => isSelected)
-      .map(([creneauId]) => creneauId);
-  
-    const selectedJoursArray = Object.entries(selectedJours)
-      .filter(([_, isSelected]) => isSelected)
-      .map(([jourId]) => {
-        // Converti correctement les IDs de jours
-        return jourId;
-      });
-  
-    if (selectedCreneauxArray.length === 0) {
-      alert('Veuillez sélectionner au moins un créneau');
-      return;
-    }
-  
-    if (selectedJoursArray.length === 0) {
-      alert('Veuillez sélectionner au moins un jour');
-      return;
-    }
-  
+    if (!selectedDispo) {return setValidationError('Veuillez sélectionner une disponibilité');}
+    if (!startDate || !endDate) {return setValidationError('Veuillez sélectionner une période');}
+
+    const creneauxArray = Object.entries(selectedCreneaux).filter(([, v]) => v).map(([id]) => id);
+    const joursArray = Object.entries(selectedJours).filter(([, v]) => v).map(([id]) => id);
+
+    if (creneauxArray.length === 0) {return setValidationError('Veuillez sélectionner au moins un créneau');}
+    if (joursArray.length === 0) {return setValidationError('Veuillez sélectionner au moins un jour');}
+
+    setValidationError('');
     onApply({
-      creneaux: selectedCreneauxArray,
-      jours: selectedJoursArray,
+      creneaux: creneauxArray,
+      jours: joursArray,
       disponibilite: selectedDispo,
-      startDate: startDate,
-      endDate: endDate
+      startDate,
+      endDate
     });
   };
 
   return (
-    <div style={{
-      backgroundColor: 'white',
-      borderRadius: '8px',
-      boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-      width: '100%'
-    }}>
-      {/* En-tête avec bouton pour replier/déplier */}
+    <div className="overflow-hidden rounded-2xl border border-ink-100 bg-white shadow-card">
       <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        style={{
-          width: '100%',
-          padding: '1rem 1.5rem',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          border: 'none',
-          background: 'none',
-          cursor: 'pointer',
-          borderBottom: isExpanded ? '1px solid #E5E7EB' : 'none',
-          transition: 'background-color 0.2s',
-          borderRadius: '8px'
-        }}
+        type="button"
+        onClick={() => setIsExpanded(v => !v)}
+        className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left transition-colors hover:bg-ink-50"
+        aria-expanded={isExpanded}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <h3 style={{
-            fontSize: '1.125rem',
-            fontWeight: '600',
-            color: '#1F2937',
-            margin: 0
-          }}>
-            Remplissage rapide
-          </h3>
-        </div>
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          color: '#6B7280',
-          fontSize: '0.875rem',
-          gap: '0.5rem'
-        }}>
+        <span className="flex items-center gap-2.5">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary-50 text-primary-600">
+            <Zap size={16} />
+          </span>
+          <span className="font-bold text-ink-900">Remplissage rapide</span>
+        </span>
+        <span className="flex items-center gap-1.5 text-sm font-medium text-ink-400">
           {isExpanded ? 'Replier' : 'Déplier'}
-          {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-        </div>
+          <ChevronDown size={18} className={twMerge('transition-transform', isExpanded && 'rotate-180')} />
+        </span>
       </button>
 
       {isExpanded && (
-        <div style={{ padding: '1.5rem' }}>
-          <div style={{ display: 'grid', gap: '1.5rem' }}>
-            {/* Sélection de la période */}
-            <div>
-              <label style={{
-                display: 'block',
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                color: '#374151',
-                marginBottom: '0.5rem'
-              }}>
-                Période de remplissage
-              </label>
-              <div style={{ 
-                display: 'flex', 
-                flexDirection: 'column',
-                gap: '1rem'
-              }}>
-                <div style={{
-                  display: 'flex',
-                  flexWrap: 'wrap',
-                  gap: '1rem'
-                }}>
-                  <div style={{ minWidth: '140px', flex: 1 }}>
-                    <label style={{
-                      display: 'block',
-                      fontSize: '0.875rem',
-                      color: '#6B7280',
-                      marginBottom: '0.25rem'
-                    }}>
-                      Du :
-                    </label>
-                    <input
-                      type="date"
-                      value={startDate}
-                      onChange={(e) => setStartDate(e.target.value)}
-                      style={{
-                        padding: '0.5rem',
-                        border: '1px solid #D1D5DB',
-                        borderRadius: '0.375rem',
-                        width: '100%'
-                      }}
-                    />
-                  </div>
-                  <div style={{ minWidth: '140px', flex: 1 }}>
-                    <label style={{
-                      display: 'block',
-                      fontSize: '0.875rem',
-                      color: '#6B7280',
-                      marginBottom: '0.25rem'
-                    }}>
-                      Au :
-                    </label>
-                    <input
-                      type="date"
-                      value={endDate}
-                      onChange={(e) => setEndDate(e.target.value)}
-                      style={{
-                        padding: '0.5rem',
-                        border: '1px solid #D1D5DB',
-                        borderRadius: '0.375rem',
-                        width: '100%'
-                      }}
-                    />
-                  </div>
+        <div className="space-y-5 border-t border-ink-100 p-5">
+          {/* Période */}
+          <div>
+            <label className="mb-1.5 block text-sm font-semibold text-ink-700">Période de remplissage</label>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+              <div className="flex-1">
+                <span className="mb-1 block text-xs text-ink-500">Du</span>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => { setValidationError(''); setStartDate(e.target.value); }}
+                  className="w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
+                />
+              </div>
+              <div className="flex-1">
+                <span className="mb-1 block text-xs text-ink-500">Au</span>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => { setValidationError(''); setEndDate(e.target.value); }}
+                  className="w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
+                />
+              </div>
+              <Button variant="secondary" icon={<CalendarRange size={16} />} onClick={handleSelectFullPeriod}>
+                Toute la période
+              </Button>
+            </div>
+          </div>
+
+          {/* Créneaux */}
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <label className="text-sm font-semibold text-ink-700">Créneaux</label>
+              <button type="button" onClick={toggleAllCreneaux} className="text-xs font-semibold text-primary-600 hover:text-primary-700">
+                {allCreneaux ? 'Tout désélectionner' : 'Tout sélectionner'}
+              </button>
+            </div>
+            <div className="grid gap-1 rounded-xl border border-ink-100 bg-ink-50/50 p-2 sm:grid-cols-2">
+              {creneaux.map(creneau => (
+                <div key={creneau.id} className="rounded-lg px-2 py-1.5 hover:bg-white">
+                  <Checkbox
+                    checked={selectedCreneaux[creneau.id] || false}
+                    onChange={() => { setValidationError(''); setSelectedCreneaux(prev => ({ ...prev, [creneau.id]: !prev[creneau.id] })); }}
+                    label={creneau.label}
+                    description={creneau.hours}
+                  />
                 </div>
-                <button
-                  onClick={handleSelectFullPeriod}
-                  style={{
-                    padding: '0.75rem 1rem',
-                    backgroundColor: '#EBF5FF',
-                    border: '1px solid #2563EB',
-                    borderRadius: '0.375rem',
-                    color: '#2563EB',
-                    fontSize: '0.875rem',
-                    cursor: 'pointer',
-                    width: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '0.5rem',
-                    fontWeight: '500',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#DBEAFE'}
-                  onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#EBF5FF'}
-                >
-                  <Calendar size={16} />
-                  Toute la période
-                </button>
-              </div>
+              ))}
             </div>
+          </div>
 
-            {/* Sélection des créneaux */}
-            <div>
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '0.5rem'
-              }}>
-                <label style={{
-                  fontSize: '0.875rem',
-                  fontWeight: '500',
-                  color: '#374151'
-                }}>
-                  Créneaux
-                </label>
-                <button
-                  onClick={toggleAllCreneaux}
-                  style={{
-                    fontSize: '0.75rem',
-                    color: '#2563EB',
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    padding: '0.25rem 0.5rem'
-                  }}
-                >
-                  {creneaux.every(creneau => selectedCreneaux[creneau.id]) 
-                    ? 'Tout désélectionner' 
-                    : 'Tout sélectionner'}
-                </button>
-              </div>
-              <div style={{
-                display: 'grid',
-                gap: '0.5rem',
-                border: '1px solid #E5E7EB',
-                padding: '0.5rem',
-                borderRadius: '0.375rem'
-              }}>
-                {creneaux.map(creneau => (
-                  <label
-                    key={creneau.id}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      padding: '0.5rem',
-                      cursor: 'pointer',
-                      borderRadius: '0.25rem',
-                      transition: 'background-color 0.2s'
-                    }}
-                    onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#F3F4F6'}
-                    onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedCreneaux[creneau.id] || false}
-                      onChange={() => {
-                        setSelectedCreneaux(prev => ({
-                          ...prev,
-                          [creneau.id]: !prev[creneau.id]
-                        }));
-                      }}
-                      style={{
-                        width: '1rem',
-                        height: '1rem',
-                        borderRadius: '0.25rem'
-                      }}
-                    />
-                    <div>
-                      <div>{creneau.label}</div>
-                      <div style={{ fontSize: '0.75rem', color: '#6B7280' }}>
-                        {creneau.hours}
-                      </div>
-                    </div>
-                  </label>
-                ))}
-              </div>
+          {/* Jours */}
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <label className="text-sm font-semibold text-ink-700">Jours de la semaine</label>
+              <button type="button" onClick={toggleAllJours} className="text-xs font-semibold text-primary-600 hover:text-primary-700">
+                {allJours ? 'Tout désélectionner' : 'Tout sélectionner'}
+              </button>
             </div>
-
-            {/* Sélection des jours */}
-            <div>
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '0.5rem'
-              }}>
-                <label style={{
-                  fontSize: '0.875rem',
-                  fontWeight: '500',
-                  color: '#374151'
-                }}>
-                  Jours de la semaine
-                </label>
-                <button
-                  onClick={toggleAllJours}
-                  style={{
-                    fontSize: '0.75rem',
-                    color: '#2563EB',
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    padding: '0.25rem 0.5rem'
-                  }}
-                >
-                  {jours.every(jour => selectedJours[jour.id]) 
-                    ? 'Tout désélectionner' 
-                    : 'Tout sélectionner'}
-                </button>
-              </div>
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))',
-                gap: '0.5rem',
-                border: '1px solid #E5E7EB',
-                padding: '0.5rem',
-                borderRadius: '0.375rem'
-              }}>
-                {jours.map(jour => (
-                  <label
-                    key={jour.id}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.5rem',
-                      padding: '0.5rem',
-                      cursor: 'pointer',
-                      borderRadius: '0.25rem',
-                      transition: 'background-color 0.2s'
-                    }}
-                    onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#F3F4F6'}
-                    onMouseOut={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedJours[jour.id] || false}
-                      onChange={() => {
-                        setSelectedJours(prev => ({
-                          ...prev,
-                          [jour.id]: !prev[jour.id]
-                        }));
-                      }}
-                      style={{
-                        width: '1rem',
-                        height: '1rem',
-                        borderRadius: '0.25rem'
-                      }}
-                    />
-                    <span>{jour.label}</span>
-                  </label>
-                ))}
-              </div>
+            <div className="grid grid-cols-2 gap-1 rounded-xl border border-ink-100 bg-ink-50/50 p-2 sm:grid-cols-4">
+              {jours.map(jour => (
+                <div key={jour.id} className="rounded-lg px-2 py-1.5 hover:bg-white">
+                  <Checkbox
+                    checked={selectedJours[jour.id] || false}
+                    onChange={() => { setValidationError(''); setSelectedJours(prev => ({ ...prev, [jour.id]: !prev[jour.id] })); }}
+                    label={jour.label}
+                  />
+                </div>
+              ))}
             </div>
+          </div>
 
-            {/* Sélection de la disponibilité */}
-            <div>
-              <label style={{
-                display: 'block',
-                fontSize: '0.875rem',
-                fontWeight: '500',
-                color: '#374151',
-                marginBottom: '0.5rem'
-              }}>
-                Disponibilité
-              </label>
-              <select
-                value={selectedDispo}
-                onChange={(e) => setSelectedDispo(e.target.value)}
-                style={{
-                  width: '100%',
-                  padding: '0.5rem',
-                  border: '1px solid #D1D5DB',
-                  borderRadius: '0.375rem',
-                  backgroundColor: 'white'
-                }}
-              >
-                <option value="">Sélectionnez une disponibilité</option>
-                <option value="Oui">Oui</option>
-                <option value="Possible">Possible</option>
-                <option value="Non">Non</option>
-              </select>
-            </div>
-
-            {/* Bouton d'application */}
-            <button
-              onClick={handleApply}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '0.5rem',
-                width: '100%',
-                padding: '0.75rem',
-                backgroundColor: '#2563EB',
-                color: 'white',
-                border: 'none',
-                borderRadius: '0.375rem',
-                fontWeight: '500',
-                cursor: 'pointer'
-              }}
+          {/* Disponibilité */}
+          <div>
+            <label className="mb-1.5 block text-sm font-semibold text-ink-700">Disponibilité à appliquer</label>
+            <Select
+              value={selectedDispo}
+              onChange={(e) => { setValidationError(''); setSelectedDispo(e.target.value); }}
+              className="sm:max-w-xs"
             >
-              <Upload size={18} />
-              Appliquer
-            </button>
+              <option value="">Sélectionnez une disponibilité</option>
+              <option value="Oui">Oui</option>
+              <option value="Possible">Possible</option>
+              <option value="Non">Non</option>
+            </Select>
+          </div>
+
+          {validationError && <Alert kind="warning">{validationError}</Alert>}
+
+          <div className="flex justify-end">
+            <Button variant="primary" icon={<Wand2 size={16} />} onClick={handleApply}>
+              Appliquer le remplissage
+            </Button>
           </div>
         </div>
       )}
