@@ -1,4 +1,4 @@
-import { db, auth } from '../firebase';
+import { db, auth, functions } from '../firebase';
 import {
   doc,
   getDoc,
@@ -10,6 +10,7 @@ import {
   query,
   where
 } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
 import logger from '../utils/logger';
 
 const USERS_COLLECTION = 'users';
@@ -56,11 +57,49 @@ export const updateUser = async (uid, userData) => {
   }
 };
 
+// Codes d'erreur indiquant que la Cloud Function n'est pas (encore) déployée
+// ou joignable. Dans ces cas seulement, on bascule sur le repli côté client.
+const FUNCTION_UNAVAILABLE_CODES = [
+  'functions/not-found',
+  'functions/internal',
+  'functions/unavailable',
+  'unavailable',
+  'internal',
+  'not-found',
+];
+
 export const deleteUser = async (uid) => {
   try {
-    await deleteDoc(doc(db, USERS_COLLECTION, uid));
-    logger.debug('Utilisateur supprimé avec succès');
+    // Chemin nominal : suppression COMPLÈTE (compte Auth + document Firestore)
+    // réalisée côté serveur par la Cloud Function `deleteUserAccount`.
+    const callable = httpsCallable(functions, 'deleteUserAccount');
+    await callable({ uid });
+    logger.debug('Utilisateur supprimé avec succès (compte Auth + document Firestore)');
   } catch (error) {
+    const code = error && error.code;
+
+    // Repli GRACIEUX : si la fonction n'est pas déployée / injoignable,
+    // on supprime au moins le document Firestore (comportement historique).
+    const isUnavailable =
+      FUNCTION_UNAVAILABLE_CODES.includes(code) ||
+      // Erreur réseau (fetch échoué) : pas de `code` métier exploitable.
+      error instanceof TypeError ||
+      (typeof error?.message === 'string' &&
+        error.message.toLowerCase().includes('network'));
+
+    if (isUnavailable) {
+      logger.warn(
+        "Cloud Function `deleteUserAccount` indisponible : repli sur la suppression du seul document Firestore. " +
+        "ATTENTION : le compte Firebase Auth N'A PAS été supprimé. " +
+        "Déployez la Cloud Function (firebase deploy --only functions) pour une suppression complète (RGPD).",
+        error
+      );
+      await deleteDoc(doc(db, USERS_COLLECTION, uid));
+      logger.debug('Document Firestore de l\'utilisateur supprimé (repli, compte Auth conservé)');
+      return;
+    }
+
+    // Autre erreur (permission refusée, argument invalide, etc.) : on propage.
     logger.error('Erreur lors de la suppression de l\'utilisateur:', error);
     throw error;
   }

@@ -1,0 +1,6 @@
+# Dépendances installées localement / lors du déploiement
+node_modules/
+
+# Logs et fichiers d'environnement éventuels
+*.log
+.env
