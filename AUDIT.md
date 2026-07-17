@@ -173,16 +173,35 @@ Deuxième passe (« rendre l'app la plus pro possible »). Vérifié à chaque �
   (références `favicon.ico`/`logo192.png` inexistantes supprimées).
 
 ### Reste à faire (recommandé, non inclus dans la passe sûre)
-- 🔴 **Déployer les règles Firestore** (`firebase deploy --only firestore:rules`).
+- 🔴 **Déployer les règles Firestore** (`firebase deploy --only firestore:rules`) — ✅ déployées le 17/07/2026.
 - 🔴 Purge de l'historique git + rotation du mot de passe Gmail.
-- Suppression du compte Firebase Auth à la révocation d'un utilisateur
-  (nécessite une Cloud Function ; aujourd'hui seul le doc Firestore est supprimé).
+- 🔴 **Déployer la Cloud Function** de révocation (plan Blaze requis) :
+  `cd functions && npm install && cd .. && firebase deploy --only functions`.
 - Création d'utilisateur atomique (Cloud Function transactionnelle Auth + doc).
 - ~~Migration react-router v6 + code-splitting~~ ✅ Fait (vague 3) : router v6
   (createBrowserRouter, useNavigate, useBlocker), lazy-loading par route et
   imports dynamiques exceljs/jspdf/ics → **bundle initial 595 kB → 190 kB gzip**.
-- Fusion des deux formulaires desiderata (~300 lignes communes restantes).
-- Fiabilisation complète des dates (date-fns / UTC) ; génération de planning en
-  Web Worker (aujourd'hui synchrone sur le thread principal).
-- Réécriture de `GenerateurTrimestre` sur le design system (43 styles inline,
-  responsive figé au render).
+- Fiabilisation complète des dates (date-fns / UTC).
+
+---
+
+## Vague 4 — juillet 2026 : refactors de fond
+
+Vérifié : **lint OK, 53 tests, build OK, smoke test navigation headless 4/4**.
+
+- ~~**Fusion des 2 formulaires desiderata**~~ ✅ : logique + présentation
+  factorisées dans `src/components/desiderata/` (`useDesiderataForm`,
+  `DesiderataPreferences`, `DesiderataTable`) ; les deux écrans deviennent des
+  coquilles fines (comportements préservés).
+- ~~**Réécriture de `GenerateurTrimestre`**~~ ✅ : passage complet au design
+  system (43 styles inline supprimés), responsive natif (fin des
+  `window.innerWidth` au render), emojis → icônes accessibles.
+- ~~**Génération de planning en Web Worker**~~ ✅ : cœur de calcul pur extrait
+  dans `planningCore.js` (sans Firebase, dédupliqué), exécuté dans
+  `src/workers/planning.worker.js` via `runPlanningWorker` (repli synchrone) →
+  l'UI ne gèle plus pendant la génération. Signatures des générateurs
+  inchangées.
+- ~~**Suppression du compte Auth à la révocation**~~ ✅ (code) : Cloud Function
+  callable `deleteUserAccount` (`functions/`, 2e gén, europe-west1) supprimant
+  Auth + doc côté serveur, avec repli gracieux côté client tant qu'elle n'est
+  pas déployée. 🔴 **déploiement à faire** (plan Blaze).
