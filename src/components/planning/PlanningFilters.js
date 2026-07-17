@@ -49,12 +49,14 @@ const PlanningFilters = ({
               <div className="flex gap-2">
                 <input
                   type="date"
+                  aria-label="Date de début"
                   value={dateFilter.start}
                   onChange={(e) => onDateFilterChange({ ...dateFilter, start: e.target.value })}
                   className={inputClass}
                 />
                 <input
                   type="date"
+                  aria-label="Date de fin"
                   value={dateFilter.end}
                   onChange={(e) => onDateFilterChange({ ...dateFilter, end: e.target.value })}
                   className={inputClass}

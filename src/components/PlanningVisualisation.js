@@ -18,16 +18,8 @@ import {
 } from './ui';
 import { useAuth } from '../contexts/AuthContext';
 import logger from '../utils/logger';
-
-// Chaque créneau a sa teinte pour un repérage visuel immédiat
-const creneaux = [
-  { id: 'QUART_1', label: '1er QUART', hours: '1h - 7h', chip: 'bg-sky-50 text-sky-700 ring-sky-200' },
-  { id: 'QUART_2', label: '2ème QUART', hours: '7h - 13h', chip: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },
-  { id: 'RENFORT_1', label: 'RENFORT', hours: '10h - 13h', samediOnly: true, chip: 'bg-amber-50 text-amber-700 ring-amber-200' },
-  { id: 'QUART_3', label: '3ème QUART', hours: '13h - 19h', chip: 'bg-violet-50 text-violet-700 ring-violet-200' },
-  { id: 'RENFORT_2', label: 'RENFORT', hours: '20h - 00h', chip: 'bg-amber-50 text-amber-700 ring-amber-200' },
-  { id: 'QUART_4', label: '4ème QUART', hours: '19h - 1h', chip: 'bg-cyan-50 text-cyan-700 ring-cyan-200' }
-];
+// Créneaux (avec teinte `chip`) : source unique partagée avec les formulaires.
+import { CRENEAUX as creneaux } from '../constants/creneaux';
 
 function PlanningVisualisation() {
   const [planning, setPlanning] = useState(null);
@@ -43,12 +35,15 @@ function PlanningVisualisation() {
   const toast = useToast();
 
   useEffect(() => {
+    let cancelled = false;
     const fetchData = async () => {
       try {
         const allMedecins = await getMedecins();
+        if (cancelled) { return; }
         setMedecins(allMedecins);
 
         const periode = await getPeriodeSaisie();
+        if (cancelled) { return; }
         if (!periode) {
           setError('Aucune période de saisie n\'a été définie');
           return;
@@ -57,19 +52,22 @@ function PlanningVisualisation() {
         setEndDate(periode.endDate.split('T')[0]);
 
         const publishedPlan = await getPublishedPlanning();
+        if (cancelled) { return; }
         if (publishedPlan) {
           setPlanning(publishedPlan);
         } else {
           setError('Aucun planning n\'a été publié');
         }
       } catch (err) {
+        if (cancelled) { return; }
         logger.error('Erreur:', err);
         setError('Une erreur est survenue lors du chargement des données');
       } finally {
-        setLoading(false);
+        if (!cancelled) { setLoading(false); }
       }
     };
     fetchData();
+    return () => { cancelled = true; };
   }, []);
 
   const exportToICS = () => {
@@ -221,8 +219,9 @@ function PlanningVisualisation() {
           <Card className="mb-5 p-4 animate-scale-in">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
               <div className="flex-1">
-                <span className="mb-1 block text-xs font-medium text-ink-500">Du</span>
+                <label htmlFor="planning-view-start" className="mb-1 block text-xs font-medium text-ink-500">Du</label>
                 <input
+                  id="planning-view-start"
                   type="date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
@@ -230,8 +229,9 @@ function PlanningVisualisation() {
                 />
               </div>
               <div className="flex-1">
-                <span className="mb-1 block text-xs font-medium text-ink-500">Au</span>
+                <label htmlFor="planning-view-end" className="mb-1 block text-xs font-medium text-ink-500">Au</label>
                 <input
+                  id="planning-view-end"
                   type="date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
@@ -265,7 +265,7 @@ function PlanningVisualisation() {
                     {creneaux.map(creneau => (
                       <th key={creneau.id} className="sticky top-0 z-20 min-w-[150px] border-b border-l border-ink-100 bg-ink-50 px-4 py-3 text-left">
                         <div className="font-bold text-ink-800">{creneau.label}</div>
-                        <div className="text-xs font-medium text-ink-400">{creneau.hours}</div>
+                        <div className="text-xs font-medium text-ink-500">{creneau.hours}</div>
                       </th>
                     ))}
                   </tr>
@@ -279,9 +279,9 @@ function PlanningVisualisation() {
                       <tr key={date} className={rowBg}>
                         <td className={twMerge('sticky left-0 z-10 border-b border-ink-100 px-4 py-2.5 font-semibold', rowBg)}>
                           <span className="flex items-baseline gap-1.5">
-                            <span className={twMerge('text-xs font-bold uppercase', we ? 'text-primary-600' : 'text-ink-400')}>{d.day}</span>
+                            <span className={twMerge('text-xs font-bold uppercase', we ? 'text-primary-600' : 'text-ink-500')}>{d.day}</span>
                             <span className="text-ink-900">{d.num}</span>
-                            <span className="text-xs text-ink-400">{d.month}</span>
+                            <span className="text-xs text-ink-500">{d.month}</span>
                           </span>
                         </td>
                         {creneaux.map(creneau => {
@@ -298,7 +298,7 @@ function PlanningVisualisation() {
                                         key={index}
                                         className={twMerge(
                                           'truncate rounded-lg px-2 py-1 text-xs font-semibold ring-1 ring-inset',
-                                          medecinId ? creneau.chip : 'bg-ink-50 text-ink-400 ring-ink-200',
+                                          medecinId ? creneau.chip : 'bg-ink-50 text-ink-500 ring-ink-200',
                                           mine && 'outline outline-2 outline-primary-400'
                                         )}
                                         title={medecinId ? getMedecinName(medecinId) : 'Non assigné'}

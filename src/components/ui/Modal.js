@@ -10,12 +10,16 @@ const widths = {
   xl: 'max-w-5xl',
 };
 
+const FOCUSABLE_SELECTOR =
+  'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
 /**
  * Modale accessible et unifiée :
  * - role="dialog" + aria-modal
  * - fermeture par Échap et clic sur l'arrière-plan
  * - verrouillage du scroll de la page
- * - focus initial sur le contenu, animations d'entrée
+ * - piège de focus (Tab/Maj+Tab reste dans la modale)
+ * - focus initial sur le premier élément, restauration du focus à la fermeture
  */
 function Modal({ open, onClose, title, size = 'md', children, footer = null }) {
   const panelRef = useRef(null);
@@ -25,9 +29,40 @@ function Modal({ open, onClose, title, size = 'md', children, footer = null }) {
       return undefined;
     }
 
+    // Mémorise l'élément déclencheur pour lui rendre le focus à la fermeture.
+    const previouslyFocused =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+
+    const getFocusable = () =>
+      panelRef.current
+        ? Array.from(panelRef.current.querySelectorAll(FOCUSABLE_SELECTOR)).filter(
+            (el) => el.offsetParent !== null || el === document.activeElement
+          )
+        : [];
+
     const handleKeyDown = (e) => {
       if (e.key === 'Escape') {
         onClose();
+        return;
+      }
+      if (e.key !== 'Tab') {
+        return;
+      }
+      // Piège de focus : boucle Tab / Maj+Tab à l'intérieur du panneau.
+      const focusable = getFocusable();
+      if (focusable.length === 0) {
+        e.preventDefault();
+        panelRef.current?.focus();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
       }
     };
 
@@ -35,13 +70,19 @@ function Modal({ open, onClose, title, size = 'md', children, footer = null }) {
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
 
-    if (panelRef.current) {
+    // Focus initial : premier élément interactif, sinon le panneau lui-même.
+    const focusable = getFocusable();
+    if (focusable.length > 0) {
+      focusable[0].focus();
+    } else if (panelRef.current) {
       panelRef.current.focus();
     }
 
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = previousOverflow;
+      // Restaure le focus sur l'élément qui a ouvert la modale.
+      previouslyFocused?.focus?.();
     };
   }, [open, onClose]);
 

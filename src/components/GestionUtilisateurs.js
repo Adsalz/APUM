@@ -230,10 +230,11 @@ function GestionUtilisateurs() {
             />
             <input
               type="text"
+              aria-label="Rechercher un utilisateur"
               placeholder="Rechercher un utilisateur..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full rounded-lg border border-ink-200 bg-white py-2 pl-10 pr-3 text-sm text-ink-900 placeholder-ink-400 shadow-sm transition-colors hover:border-ink-300 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
+              className="w-full rounded-lg border border-ink-200 bg-white py-2 pl-10 pr-3 text-sm text-ink-900 placeholder-ink-500 shadow-sm transition-colors hover:border-ink-300 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/25"
             />
           </div>
 
@@ -243,6 +244,7 @@ function GestionUtilisateurs() {
             <Select
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value)}
+              aria-label="Filtrer par rôle"
               className="min-w-[160px]"
             >
               <option value="all">Tous les rôles</option>

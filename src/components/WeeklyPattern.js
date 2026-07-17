@@ -62,7 +62,7 @@ function WeeklyPattern({ creneaux, onApplyPattern, periodeSaisie }) {
           </span>
           <span className="font-bold text-ink-900">Modèle hebdomadaire</span>
         </span>
-        <span className="flex items-center gap-1.5 text-sm font-medium text-ink-400">
+        <span className="flex items-center gap-1.5 text-sm font-medium text-ink-500">
           {isExpanded ? 'Replier' : 'Déplier'}
           <ChevronDown size={18} className={twMerge('transition-transform', isExpanded && 'rotate-180')} />
         </span>
@@ -84,7 +84,7 @@ function WeeklyPattern({ creneaux, onApplyPattern, periodeSaisie }) {
                   {creneaux.map(creneau => (
                     <th key={creneau.id} className="border-b border-l border-ink-100 bg-ink-50 px-4 py-2.5 text-left">
                       <div className="font-bold text-ink-800">{creneau.label}</div>
-                      <div className="text-xs font-medium text-ink-400">{creneau.hours}</div>
+                      <div className="text-xs font-medium text-ink-500">{creneau.hours}</div>
                     </th>
                   ))}
                 </tr>
@@ -103,6 +103,7 @@ function WeeklyPattern({ creneaux, onApplyPattern, periodeSaisie }) {
                               <select
                                 value={value}
                                 onChange={(e) => handlePatternChange(jour.id, creneau.id, e.target.value)}
+                                aria-label={`Disponibilité ${jour.label} — ${creneau.label}`}
                                 className={twMerge(
                                   'w-full appearance-none rounded-lg border py-1.5 pl-2.5 pr-7 text-sm font-semibold shadow-sm transition-colors focus:outline-none focus:ring-2',
                                   choiceStyles[value] || choiceStyles['']
@@ -130,8 +131,9 @@ function WeeklyPattern({ creneaux, onApplyPattern, periodeSaisie }) {
           {/* Période */}
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
             <div className="flex-1">
-              <span className="mb-1 block text-xs text-ink-500">Du</span>
+              <label htmlFor="weekly-pattern-start" className="mb-1 block text-xs text-ink-500">Du</label>
               <input
+                id="weekly-pattern-start"
                 type="date"
                 value={startDate}
                 onChange={(e) => { setValidationError(''); setStartDate(e.target.value); }}
@@ -139,8 +141,9 @@ function WeeklyPattern({ creneaux, onApplyPattern, periodeSaisie }) {
               />
             </div>
             <div className="flex-1">
-              <span className="mb-1 block text-xs text-ink-500">Au</span>
+              <label htmlFor="weekly-pattern-end" className="mb-1 block text-xs text-ink-500">Au</label>
               <input
+                id="weekly-pattern-end"
                 type="date"
                 value={endDate}
                 onChange={(e) => { setValidationError(''); setEndDate(e.target.value); }}

@@ -438,4 +438,12 @@ const verifierContraintes = (planning) => {
   return true;
 };
 
-export { genererPlanning, creneaux };
+export {
+  genererPlanning,
+  creneaux,
+  getWeekNumber,
+  aCreneauxChevauchants,
+  compterGardesParSemaine,
+  verifierContraintes,
+  evaluerPlanning
+};

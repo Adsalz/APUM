@@ -25,24 +25,18 @@ import {
 } from './ui';
 import QuickFill from './QuickFill';
 import WeeklyPattern from './WeeklyPattern';
+import { Prompt } from 'react-router-dom';
+import useUnsavedChangesWarning from '../hooks/useUnsavedChangesWarning';
+import { CRENEAUX as creneaux, CHOIX_DISPONIBILITE } from '../constants/creneaux';
 
-const creneaux = [
-  { id: 'QUART_1', label: '1er QUART', hours: '1h - 7h', medecins: 2 },
-  { id: 'QUART_2', label: '2ème QUART', hours: '7h - 13h', medecins: 3 },
-  { id: 'RENFORT_1', label: 'RENFORT', hours: '10h - 13h', medecins: 1, samediOnly: true },
-  { id: 'QUART_3', label: '3ème QUART', hours: '13h - 19h', medecins: 3 },
-  { id: 'RENFORT_2', label: 'RENFORT', hours: '20h - 00h', medecins: 1 },
-  { id: 'QUART_4', label: '4ème QUART', hours: '19h - 1h', medecins: 3 }
-];
-
-const options = ['Oui', 'Possible', 'Non'];
+const options = CHOIX_DISPONIBILITE;
 
 // Habillage coloré du sélecteur de choix selon la valeur
 const choiceStyles = {
   Oui: 'border-success-300 bg-success-50 text-success-700 focus:ring-success-500/30',
   Possible: 'border-warning-300 bg-warning-50 text-warning-700 focus:ring-warning-500/30',
   Non: 'border-danger-300 bg-danger-50 text-danger-700 focus:ring-danger-500/30',
-  '': 'border-ink-200 bg-white text-ink-400 focus:ring-primary-500/25'
+  '': 'border-ink-200 bg-white text-ink-500 focus:ring-primary-500/25'
 };
 
 function FormulaireDesirata() {
@@ -57,10 +51,14 @@ function FormulaireDesirata() {
   const [existingDesiderataId, setExistingDesiderataId] = useState(null);
   const [isExporting, setIsExporting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
 
   const { profile } = useAuth();
   const user = profile;
   const toast = useToast();
+
+  // Avertit avant fermeture/rechargement de l'onglet si saisie non enregistrée.
+  useUnsavedChangesWarning(isDirty);
 
   const generateDates = useCallback(() => {
     if (!periodeSaisie) {return [];}
@@ -77,14 +75,17 @@ function FormulaireDesirata() {
   }, [periodeSaisie]);
 
   useEffect(() => {
-    if (!profile) {return;}
+    if (!profile) {return undefined;}
 
+    let cancelled = false;
     const fetchData = async () => {
       try {
         const periode = await getPeriodeSaisie();
+        if (cancelled) { return; }
         if (periode) {
           setPeriodeSaisie(periode);
           const userDesiderata = await getDesiderataByUser(profile.id);
+          if (cancelled) { return; }
           const relevantDesiderata = userDesiderata.find(d =>
             new Date(d.startDate) <= new Date(periode.endDate) &&
             new Date(d.endDate) >= new Date(periode.startDate)
@@ -102,17 +103,20 @@ function FormulaireDesirata() {
           setError('Aucune période de saisie n\'a été définie par l\'administrateur.');
         }
       } catch (err) {
+        if (cancelled) { return; }
         logger.error('Erreur lors de la récupération des données:', err);
         setError('Erreur lors de la récupération des données: ' + err.message);
       } finally {
-        setLoading(false);
+        if (!cancelled) { setLoading(false); }
       }
     };
 
     fetchData();
+    return () => { cancelled = true; };
   }, [profile]);
 
   const handleDesiderataChange = (date, creneau, value) => {
+    setIsDirty(true);
     setDesiderata(prev => {
       const newDesiderata = { ...prev };
       if (!newDesiderata[date]) {
@@ -124,6 +128,7 @@ function FormulaireDesirata() {
   };
 
   const handleQuickFill = ({ creneaux: selectedCreneaux, jours: selectedJours, disponibilite, startDate, endDate }) => {
+    setIsDirty(true);
     const start = new Date(startDate);
     start.setHours(12, 0, 0, 0);
     const end = new Date(endDate);
@@ -156,6 +161,7 @@ function FormulaireDesirata() {
   };
 
   const handleApplyPattern = (pattern, startDate, endDate) => {
+    setIsDirty(true);
     const start = new Date(startDate);
     const end = new Date(endDate);
 
@@ -203,6 +209,7 @@ function FormulaireDesirata() {
           }
           toast.success('Desiderata enregistrés avec succès !');
         }
+        setIsDirty(false);
       } catch (err) {
         logger.error('Erreur lors de la soumission des desiderata:', err);
         toast.error('Erreur lors de l\'enregistrement : ' + err.message);
@@ -270,6 +277,10 @@ function FormulaireDesirata() {
 
   return (
     <div className="min-h-screen bg-ink-100">
+      <Prompt
+        when={isDirty}
+        message="Vous avez des modifications non enregistrées. Voulez-vous vraiment quitter cette page ?"
+      />
       <AppHeader
         backTo="/dashboard-medecin"
         actions={
@@ -326,7 +337,7 @@ function FormulaireDesirata() {
               min="0"
               className="mb-0"
               value={nombreGardesSouhaitees}
-              onChange={(e) => setNombreGardesSouhaitees(parseInt(e.target.value, 10) || 0)}
+              onChange={(e) => { setIsDirty(true); setNombreGardesSouhaitees(parseInt(e.target.value, 10) || 0); }}
             />
             <FormField
               label="Maximum de gardes par semaine"
@@ -335,16 +346,16 @@ function FormulaireDesirata() {
               max="7"
               className="mb-0"
               value={nombreGardesMaxParSemaine}
-              onChange={(e) => setNombreGardesMaxParSemaine(parseInt(e.target.value, 10) || 1)}
+              onChange={(e) => { setIsDirty(true); setNombreGardesMaxParSemaine(parseInt(e.target.value, 10) || 1); }}
             />
             <Checkbox
               checked={gardesGroupees}
-              onChange={setGardesGroupees}
+              onChange={(v) => { setIsDirty(true); setGardesGroupees(v); }}
               label="Gardes groupées dans un même week-end"
             />
             <Checkbox
               checked={renfortsAssocies}
-              onChange={setRenfortsAssocies}
+              onChange={(v) => { setIsDirty(true); setRenfortsAssocies(v); }}
               label="Renforts associés à une garde"
             />
           </div>
@@ -390,8 +401,8 @@ function FormulaireDesirata() {
                   {creneaux.map(creneau => (
                     <th key={creneau.id} className="sticky top-0 z-20 min-w-[150px] border-b border-l border-ink-100 bg-ink-50 px-4 py-3 text-left">
                       <div className="font-bold text-ink-800">{creneau.label}</div>
-                      <div className="text-xs font-medium text-ink-400">{creneau.hours}</div>
-                      <div className="text-[11px] text-ink-400">
+                      <div className="text-xs font-medium text-ink-500">{creneau.hours}</div>
+                      <div className="text-[11px] text-ink-500">
                         {creneau.medecins} médecin{creneau.medecins > 1 ? 's' : ''}
                       </div>
                     </th>
@@ -430,6 +441,7 @@ function FormulaireDesirata() {
                               <div className="relative">
                                 <select
                                   value={value}
+                                  aria-label={`Disponibilité ${d.day} ${d.num} ${d.month} — ${creneau.label} ${creneau.hours}`}
                                   onChange={(e) => handleDesiderataChange(dateString, creneau.id, e.target.value)}
                                   className={twMerge(
                                     'w-full appearance-none rounded-lg border py-1.5 pl-2.5 pr-7 text-sm font-semibold shadow-sm transition-colors focus:outline-none focus:ring-2',

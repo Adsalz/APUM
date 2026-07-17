@@ -75,7 +75,7 @@ function App() {
           <ProtectedRoute
             path="/gestion-planning-admin"
             roles={['admin']}
-            render={() => <GestionPlanning isAdmin={true} />}
+            component={GestionPlanning}
           />
           <ProtectedRoute
             path="/gestion-periode-saisie"

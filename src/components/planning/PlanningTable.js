@@ -36,7 +36,6 @@ const preferenceCellBg = (preference) => {
 };
 
 // Composant pour le sélecteur de médecin
-// Modifiez la partie MedecinSelect comme suit :
 const MedecinSelect = ({
   date,
   creneauId,
@@ -45,7 +44,9 @@ const MedecinSelect = ({
   medecins,
   desiderata,
   selectedMedecin, // On garde ce paramètre pour l'affichage des infos mais pas pour le filtrage
-  onChange
+  onChange,
+  dateLabel,
+  creneauLabel
 }) => {
   // Trier les médecins selon leurs préférences
   const sortedMedecins = sortMedecinsByPreference(medecins, desiderata, date, creneauId);
@@ -54,6 +55,7 @@ const MedecinSelect = ({
     <Select
       value={currentValue || ''}
       onChange={(e) => onChange(date, creneauId, index, e.target.value)}
+      aria-label={`Médecin — ${dateLabel} ${creneauLabel} place ${index + 1}`}
     >
       <option value="">Non assigné</option>
       {sortedMedecins.all.map(medecin => {
@@ -158,10 +160,10 @@ const PlanningTable = ({
               {getFilteredCreneaux().map(creneau => (
                 <th key={creneau.id} className={`${headerCellClass} min-w-[200px]`}>
                   <div className={headerLabelClass}>{creneau.label}</div>
-                  <div className="mt-0.5 text-[0.7rem] font-normal text-ink-400">
+                  <div className="mt-0.5 text-[0.7rem] font-normal text-ink-500">
                     {creneau.hours}
                   </div>
-                  <div className="text-[0.7rem] font-normal text-ink-400">
+                  <div className="text-[0.7rem] font-normal text-ink-500">
                     {creneau.medecins} médecin{creneau.medecins > 1 ? 's' : ''}
                   </div>
                 </th>
@@ -215,6 +217,8 @@ const PlanningTable = ({
                                       desiderata={desiderata}
                                       selectedMedecin={selectedMedecin}
                                       onChange={onMedecinChange}
+                                      dateLabel={formatDate(date)}
+                                      creneauLabel={creneau.label}
                                     />
                                   ) : (
                                     planning.planning[date]?.[creneau.id]?.[index] ? (
@@ -241,7 +245,7 @@ const PlanningTable = ({
                                         );
                                       })()
                                     ) : (
-                                      <span className="inline-flex rounded-lg bg-ink-50 px-2 py-1 text-xs font-medium text-ink-400 ring-1 ring-inset ring-ink-100">
+                                      <span className="inline-flex rounded-lg bg-ink-50 px-2 py-1 text-xs font-medium text-ink-500 ring-1 ring-inset ring-ink-100">
                                         Non assigné
                                       </span>
                                     )

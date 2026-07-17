@@ -334,4 +334,4 @@ const genererPlanningPourPeriode = (debut, fin, ordrePriorite, mapMedecinNomVers
   return planning;
 };
 
-export { genererPlanningPriorite, creneaux };
+export { genererPlanningPriorite, creneaux, diviserPeriode };

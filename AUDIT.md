@@ -107,7 +107,80 @@ trouvé**, **ce qui a été corrigé** et **ce qui reste à faire**.
 3. Fusionner `FormulaireDesirata` et `FormulaireDesiderataAdmin` (~430 lignes communes).
 4. Introduire date-fns et fiabiliser tous les calculs de dates (UTC/local).
 5. ~~Dé-publication automatique des anciens plannings~~ ✅ Fait · valider emails et payloads desiderata.
-6. Migration React 18 / react-router v6 / code-splitting (bundle 590 kB).
+6. ~~Migration React 18~~ ✅ Fait (vague 2) · react-router v6 / code-splitting : ⏳ à faire.
 7. Purge de l'historique git + rotation du mot de passe Gmail (🔴 prioritaire).
-8. Garde de navigation sur formulaire modifié non sauvegardé ; passe responsive
-   sur les grands tableaux ; moderniser les modales email/export restantes.
+8. ~~Garde de navigation sur formulaire modifié non sauvegardé~~ ✅ Fait (vague 2) ;
+   passe responsive sur les grands tableaux ; moderniser les modales email/export restantes.
+
+---
+
+## Vague 2 — juillet 2026 : professionnalisation
+
+Deuxième passe (« rendre l'app la plus pro possible »). Vérifié à chaque étape :
+**lint propre**, **53 tests unitaires verts**, **build de production compilé** (React 18).
+
+### Sécurité (règles + services)
+- **Desiderata verrouillés au profil** : `firestore.rules` exige désormais
+  `isMedecin() || isAdmin()` (plus seulement `isSignedIn()`) — un compte
+  auto-enregistré via la clé API publique ne peut plus écrire dans la base
+  médicale. Propriété/`userId` immuable préservés. 🔴 **à déployer** :
+  `npx firebase deploy --only firestore:rules`.
+- **email_queue validé côté règles** : `create/update` réservés aux admins avec
+  contrôle de type sur `from`/`to` (liste ou chaîne non vide) ; `delete` conservé.
+- **authService** : erreur Firebase désormais correctement propagée
+  (`auth/email-already-in-use`, `auth/invalid-email`, `auth/weak-password`) —
+  le message « email déjà utilisé » s'affiche enfin. Mot de passe temporaire
+  généré via `crypto.getRandomValues` (au lieu de `Math.random`).
+- **userService** : le log de debug ne journalise plus que l'`uid` (pas le profil).
+- En-têtes de sécurité HTTP ajoutés à `firebase.json` (`X-Content-Type-Options`,
+  `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`, cache long `/static`).
+
+### Robustesse
+- **ErrorBoundary** applicatif (`src/components/ErrorBoundary.js`) autour de
+  toute l'app → écran de repli au lieu d'une page blanche en cas de crash.
+- **Migration React 18** : `ReactDOM.render` → `createRoot` (`src/index.js`).
+- **Garde de saisie non sauvegardée** : hook `useUnsavedChangesWarning`
+  (avertissement de fermeture d'onglet) + `<Prompt>` de navigation dans les deux
+  formulaires desiderata + confirmation avant de **changer de médecin** (admin)
+  ou de **quitter le planning en cours d'édition**.
+- Bug corrigé : `App.js` passait `isAdmin` que `GestionPlanning` lisait sous le
+  nom `_isAdmin` (prop morte) — prop supprimée.
+- Gardes d'annulation (`cancelled`) ajoutées aux `useEffect` de chargement
+  (formulaires, planning, visualisation) — évite les mises à jour d'état après
+  démontage sous React 18 StrictMode.
+
+### Accessibilité (WCAG 2.1 AA)
+- **Noms accessibles** ajoutés à tous les `<select>` de disponibilité/médecin,
+  aux champs de date (labels associés) et aux champs de recherche (`aria-label`).
+- **Modale** : piège de focus (Tab/Maj+Tab) + restauration du focus sur
+  l'élément déclencheur à la fermeture (`src/components/ui/Modal.js`).
+- **Combobox** `MedecinSearchSelect` rendu conforme ARIA + navigation clavier
+  (flèches/Entrée/Échap).
+- **Contraste** : texte d'information passé de `ink-400` (~2.6:1, échec) à
+  `ink-500` (≥4.5:1) sur l'ensemble des écrans. Emoji décoratifs `aria-hidden`.
+
+### Qualité / outillage
+- **53 tests unitaires** (jours fériés / algorithme de Meeus, générateurs de
+  planning, utilitaires) — `src/utils/__tests__/`, aucun test auparavant.
+- **CI GitHub Actions** (`.github/workflows/ci.yml`) : lint + tests + build à
+  chaque push/PR.
+- **5 dépendances inutilisées retirées** (`clsx`, `class-variance-authority`,
+  3× `@radix-ui/*`).
+- Constante `creneaux` centralisée pour la couche d'affichage
+  (`src/constants/creneaux.js`) — formulaires + visualisation.
+- `public/index.html` nettoyé (suppression de ~90 lignes de polyfills manuels
+  inutiles avec CRA 5) ; **favicon SVG** créé + `manifest.json` corrigé
+  (références `favicon.ico`/`logo192.png` inexistantes supprimées).
+
+### Reste à faire (recommandé, non inclus dans la passe sûre)
+- 🔴 **Déployer les règles Firestore** (`firebase deploy --only firestore:rules`).
+- 🔴 Purge de l'historique git + rotation du mot de passe Gmail.
+- Suppression du compte Firebase Auth à la révocation d'un utilisateur
+  (nécessite une Cloud Function ; aujourd'hui seul le doc Firestore est supprimé).
+- Création d'utilisateur atomique (Cloud Function transactionnelle Auth + doc).
+- Migration react-router v6 + code-splitting des libs d'export (bundle ~595 kB).
+- Fusion des deux formulaires desiderata (~300 lignes communes restantes).
+- Fiabilisation complète des dates (date-fns / UTC) ; génération de planning en
+  Web Worker (aujourd'hui synchrone sur le thread principal).
+- Réécriture de `GenerateurTrimestre` sur le design system (43 styles inline,
+  responsive figé au render).

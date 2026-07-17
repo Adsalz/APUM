@@ -1,7 +1,7 @@
 // src/components/FormulaireDesiderataAdmin.js
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { twMerge } from 'tailwind-merge';
-import { useHistory } from 'react-router-dom';
+import { useHistory, Prompt } from 'react-router-dom';
 import { getMedecins } from '../services/userService';
 import {
   addDesiderata,
@@ -37,24 +37,17 @@ import {
   useToast
 } from './ui';
 import { useAuth } from '../contexts/AuthContext';
+import useUnsavedChangesWarning from '../hooks/useUnsavedChangesWarning';
+import { CRENEAUX as creneaux, CHOIX_DISPONIBILITE } from '../constants/creneaux';
 
-const creneaux = [
-  { id: 'QUART_1', label: '1er QUART', hours: '1h - 7h', medecins: 2 },
-  { id: 'QUART_2', label: '2ème QUART', hours: '7h - 13h', medecins: 3 },
-  { id: 'RENFORT_1', label: 'RENFORT', hours: '10h - 13h', medecins: 1, samediOnly: true },
-  { id: 'QUART_3', label: '3ème QUART', hours: '13h - 19h', medecins: 3 },
-  { id: 'RENFORT_2', label: 'RENFORT', hours: '20h - 00h', medecins: 1 },
-  { id: 'QUART_4', label: '4ème QUART', hours: '19h - 1h', medecins: 3 }
-];
-
-const options = ['Oui', 'Possible', 'Non'];
+const options = CHOIX_DISPONIBILITE;
 
 // Habillage coloré du sélecteur de choix selon la valeur
 const choiceStyles = {
   Oui: 'border-success-300 bg-success-50 text-success-700 focus:ring-success-500/30',
   Possible: 'border-warning-300 bg-warning-50 text-warning-700 focus:ring-warning-500/30',
   Non: 'border-danger-300 bg-danger-50 text-danger-700 focus:ring-danger-500/30',
-  '': 'border-ink-200 bg-white text-ink-400 focus:ring-primary-500/25'
+  '': 'border-ink-200 bg-white text-ink-500 focus:ring-primary-500/25'
 };
 
 function FormulaireDesiderataAdmin() {
@@ -72,11 +65,17 @@ function FormulaireDesiderataAdmin() {
   const [existingDesiderataId, setExistingDesiderataId] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const [pendingImport, setPendingImport] = useState(null);
+  const [isDirty, setIsDirty] = useState(false);
+  // Médecin vers lequel basculer, en attente de confirmation d'abandon.
+  const [pendingMedecinId, setPendingMedecinId] = useState(null);
 
   const fileInputRef = useRef(null);
   const history = useHistory();
   const { profile } = useAuth();
   const toast = useToast();
+
+  // Avertit avant fermeture/rechargement de l'onglet si saisie non enregistrée.
+  useUnsavedChangesWarning(isDirty);
 
   // Génération des dates avec correction de fuseau horaire
   const generateDates = useCallback(() => {
@@ -101,27 +100,32 @@ function FormulaireDesiderataAdmin() {
 
   // Effet pour charger les données initiales
   useEffect(() => {
+    let cancelled = false;
     const fetchData = async () => {
       try {
         // Charger la liste des médecins
         const medecinsList = await getMedecins();
+        if (cancelled) { return; }
         setMedecins(medecinsList);
 
         const periode = await getPeriodeSaisie();
+        if (cancelled) { return; }
         if (periode) {
           setPeriodeSaisie(periode);
         } else {
           setError('Aucune période de saisie n\'a été définie.');
         }
       } catch (error) {
+        if (cancelled) { return; }
         logger.error('Erreur lors de la récupération des données:', error);
         setError('Erreur lors de la récupération des données: ' + error.message);
       } finally {
-        setLoading(false);
+        if (!cancelled) { setLoading(false); }
       }
     };
 
     fetchData();
+    return () => { cancelled = true; };
   }, []);
 
   // Effet pour charger les desiderata existants du médecin sélectionné
@@ -135,6 +139,7 @@ function FormulaireDesiderataAdmin() {
         setGardesGroupees(false);
         setRenfortsAssocies(false);
         setExistingDesiderataId(null);
+        setIsDirty(false);
         return;
       }
 
@@ -161,6 +166,8 @@ function FormulaireDesiderataAdmin() {
           setRenfortsAssocies(false);
           setExistingDesiderataId(null);
         }
+        // Données fraîchement chargées depuis le serveur : rien à sauvegarder.
+        setIsDirty(false);
       } catch (error) {
         logger.error('Erreur lors du chargement des desiderata du médecin:', error);
       }
@@ -171,6 +178,7 @@ function FormulaireDesiderataAdmin() {
 
   // Gestion des changements de desiderata
   const handleDesiderataChange = (date, creneau, value) => {
+    setIsDirty(true);
     setDesiderata(prev => {
       const newDesiderata = { ...prev };
 
@@ -186,6 +194,7 @@ function FormulaireDesiderataAdmin() {
 
   // Gestion du remplissage rapide
   const handleQuickFill = ({ creneaux: selectedCreneaux, jours: selectedJours, disponibilite, startDate, endDate }) => {
+    setIsDirty(true);
     const start = new Date(startDate);
     start.setHours(12, 0, 0, 0);
     const end = new Date(endDate);
@@ -221,6 +230,7 @@ function FormulaireDesiderataAdmin() {
 
   // Gestion du pattern hebdomadaire
   const handleApplyPattern = (pattern, startDate, endDate) => {
+    setIsDirty(true);
     const start = new Date(startDate);
     const end = new Date(endDate);
 
@@ -245,6 +255,7 @@ function FormulaireDesiderataAdmin() {
 
   // Application des données importées (directement ou après confirmation)
   const applyImportedData = (importedData) => {
+    setIsDirty(true);
     setDesiderata(importedData.desiderata || {});
     setNombreGardesSouhaitees(importedData.nombreGardesSouhaitees || 0);
     setNombreGardesMaxParSemaine(importedData.nombreGardesMaxParSemaine || 3);
@@ -318,6 +329,22 @@ function FormulaireDesiderataAdmin() {
     setPendingImport(null);
   };
 
+  // Changement de médecin : si des modifications ne sont pas enregistrées,
+  // demander confirmation avant de basculer (le changement écrase la saisie).
+  const handleMedecinSelectChange = (e) => {
+    const newId = e.target.value;
+    if (isDirty && selectedMedecinId && newId !== selectedMedecinId) {
+      setPendingMedecinId(newId);
+      return;
+    }
+    setSelectedMedecinId(newId);
+  };
+
+  const confirmMedecinSwitch = () => {
+    setSelectedMedecinId(pendingMedecinId || '');
+    setPendingMedecinId(null);
+  };
+
   // Soumission du formulaire
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -351,6 +378,8 @@ function FormulaireDesiderataAdmin() {
           await addDesiderata(selectedMedecinId, desiderataData);
           toast.success('Desiderata soumis avec succès !');
         }
+        // Plus de modifications en attente → ne pas bloquer la navigation.
+        setIsDirty(false);
         // Laisser le temps de voir le message avant de revenir au tableau de bord
         setTimeout(() => history.push('/dashboard-admin'), 1500);
       } catch (error) {
@@ -399,6 +428,10 @@ function FormulaireDesiderataAdmin() {
 
   return (
     <div className="min-h-screen bg-ink-100">
+      <Prompt
+        when={isDirty}
+        message="Vous avez des modifications non enregistrées. Voulez-vous vraiment quitter cette page ?"
+      />
       {/* Menu fixe en haut */}
       <AppHeader
         backTo="/dashboard-admin"
@@ -456,6 +489,28 @@ function FormulaireDesiderataAdmin() {
         </p>
       </Modal>
 
+      {/* Modale de confirmation avant de changer de médecin (saisie non enregistrée) */}
+      <Modal
+        open={!!pendingMedecinId}
+        onClose={() => setPendingMedecinId(null)}
+        title="Changer de médecin ?"
+        size="sm"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setPendingMedecinId(null)}>
+              Rester
+            </Button>
+            <Button variant="danger" onClick={confirmMedecinSwitch}>
+              Changer sans enregistrer
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-ink-600">
+          Les modifications non enregistrées pour ce médecin seront perdues. Voulez-vous continuer ?
+        </p>
+      </Modal>
+
       {/* Contenu principal */}
       <main className="mx-auto max-w-7xl px-4 pb-16 pt-24 sm:px-6 animate-fade-up">
         {/* En-tête de page */}
@@ -488,7 +543,8 @@ function FormulaireDesiderataAdmin() {
           </h2>
           <Select
             value={selectedMedecinId}
-            onChange={(e) => setSelectedMedecinId(e.target.value)}
+            onChange={handleMedecinSelectChange}
+            aria-label="Sélectionner un médecin"
             className="sm:max-w-md"
           >
             <option value="">— Choisir un médecin —</option>
@@ -527,7 +583,7 @@ function FormulaireDesiderataAdmin() {
                   min="0"
                   className="mb-0"
                   value={nombreGardesSouhaitees}
-                  onChange={(e) => setNombreGardesSouhaitees(parseInt(e.target.value))}
+                  onChange={(e) => { setIsDirty(true); setNombreGardesSouhaitees(parseInt(e.target.value, 10) || 0); }}
                 />
                 <FormField
                   label="Maximum de gardes par semaine"
@@ -536,16 +592,16 @@ function FormulaireDesiderataAdmin() {
                   max="7"
                   className="mb-0"
                   value={nombreGardesMaxParSemaine}
-                  onChange={(e) => setNombreGardesMaxParSemaine(parseInt(e.target.value))}
+                  onChange={(e) => { setIsDirty(true); setNombreGardesMaxParSemaine(parseInt(e.target.value, 10) || 1); }}
                 />
                 <Checkbox
                   checked={gardesGroupees}
-                  onChange={setGardesGroupees}
+                  onChange={(v) => { setIsDirty(true); setGardesGroupees(v); }}
                   label="Gardes groupées dans un même week-end"
                 />
                 <Checkbox
                   checked={renfortsAssocies}
-                  onChange={setRenfortsAssocies}
+                  onChange={(v) => { setIsDirty(true); setRenfortsAssocies(v); }}
                   label="Renforts associés à une garde"
                 />
               </div>
@@ -599,8 +655,8 @@ function FormulaireDesiderataAdmin() {
                       {creneaux.map(creneau => (
                         <th key={creneau.id} className="sticky top-0 z-20 min-w-[150px] border-b border-l border-ink-100 bg-ink-50 px-4 py-3 text-left">
                           <div className="font-bold text-ink-800">{creneau.label}</div>
-                          <div className="text-xs font-medium text-ink-400">{creneau.hours}</div>
-                          <div className="text-[11px] text-ink-400">
+                          <div className="text-xs font-medium text-ink-500">{creneau.hours}</div>
+                          <div className="text-[11px] text-ink-500">
                             {creneau.medecins} médecin{creneau.medecins > 1 ? 's' : ''}
                           </div>
                         </th>
@@ -622,12 +678,12 @@ function FormulaireDesiderataAdmin() {
                             <span className="flex items-baseline gap-1.5">
                               <span className={twMerge(
                                 'text-xs font-bold uppercase',
-                                isHighlighted ? 'text-primary-600' : 'text-ink-400'
+                                isHighlighted ? 'text-primary-600' : 'text-ink-500'
                               )}>
                                 {d.day}
                               </span>
                               <span className="text-ink-900">{d.num}</span>
-                              <span className="text-xs text-ink-400">{d.month}</span>
+                              <span className="text-xs text-ink-500">{d.month}</span>
                             </span>
                           </td>
                           {creneaux.map(creneau => {
@@ -639,6 +695,7 @@ function FormulaireDesiderataAdmin() {
                                   <div className="relative">
                                     <select
                                       value={value}
+                                      aria-label={`Disponibilité ${d.day} ${d.num} ${d.month} — ${creneau.label} ${creneau.hours}`}
                                       onChange={(e) => handleDesiderataChange(dateString, creneau.id, e.target.value)}
                                       className={twMerge(
                                         'w-full appearance-none rounded-lg border py-1.5 pl-2.5 pr-7 text-sm font-semibold shadow-sm transition-colors focus:outline-none focus:ring-2',

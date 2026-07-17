@@ -167,6 +167,7 @@ function GestionDesiderata() {
               />
               <input
                 type="text"
+                aria-label="Rechercher un médecin"
                 placeholder="Rechercher un médecin..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}

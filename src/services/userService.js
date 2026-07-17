@@ -34,7 +34,7 @@ export const getUser = async (uid) => {
     const userDoc = await getDoc(doc(db, USERS_COLLECTION, uid));
     if (userDoc.exists()) {
       const userData = userDoc.data();
-      logger.debug('Utilisateur trouvé:', userData);
+      logger.debug('Profil chargé', { uid });
       return { id: userDoc.id, ...userData };
     } else {
       logger.warn('Aucun utilisateur trouvé avec cet UID');
