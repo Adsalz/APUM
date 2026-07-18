@@ -2,7 +2,6 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
-import { getFunctions } from 'firebase/functions';
 
 const firebaseConfig = {
   apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
@@ -22,8 +21,5 @@ if (!firebaseConfig.apiKey) {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
-// Instance Functions pointant sur la région europe-west1 (résidence des données UE),
-// identique à celle où sont déployées les Cloud Functions.
-export const functions = getFunctions(app, 'europe-west1');
 
 export { db, auth };

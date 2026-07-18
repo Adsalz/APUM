@@ -29,6 +29,13 @@ Desideratas papiers/
 *.xlsx
 *.xls
 
+# Scripts d'administration : dépendances + clés de compte de service (JAMAIS versionnées)
+scripts/node_modules/
+*serviceaccount*.json
+*service-account*.json
+serviceAccountKey.json
+*firebase-adminsdk*.json
+
 # Système / IDE
 .DS_Store
 Thumbs.db

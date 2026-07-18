@@ -516,6 +516,13 @@ function GestionUtilisateurs() {
           </span>
           {' '}? Cette action est irréversible.
         </p>
+        <p className="mt-3 rounded-lg bg-warning-50 px-3 py-2 text-xs text-warning-800">
+          L'accès est <strong>révoqué immédiatement</strong>. Le compte de
+          connexion{userToDelete?.email ? ` (${userToDelete.email})` : ''} subsiste
+          toutefois dans Firebase Authentication : supprimez-le dans la console
+          Firebase → Authentication (ou via <code>scripts/supprimer-compte-auth.js</code>)
+          pour une suppression définitive (réutilisation de l'email / RGPD).
+        </p>
       </Modal>
     </div>
   );
