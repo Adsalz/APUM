@@ -175,9 +175,10 @@ Deuxième passe (« rendre l'app la plus pro possible »). Vérifié à chaque �
 ### Reste à faire (recommandé, non inclus dans la passe sûre)
 - 🔴 **Déployer les règles Firestore** (`firebase deploy --only firestore:rules`) — ✅ déployées le 17/07/2026.
 - 🔴 Purge de l'historique git + rotation du mot de passe Gmail.
-- 🔴 **Déployer la Cloud Function** de révocation (plan Blaze requis) :
-  `cd functions && npm install && cd .. && firebase deploy --only functions`.
-- Création d'utilisateur atomique (Cloud Function transactionnelle Auth + doc).
+- Effacement définitif d'un compte de connexion (email) : à faire à la demande
+  via la console Firebase → Authentication, ou `scripts/supprimer-compte-auth.js`
+  (l'accès, lui, est déjà révoqué à la suppression dans l'app — voir vague 5).
+- Création d'utilisateur atomique (aujourd'hui non transactionnel côté client).
 - ~~Migration react-router v6 + code-splitting~~ ✅ Fait (vague 3) : router v6
   (createBrowserRouter, useNavigate, useBlocker), lazy-loading par route et
   imports dynamiques exceljs/jspdf/ics → **bundle initial 595 kB → 190 kB gzip**.
@@ -201,7 +202,29 @@ Vérifié : **lint OK, 53 tests, build OK, smoke test navigation headless 4/4**.
   `src/workers/planning.worker.js` via `runPlanningWorker` (repli synchrone) →
   l'UI ne gèle plus pendant la génération. Signatures des générateurs
   inchangées.
-- ~~**Suppression du compte Auth à la révocation**~~ ✅ (code) : Cloud Function
-  callable `deleteUserAccount` (`functions/`, 2e gén, europe-west1) supprimant
-  Auth + doc côté serveur, avec repli gracieux côté client tant qu'elle n'est
-  pas déployée. 🔴 **déploiement à faire** (plan Blaze).
+- ~~**Suppression du compte Auth à la révocation**~~ ✅ (approche adaptée au
+  plan gratuit) : la Cloud Function a d'abord été implémentée, mais son
+  déploiement exige le plan Blaze — écarté. La révocation d'accès est de toute
+  façon déjà assurée par les règles Firestore durcies (un compte sans document
+  `users` n'a plus aucun rôle → tout accès refusé). Voir vague 5.
+
+---
+
+## Vague 5 — juillet 2026 : révocation sans Cloud Function (plan gratuit)
+
+Le projet reste sur le plan **Spark** (gratuit) : la Cloud Function de révocation
+est écartée (son déploiement exigerait le plan Blaze).
+
+- L'**accès est déjà révoqué** dès la suppression d'un utilisateur dans l'app :
+  le document `users/{uid}` est effacé et les règles Firestore refusent tout à un
+  compte sans rôle (vérifié par le test des règles, cas « compte sans rôle → DENY »).
+- `userService.deleteUser` : suppression directe du document Firestore (retrait de
+  tout le câblage Cloud Function : export `functions`, bloc `firebase.json`, dossier
+  `functions/`).
+- La modale de suppression (GestionUtilisateurs) indique désormais que l'accès est
+  révoqué immédiatement et comment supprimer *définitivement* le compte de connexion.
+- `scripts/supprimer-compte-auth.js` : script d'administration **local** (SDK Admin,
+  gratuit sur Spark) pour effacer un compte Auth (réutilisation d'email / RGPD).
+  Alternative sans script : console Firebase → Authentication.
+
+Vérifié : **lint OK, 53 tests, build OK**.
