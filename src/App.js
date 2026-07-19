@@ -1,19 +1,29 @@
 // src/App.js
-import React from 'react';
-import { BrowserRouter as Router, Route, Switch, Link } from 'react-router-dom';
+import React, { Suspense, lazy } from 'react';
+import {
+  createBrowserRouter,
+  createRoutesFromElements,
+  Route,
+  RouterProvider,
+  Outlet,
+  Link,
+} from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
-import { ToastProvider } from './components/ui';
+import { ToastProvider, LoadingScreen } from './components/ui';
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './components/Login';
-import DashboardMedecin from './components/DashboardMedecin';
-import DashboardAdmin from './components/DashboardAdmin';
-import FormulaireDesirata from './components/FormulaireDesirata';
-import FormulaireDesiderataAdmin from './components/FormulaireDesiderataAdmin';
-import GestionUtilisateurs from './components/GestionUtilisateurs';
-import GestionPlanning from './components/planning/GestionPlanning';
-import GestionPeriodeSaisie from './components/GestionPeriodeSaisie';
-import PlanningVisualisation from './components/PlanningVisualisation';
-import GestionDesiderata from './components/GestionDesiderata';
+
+// Écrans chargés à la demande (code-splitting par route) : seul l'écran de
+// connexion est dans le bundle initial, le reste est récupéré à la navigation.
+const DashboardMedecin = lazy(() => import('./components/DashboardMedecin'));
+const DashboardAdmin = lazy(() => import('./components/DashboardAdmin'));
+const FormulaireDesirata = lazy(() => import('./components/FormulaireDesirata'));
+const FormulaireDesiderataAdmin = lazy(() => import('./components/FormulaireDesiderataAdmin'));
+const GestionUtilisateurs = lazy(() => import('./components/GestionUtilisateurs'));
+const GestionPlanning = lazy(() => import('./components/planning/GestionPlanning'));
+const GestionPeriodeSaisie = lazy(() => import('./components/GestionPeriodeSaisie'));
+const PlanningVisualisation = lazy(() => import('./components/PlanningVisualisation'));
+const GestionDesiderata = lazy(() => import('./components/GestionDesiderata'));
 
 function NotFound() {
   return (
@@ -31,66 +41,51 @@ function NotFound() {
   );
 }
 
+// Layout racine : fournit la frontière Suspense des écrans lazy.
+function RootLayout() {
+  return (
+    <Suspense fallback={<LoadingScreen message="Chargement…" />}>
+      <Outlet />
+    </Suspense>
+  );
+}
+
+const router = createBrowserRouter(
+  createRoutesFromElements(
+    <Route element={<RootLayout />}>
+      <Route path="/" element={<Login />} />
+
+      {/* Espace médecin */}
+      <Route element={<ProtectedRoute roles={['medecin']} />}>
+        <Route path="/dashboard-medecin" element={<DashboardMedecin />} />
+      </Route>
+
+      {/* Écrans partagés médecin + admin */}
+      <Route element={<ProtectedRoute roles={['medecin', 'admin']} />}>
+        <Route path="/formulaire-desirata" element={<FormulaireDesirata />} />
+        <Route path="/planning-visualisation" element={<PlanningVisualisation />} />
+      </Route>
+
+      {/* Espace administrateur */}
+      <Route element={<ProtectedRoute roles={['admin']} />}>
+        <Route path="/dashboard-admin" element={<DashboardAdmin />} />
+        <Route path="/desiderata-admin" element={<FormulaireDesiderataAdmin />} />
+        <Route path="/gestion-utilisateurs" element={<GestionUtilisateurs />} />
+        <Route path="/gestion-planning-admin" element={<GestionPlanning />} />
+        <Route path="/gestion-periode-saisie" element={<GestionPeriodeSaisie />} />
+        <Route path="/gestion-desiderata" element={<GestionDesiderata />} />
+      </Route>
+
+      <Route path="*" element={<NotFound />} />
+    </Route>
+  )
+);
+
 function App() {
   return (
     <AuthProvider>
       <ToastProvider>
-        <Router>
-        <Switch>
-          <Route exact path="/" component={Login} />
-
-          {/* Espace médecin */}
-          <ProtectedRoute
-            path="/dashboard-medecin"
-            roles={['medecin']}
-            component={DashboardMedecin}
-          />
-          <ProtectedRoute
-            path="/formulaire-desirata"
-            roles={['medecin', 'admin']}
-            component={FormulaireDesirata}
-          />
-          <ProtectedRoute
-            path="/planning-visualisation"
-            roles={['medecin', 'admin']}
-            component={PlanningVisualisation}
-          />
-
-          {/* Espace administrateur */}
-          <ProtectedRoute
-            path="/dashboard-admin"
-            roles={['admin']}
-            component={DashboardAdmin}
-          />
-          <ProtectedRoute
-            path="/desiderata-admin"
-            roles={['admin']}
-            component={FormulaireDesiderataAdmin}
-          />
-          <ProtectedRoute
-            path="/gestion-utilisateurs"
-            roles={['admin']}
-            component={GestionUtilisateurs}
-          />
-          <ProtectedRoute
-            path="/gestion-planning-admin"
-            roles={['admin']}
-            render={() => <GestionPlanning isAdmin={true} />}
-          />
-          <ProtectedRoute
-            path="/gestion-periode-saisie"
-            roles={['admin']}
-            component={GestionPeriodeSaisie}
-          />
-          <ProtectedRoute
-            path="/gestion-desiderata"
-            roles={['admin']}
-            component={GestionDesiderata}
-          />
-
-          <Route component={NotFound} />
-          </Switch>
-        </Router>
+        <RouterProvider router={router} />
       </ToastProvider>
     </AuthProvider>
   );

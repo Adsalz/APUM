@@ -1,5 +1,8 @@
-import ExcelJS from 'exceljs';
 import logger from '../utils/logger';
+
+// exceljs (~lourd) est chargé à la demande (import dynamique) pour ne pas
+// alourdir le bundle initial : il n'est utile qu'au moment d'un export.
+const loadExcelJS = async () => (await import('exceljs')).default;
 
 /**
  * Service pour l'export des desiderata au format Excel
@@ -15,6 +18,7 @@ import logger from '../utils/logger';
  */
 export const exportDesiderataToExcel = async (medecins, desiderataList, periode) => {
   try {
+    const ExcelJS = await loadExcelJS();
     // Créer un nouveau workbook
     const workbook = new ExcelJS.Workbook();
 
@@ -394,6 +398,7 @@ const generateFileName = (periode) => {
  */
 export const exportMedecinDesiderataToExcel = async (medecin, desiderata, periode) => {
   try {
+    const ExcelJS = await loadExcelJS();
     // Créer un nouveau workbook
     const workbook = new ExcelJS.Workbook();
 

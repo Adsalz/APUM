@@ -107,7 +107,192 @@ trouvé**, **ce qui a été corrigé** et **ce qui reste à faire**.
 3. Fusionner `FormulaireDesirata` et `FormulaireDesiderataAdmin` (~430 lignes communes).
 4. Introduire date-fns et fiabiliser tous les calculs de dates (UTC/local).
 5. ~~Dé-publication automatique des anciens plannings~~ ✅ Fait · valider emails et payloads desiderata.
-6. Migration React 18 / react-router v6 / code-splitting (bundle 590 kB).
+6. ~~Migration React 18~~ ✅ Fait (vague 2) · react-router v6 / code-splitting : ⏳ à faire.
 7. Purge de l'historique git + rotation du mot de passe Gmail (🔴 prioritaire).
-8. Garde de navigation sur formulaire modifié non sauvegardé ; passe responsive
-   sur les grands tableaux ; moderniser les modales email/export restantes.
+8. ~~Garde de navigation sur formulaire modifié non sauvegardé~~ ✅ Fait (vague 2) ;
+   passe responsive sur les grands tableaux ; moderniser les modales email/export restantes.
+
+---
+
+## Vague 2 — juillet 2026 : professionnalisation
+
+Deuxième passe (« rendre l'app la plus pro possible »). Vérifié à chaque étape :
+**lint propre**, **53 tests unitaires verts**, **build de production compilé** (React 18).
+
+### Sécurité (règles + services)
+- **Desiderata verrouillés au profil** : `firestore.rules` exige désormais
+  `isMedecin() || isAdmin()` (plus seulement `isSignedIn()`) — un compte
+  auto-enregistré via la clé API publique ne peut plus écrire dans la base
+  médicale. Propriété/`userId` immuable préservés. 🔴 **à déployer** :
+  `npx firebase deploy --only firestore:rules`.
+- **email_queue validé côté règles** : `create/update` réservés aux admins avec
+  contrôle de type sur `from`/`to` (liste ou chaîne non vide) ; `delete` conservé.
+- **authService** : erreur Firebase désormais correctement propagée
+  (`auth/email-already-in-use`, `auth/invalid-email`, `auth/weak-password`) —
+  le message « email déjà utilisé » s'affiche enfin. Mot de passe temporaire
+  généré via `crypto.getRandomValues` (au lieu de `Math.random`).
+- **userService** : le log de debug ne journalise plus que l'`uid` (pas le profil).
+- En-têtes de sécurité HTTP ajoutés à `firebase.json` (`X-Content-Type-Options`,
+  `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`, cache long `/static`).
+
+### Robustesse
+- **ErrorBoundary** applicatif (`src/components/ErrorBoundary.js`) autour de
+  toute l'app → écran de repli au lieu d'une page blanche en cas de crash.
+- **Migration React 18** : `ReactDOM.render` → `createRoot` (`src/index.js`).
+- **Garde de saisie non sauvegardée** : hook `useUnsavedChangesWarning`
+  (avertissement de fermeture d'onglet) + `<Prompt>` de navigation dans les deux
+  formulaires desiderata + confirmation avant de **changer de médecin** (admin)
+  ou de **quitter le planning en cours d'édition**.
+- Bug corrigé : `App.js` passait `isAdmin` que `GestionPlanning` lisait sous le
+  nom `_isAdmin` (prop morte) — prop supprimée.
+- Gardes d'annulation (`cancelled`) ajoutées aux `useEffect` de chargement
+  (formulaires, planning, visualisation) — évite les mises à jour d'état après
+  démontage sous React 18 StrictMode.
+
+### Accessibilité (WCAG 2.1 AA)
+- **Noms accessibles** ajoutés à tous les `<select>` de disponibilité/médecin,
+  aux champs de date (labels associés) et aux champs de recherche (`aria-label`).
+- **Modale** : piège de focus (Tab/Maj+Tab) + restauration du focus sur
+  l'élément déclencheur à la fermeture (`src/components/ui/Modal.js`).
+- **Combobox** `MedecinSearchSelect` rendu conforme ARIA + navigation clavier
+  (flèches/Entrée/Échap).
+- **Contraste** : texte d'information passé de `ink-400` (~2.6:1, échec) à
+  `ink-500` (≥4.5:1) sur l'ensemble des écrans. Emoji décoratifs `aria-hidden`.
+
+### Qualité / outillage
+- **53 tests unitaires** (jours fériés / algorithme de Meeus, générateurs de
+  planning, utilitaires) — `src/utils/__tests__/`, aucun test auparavant.
+- **CI GitHub Actions** (`.github/workflows/ci.yml`) : lint + tests + build à
+  chaque push/PR.
+- **5 dépendances inutilisées retirées** (`clsx`, `class-variance-authority`,
+  3× `@radix-ui/*`).
+- Constante `creneaux` centralisée pour la couche d'affichage
+  (`src/constants/creneaux.js`) — formulaires + visualisation.
+- `public/index.html` nettoyé (suppression de ~90 lignes de polyfills manuels
+  inutiles avec CRA 5) ; **favicon SVG** créé + `manifest.json` corrigé
+  (références `favicon.ico`/`logo192.png` inexistantes supprimées).
+
+### Reste à faire (recommandé, non inclus dans la passe sûre)
+- 🔴 **Déployer les règles Firestore** (`firebase deploy --only firestore:rules`) — ✅ déployées le 17/07/2026.
+- 🔴 Purge de l'historique git + rotation du mot de passe Gmail.
+- Effacement définitif d'un compte de connexion (email) : à faire à la demande
+  via la console Firebase → Authentication, ou `scripts/supprimer-compte-auth.js`
+  (l'accès, lui, est déjà révoqué à la suppression dans l'app — voir vague 5).
+- Création d'utilisateur atomique (aujourd'hui non transactionnel côté client).
+- ~~Migration react-router v6 + code-splitting~~ ✅ Fait (vague 3) : router v6
+  (createBrowserRouter, useNavigate, useBlocker), lazy-loading par route et
+  imports dynamiques exceljs/jspdf/ics → **bundle initial 595 kB → 190 kB gzip**.
+- Fiabilisation complète des dates (date-fns / UTC).
+
+---
+
+## Vague 4 — juillet 2026 : refactors de fond
+
+Vérifié : **lint OK, 53 tests, build OK, smoke test navigation headless 4/4**.
+
+- ~~**Fusion des 2 formulaires desiderata**~~ ✅ : logique + présentation
+  factorisées dans `src/components/desiderata/` (`useDesiderataForm`,
+  `DesiderataPreferences`, `DesiderataTable`) ; les deux écrans deviennent des
+  coquilles fines (comportements préservés).
+- ~~**Réécriture de `GenerateurTrimestre`**~~ ✅ : passage complet au design
+  system (43 styles inline supprimés), responsive natif (fin des
+  `window.innerWidth` au render), emojis → icônes accessibles.
+- ~~**Génération de planning en Web Worker**~~ ✅ : cœur de calcul pur extrait
+  dans `planningCore.js` (sans Firebase, dédupliqué), exécuté dans
+  `src/workers/planning.worker.js` via `runPlanningWorker` (repli synchrone) →
+  l'UI ne gèle plus pendant la génération. Signatures des générateurs
+  inchangées.
+- ~~**Suppression du compte Auth à la révocation**~~ ✅ (approche adaptée au
+  plan gratuit) : la Cloud Function a d'abord été implémentée, mais son
+  déploiement exige le plan Blaze — écarté. La révocation d'accès est de toute
+  façon déjà assurée par les règles Firestore durcies (un compte sans document
+  `users` n'a plus aucun rôle → tout accès refusé). Voir vague 5.
+
+---
+
+## Vague 5 — juillet 2026 : révocation sans Cloud Function (plan gratuit)
+
+Le projet reste sur le plan **Spark** (gratuit) : la Cloud Function de révocation
+est écartée (son déploiement exigerait le plan Blaze).
+
+- L'**accès est déjà révoqué** dès la suppression d'un utilisateur dans l'app :
+  le document `users/{uid}` est effacé et les règles Firestore refusent tout à un
+  compte sans rôle (vérifié par le test des règles, cas « compte sans rôle → DENY »).
+- `userService.deleteUser` : suppression directe du document Firestore (retrait de
+  tout le câblage Cloud Function : export `functions`, bloc `firebase.json`, dossier
+  `functions/`).
+- La modale de suppression (GestionUtilisateurs) indique désormais que l'accès est
+  révoqué immédiatement et comment supprimer *définitivement* le compte de connexion.
+- `scripts/supprimer-compte-auth.js` : script d'administration **local** (SDK Admin,
+  gratuit sur Spark) pour effacer un compte Auth (réutilisation d'email / RGPD).
+  Alternative sans script : console Firebase → Authentication.
+
+Vérifié : **lint OK, 53 tests, build OK**.
+
+---
+
+## Vague 6 — juillet 2026 : connexion médecin sans email (liste déroulante + code)
+
+Objectif : **supprimer la friction du mot de passe**. Le médecin ne saisit plus
+d'email : il **choisit son nom dans une liste déroulante** et tape son **code**
+(= son mot de passe Firebase, qu'il gère lui-même : il peut le changer, et
+« Définir / réinitialiser mon code » lui envoie un lien s'il l'oublie). Design
+durci en amont par une revue multi-agents (sécurité, règles Firestore, UX,
+migration) avant implémentation.
+
+**Contrainte de plan** : reste sur **Spark** (gratuit). Aucune Cloud Function ni
+Admin SDK côté app. Le renouvellement du code est **self-service** (le médecin),
+pas piloté par l'admin.
+
+- **Annuaire public** (`src/services/annuaireService.js` + collection
+  `annuaire/{uid}`) : projection minimale `{ label: "Prénom N.", email }` de
+  `users` (rôle médecin), en **lecture publique** (la liste déroulante est
+  peuplée *avant* toute connexion), **écriture admin uniquement** avec
+  validation stricte des champs (`hasOnly(['label','email'])`). `syncAnnuaire()`
+  est idempotent et **réconcilie les orphelins**.
+- **Labels désambiguïsés** : « Prénom N. » élargi (« Prénom Dup. », nom complet,
+  puis suffixe `(1)/(2)`) pour les homonymes ; la clé de sélection reste l'**uid**
+  (jamais le label) → aucune résolution vers le mauvais compte. Couvert par
+  `src/services/__tests__/annuaireService.test.js` (5 tests).
+- **Login** (`src/components/Login.js`) : liste déroulante + code, avec états
+  **chargement / erreur / vide** et **repli « connexion par email »** toujours
+  disponible (pas de médecin bloqué dehors si l'annuaire est indisponible). Les
+  **admins** utilisent ce mode email (lien « Espace administrateur »). Erreurs
+  différenciées (`too-many-requests`, réseau) sans énumération ; champ
+  `username` caché pour les gestionnaires de mots de passe ; `<select>` avec
+  label accessible.
+- **Changement de code** (`ChangePasswordModal` + `authService`
+  `reauthenticateAndUpdatePassword`) : **réauthentification** avant `updatePassword`
+  → corrige un bug latent (`auth/requires-recent-login`) **et** une faille (une
+  session détournée ne peut plus changer le code sans connaître l'ancien).
+  Minimum **12 caractères** + bouton « générer un code fort ».
+- **Révocation** (`userService.deleteUser`) : suppression **atomique** (writeBatch)
+  du document `users/{uid}` **et** de son entrée `annuaire/{uid}` (le médecin
+  révoqué disparaît de la liste de connexion). `GestionUtilisateurs` resynchronise
+  l'annuaire à la création et expose un bouton **« Synchroniser l'annuaire »**
+  (peuplement initial des médecins existants + réconciliation).
+
+**Compromis assumés par le propriétaire** : les noms des médecins sont publics
+(affichage minimisé « Prénom N. ») et l'email de connexion devient techniquement
+résolvable (jamais affiché).
+
+**Risques résiduels à connaître** (plan gratuit) : pas de verrouillage de compte
+ni de CAPTCHA sur l'endpoint d'authentification Firebase → l'**entropie du code**
+est la seule vraie barrière anti-brute-force ; l'annuaire public permet
+d'énumérer les emails ; « Code oublié » est scriptable (quota d'emails). À
+surveiller (pics d'échecs d'auth) ; durcissements optionnels : App Check
+reCAPTCHA v3 (gratuit), et à terme retrait de `|| isMedecin()` de la règle de
+lecture `users` **après** avoir sevré la vue planning médecin de `getMedecins()`
+(aujourd'hui `PlanningVisualisation` en dépend, donc conservé).
+
+### Actions requises côté propriétaire (vague 6)
+
+1. **Déployer les règles Firestore** (collection `annuaire`) :
+   `npx firebase deploy --only firestore:rules`.
+2. **Peupler l'annuaire** une première fois : se connecter en admin →
+   *Gestion des utilisateurs* → **« Synchroniser l'annuaire »** (indispensable
+   pour que la liste déroulante affiche les médecins déjà existants).
+3. (Optionnel) Personnaliser le **template d'email** Firebase (console → Authentication)
+   pour parler de « code de connexion » et marquer « Planning APUM ».
+
+Vérifié : **lint OK, 58 tests, build OK**.

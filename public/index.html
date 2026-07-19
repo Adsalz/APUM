@@ -2,7 +2,7 @@
 <html lang="fr">
   <head>
     <meta charset="utf-8" />
-    <link rel="icon" href="favicon.ico" />
+    <link rel="icon" type="image/svg+xml" href="%PUBLIC_URL%/favicon.svg" />
     <!-- Zoom utilisateur autorisé (accessibilité) -->
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#2563eb" />
@@ -10,8 +10,7 @@
       name="description"
       content="Planning APUM — gestion des plannings de garde et desiderata des médecins"
     />
-    <link rel="apple-touch-icon" href="logo192.png" />
-    <link rel="manifest" href="manifest.json" />
+    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
     <!-- Police de l'interface : Hanken Grotesk (humaniste, très lisible) -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -20,72 +19,6 @@
       rel="stylesheet"
     />
     <title>Planning APUM</title>
-    <script>
-      // Browser polyfills - must run before any modules load
-      (function() {
-        'use strict';
-
-        // Define global if not available
-        if (typeof window.global === 'undefined') {
-          window.global = window;
-        }
-
-        // Define process with comprehensive API
-        if (typeof window.process === 'undefined') {
-          window.process = {
-            env: {
-              NODE_ENV: 'production',
-              BROWSER: 'true'
-            },
-            version: 'v16.0.0',
-            versions: {
-              node: '16.0.0'
-            },
-            platform: 'browser',
-            browser: true,
-            argv: [],
-            title: 'browser',
-            pid: 1,
-            ppid: 0,
-            uid: 501,
-            gid: 20,
-            cwd: function() { return '/'; },
-            chdir: function() {},
-            umask: function() { return 0; },
-            nextTick: function(callback) {
-              setTimeout(callback, 0);
-            },
-            stdout: { write: function() {} },
-            stderr: { write: function() {} },
-            stdin: { read: function() {} }
-          };
-        }
-
-        // Define Buffer if not available
-        if (typeof window.Buffer === 'undefined') {
-          window.Buffer = {
-            isBuffer: function() { return false; },
-            from: function() { return []; },
-            alloc: function() { return []; },
-            allocUnsafe: function() { return []; }
-          };
-        }
-
-        // Define setImmediate if not available
-        if (typeof window.setImmediate === 'undefined') {
-          window.setImmediate = function(callback) {
-            return setTimeout(callback, 0);
-          };
-        }
-
-        // Define clearImmediate if not available
-        if (typeof window.clearImmediate === 'undefined') {
-          window.clearImmediate = function(id) {
-            return clearTimeout(id);
-          };
-        }
-      })();
-    </script>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>

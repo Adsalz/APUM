@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { X, Download, Search } from 'lucide-react';
-import { jsPDF } from 'jspdf';
 import { Modal, Button, Checkbox } from './ui';
 
 function ExportDesiderataModal({
@@ -52,7 +51,9 @@ function ExportDesiderataModal({
     }
   };
 
-  const generatePDF = () => {
+  const generatePDF = async () => {
+    // jspdf (~lourd) chargé à la demande pour alléger le bundle initial.
+    const { jsPDF } = await import('jspdf');
     const doc = new jsPDF();
     const selectedMedecinsList = medecins.filter(m => selectedMedecins[m.id]);
     const creneauxSimplifies = [

@@ -1,6 +1,6 @@
 // src/components/ui/AppHeader.js
 import React, { useState } from 'react';
-import { Link, useHistory } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { CalendarDays, Key, LogOut, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import ChangePasswordModal from '../ChangePasswordModal';
@@ -16,12 +16,12 @@ import logger from '../../utils/logger';
 function AppHeader({ backTo, backLabel = 'Retour', actions = null }) {
   const [showChangePassword, setShowChangePassword] = useState(false);
   const { logout } = useAuth();
-  const history = useHistory();
+  const navigate = useNavigate();
 
   const handleLogout = async () => {
     try {
       await logout();
-      history.push('/');
+      navigate('/');
     } catch (error) {
       logger.error('Erreur lors de la déconnexion:', error);
     }
@@ -60,7 +60,7 @@ function AppHeader({ backTo, backLabel = 'Retour', actions = null }) {
               className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium text-ink-500 transition-colors hover:bg-ink-100 hover:text-ink-800"
             >
               <Key size={17} aria-hidden="true" />
-              <span className="hidden md:inline">Mot de passe</span>
+              <span className="hidden md:inline">Mon code</span>
             </button>
             <button
               type="button"

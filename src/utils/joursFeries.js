@@ -4,7 +4,7 @@
 // fériés de 2025+ n'étaient plus détectés dans les formulaires.
 
 // Algorithme de Meeus/Jones/Butcher : date du dimanche de Pâques
-function getPaques(year) {
+export function getPaques(year) {
   const a = year % 19;
   const b = Math.floor(year / 100);
   const c = year % 100;

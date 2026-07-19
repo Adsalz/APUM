@@ -1,6 +1,6 @@
 // src/components/planning/GestionPlanning.js
 import React, { useState, useEffect } from 'react';
-import { useHistory } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { getMedecins } from '../../services/userService';
 import {
   getLatestPlanning,
@@ -15,6 +15,7 @@ import { genererPlanning, creneaux } from '../../utils/planningGenerator';
 import { genererPlanningPriorite } from '../../utils/planningGeneratorPriorite';
 import { LoadingScreen, Alert } from '../ui';
 import logger from '../../utils/logger';
+import useUnsavedChangesWarning from '../../hooks/useUnsavedChangesWarning';
 
 // Import des sous-composants
 import PlanningHeader from './PlanningHeader';
@@ -27,7 +28,7 @@ import PublishPlanningModal from './modals/PublishPlanningModal';
 import DiscardChangesModal from './modals/DiscardChangesModal';
 import ExportDesiderataModal from '../ExportDesiderataModal';
 
-function GestionPlanning({ _isAdmin = true }) {
+function GestionPlanning() {
   // États pour les données
   const [periodeSaisie, setPeriodeSaisie] = useState(null);
   const [planning, setPlanning] = useState(null);
@@ -54,12 +55,18 @@ function GestionPlanning({ _isAdmin = true }) {
   const [showPublishConfirm, setShowPublishConfirm] = useState(false);
   const [showDiscardChanges, setShowDiscardChanges] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+  // Navigation en attente d'une confirmation d'abandon des modifications.
+  const [pendingBack, setPendingBack] = useState(false);
 
-  const history = useHistory();
+  const navigate = useNavigate();
+
+  // Avertit avant de quitter/recharger l'onglet si des modifications sont en cours.
+  useUnsavedChangesWarning(editMode && modified);
 
   // Effet pour charger les données initiales
   // (auth + rôle admin garantis par ProtectedRoute)
   useEffect(() => {
+    let cancelled = false;
     const fetchData = async () => {
       try {
         // Chargement des données de base
@@ -69,6 +76,7 @@ function GestionPlanning({ _isAdmin = true }) {
           getLatestPlanning(),
           getPublishedPlanning()
         ]);
+        if (cancelled) { return; }
 
         setPeriodeSaisie(periode);
         setMedecins(medecinsList);
@@ -89,18 +97,21 @@ function GestionPlanning({ _isAdmin = true }) {
             periode.startDate,
             periode.endDate
           );
+          if (cancelled) { return; }
           setDesiderata(desiderataData);
         }
 
       } catch (error) {
+        if (cancelled) { return; }
         logger.error('Erreur:', error);
         setError('Erreur lors du chargement des données');
       } finally {
-        setLoading(false);
+        if (!cancelled) { setLoading(false); }
       }
     };
 
     fetchData();
+    return () => { cancelled = true; };
   }, []);
 
   // Gestion des notifications
@@ -236,6 +247,17 @@ function GestionPlanning({ _isAdmin = true }) {
     setEditMode(!editMode);
   };
 
+  // Retour au tableau de bord : demande confirmation si des modifications
+  // d'édition ne sont pas sauvegardées.
+  const handleBack = () => {
+    if (editMode && modified) {
+      setPendingBack(true);
+      setShowDiscardChanges(true);
+      return;
+    }
+    navigate('/dashboard-admin');
+  };
+
   if (loading) {
     return <LoadingScreen message="Chargement du planning…" />;
   }
@@ -250,7 +272,7 @@ function GestionPlanning({ _isAdmin = true }) {
         onGenerateClick={() => setShowGenerateConfirm(true)}
         onPublishClick={() => setShowPublishConfirm(true)}
         onSaveChanges={handleSaveChanges}
-        onBackClick={() => history.push('/dashboard-admin')}
+        onBackClick={handleBack}
         onExportClick={() => setShowExportModal(true)}
         planning={planning}
       />
@@ -332,11 +354,18 @@ function GestionPlanning({ _isAdmin = true }) {
 
       <DiscardChangesModal
         isOpen={showDiscardChanges}
-        onClose={() => setShowDiscardChanges(false)}
+        onClose={() => {
+          setShowDiscardChanges(false);
+          setPendingBack(false);
+        }}
         onConfirm={() => {
           setShowDiscardChanges(false);
           setModified(false);
           setEditMode(false);
+          if (pendingBack) {
+            setPendingBack(false);
+            navigate('/dashboard-admin');
+          }
         }}
       />
 

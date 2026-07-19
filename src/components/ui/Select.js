@@ -6,11 +6,13 @@ import { ChevronDown } from 'lucide-react';
 /**
  * <select> natif habillé (flèche personnalisée, focus cohérent).
  * Tous les props supplémentaires sont transmis au <select>.
+ * forwardRef : la ref pointe sur le <select> natif (focus programmatique).
  */
-function Select({ className = '', children, ...props }) {
+const Select = React.forwardRef(function Select({ className = '', children, ...props }, ref) {
   return (
     <div className="relative">
       <select
+        ref={ref}
         className={twMerge(
           'w-full appearance-none rounded-lg border border-ink-200 bg-white py-2 pl-3 pr-9 text-sm text-ink-800 shadow-sm',
           'transition-colors hover:border-ink-300 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/25',
@@ -28,6 +30,6 @@ function Select({ className = '', children, ...props }) {
       />
     </div>
   );
-}
+});
 
 export default Select;

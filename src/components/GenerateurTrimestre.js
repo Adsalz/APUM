@@ -1,4 +1,15 @@
 import React, { useState } from 'react';
+import {
+  RefreshCw,
+  Users,
+  Search,
+  Trophy,
+  Medal,
+  BarChart3,
+  CheckCircle2,
+  Layers,
+} from 'lucide-react';
+import { Button, StatCard } from './ui';
 
 const GenerateurTrimestre = ({ onListeGenere, medecins = [] }) => {
   const [resultat, setResultat] = useState(null);
@@ -56,326 +67,162 @@ const GenerateurTrimestre = ({ onListeGenere, medecins = [] }) => {
 
   const formatListe = (liste) => {
     return liste.map((nom, index) => (
-      <div key={index} style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        padding: '0.25rem 0.5rem',
-        backgroundColor: index % 2 === 0 ? '#f9fafb' : 'white'
-      }}>
-        <span style={{
-          fontFamily: 'monospace',
-          fontSize: '0.875rem',
-          color: '#6b7280',
-          width: '2rem'
-        }}>
-          {index + 1}.
-        </span>
-        <span style={{
-          flex: 1,
-          marginLeft: '0.5rem'
-        }}>
-          {nom}
-        </span>
+      <div
+        key={index}
+        className={`flex justify-between px-2 py-1 ${
+          index % 2 === 0 ? 'bg-ink-50' : 'bg-white'
+        }`}
+      >
+        <span className="w-8 font-mono text-sm text-ink-500">{index + 1}.</span>
+        <span className="ml-2 flex-1 text-ink-800">{nom}</span>
       </div>
     ));
   };
 
   return (
-    <div style={{
-      maxWidth: '1200px',
-      margin: '0 auto',
-      padding: '1.5rem',
-      backgroundColor: 'white',
-      borderRadius: '0.5rem',
-      boxShadow: '0 1px 3px rgba(0,0,0,0.1)'
-    }}>
-      <h2 style={{
-        fontSize: '1.5rem',
-        fontWeight: 'bold',
-        color: '#1f2937',
-        marginBottom: '1.5rem',
-        textAlign: 'center'
-      }}>
-        🔄 Générateur de Liste Trimestrielle
+    <div className="mx-auto max-w-5xl space-y-6">
+      <h2 className="flex items-center justify-center gap-2 text-center text-2xl font-bold text-ink-900">
+        <RefreshCw size={22} aria-hidden="true" />
+        Générateur de Liste Trimestrielle
       </h2>
 
       {/* Liste automatique des médecins */}
-      <div style={{
-        backgroundColor: '#f3f4f6',
-        padding: '1.5rem',
-        borderRadius: '0.5rem',
-        marginBottom: '1.5rem'
-      }}>
-        <h3 style={{
-          fontSize: '1.125rem',
-          fontWeight: 'bold',
-          color: '#1f2937',
-          marginBottom: '1rem'
-        }}>
-          👥 Médecins détectés dans la base
+      <div className="rounded-2xl bg-ink-50 p-6">
+        <h3 className="mb-4 flex items-center gap-2 text-lg font-bold text-ink-900">
+          <Users size={20} aria-hidden="true" />
+          Médecins détectés dans la base
         </h3>
 
         {listeActuelleTriee.length > 0 ? (
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-            gap: '0.5rem',
-            marginBottom: '1rem'
-          }}>
+          <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {listeActuelleTriee.map((medecin, index) => (
-              <div key={medecin.id} style={{
-                padding: '0.5rem',
-                backgroundColor: 'white',
-                borderRadius: '0.25rem',
-                fontSize: '0.875rem'
-              }}>
-                <span style={{ fontWeight: '500' }}>
+              <div
+                key={medecin.id}
+                className="rounded-lg bg-white p-2 text-sm"
+              >
+                <span className="font-medium text-ink-800">
                   {index + 1}. {medecin.nom} {medecin.prenom}
                 </span>
               </div>
             ))}
           </div>
         ) : (
-          <p style={{ color: '#6b7280', fontStyle: 'italic' }}>
+          <p className="mb-4 italic text-ink-500">
             Aucun médecin trouvé dans la base de données
           </p>
         )}
 
-        <button
+        <Button
+          variant="primary"
           onClick={genererProchainTrimestre}
           disabled={listeActuelleTriee.length === 0}
-          style={{
-            width: '100%',
-            backgroundColor: listeActuelleTriee.length > 0 ? '#2563eb' : '#9ca3af',
-            color: 'white',
-            padding: '0.75rem',
-            borderRadius: '0.5rem',
-            border: 'none',
-            fontWeight: '500',
-            cursor: listeActuelleTriee.length > 0 ? 'pointer' : 'not-allowed'
-          }}
+          icon={<RefreshCw size={18} aria-hidden="true" />}
+          className="w-full"
         >
-          🔄 Générer la liste trimestrielle ({listeActuelleTriee.length} médecins)
-        </button>
+          Générer la liste trimestrielle ({listeActuelleTriee.length} médecins)
+        </Button>
       </div>
 
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: window.innerWidth > 768 ? '1fr 1fr' : '1fr',
-        gap: '1.5rem',
-        marginBottom: '1.5rem'
-      }}>
+      {/* Explication */}
+      <div className="rounded-2xl bg-primary-50 p-4">
+        <h3 className="mb-3 flex items-center gap-2 font-bold text-primary-800">
+          <Search size={18} aria-hidden="true" />
+          Fonctionnement
+        </h3>
+        <div className="flex flex-col gap-2 text-sm text-primary-800">
+          <p><strong>1. Rotation par tiers :</strong> La liste est divisée en 3 parties égales</p>
+          <p><strong>2. Avancement :</strong> Chaque tiers avance d&apos;une position</p>
+          <p><strong>3. Nouveaux :</strong> Ajoutés automatiquement en fin de liste</p>
+          <p><strong>4. Équité :</strong> Tout le monde passe en tête tous les 3 trimestres</p>
+        </div>
 
-        {/* Explication */}
-        <div style={{
-          backgroundColor: '#eff6ff',
-          padding: '1rem',
-          borderRadius: '0.5rem'
-        }}>
-          <h3 style={{
-            fontWeight: 'bold',
-            color: '#1e40af',
-            marginBottom: '0.75rem'
-          }}>
-            🔍 Fonctionnement
-          </h3>
-          <div style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '0.5rem',
-            fontSize: '0.875rem',
-            color: '#1e40af'
-          }}>
-            <p><strong>1. Rotation par tiers :</strong> La liste est divisée en 3 parties égales</p>
-            <p><strong>2. Avancement :</strong> Chaque tiers avance d'une position</p>
-            <p><strong>3. Nouveaux :</strong> Ajoutés automatiquement en fin de liste</p>
-            <p><strong>4. Équité :</strong> Tout le monde passe en tête tous les 3 trimestres</p>
-          </div>
-
-          <div style={{
-            marginTop: '1rem',
-            padding: '0.75rem',
-            backgroundColor: 'white',
-            borderRadius: '0.25rem',
-            borderLeft: '4px solid #3b82f6'
-          }}>
-            <p style={{
-              fontSize: '0.75rem',
-              color: '#6b7280',
-              fontFamily: 'monospace'
-            }}>
-              Tiers 3 → Tiers 1<br/>
-              Tiers 1 → Tiers 2<br/>
-              Tiers 2 → Tiers 3
-            </p>
-          </div>
+        <div className="mt-4 rounded-lg border-l-4 border-primary-500 bg-white p-3">
+          <p className="font-mono text-xs text-ink-500">
+            Tiers 3 → Tiers 1<br />
+            Tiers 1 → Tiers 2<br />
+            Tiers 2 → Tiers 3
+          </p>
         </div>
       </div>
 
       {/* Résultats */}
       {resultat && (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: window.innerWidth > 768 ? '1fr 1fr' : '1fr',
-          gap: '1.5rem'
-        }}>
+        <div className="grid gap-6 lg:grid-cols-2">
           {/* Premier tour */}
-          <div style={{
-            backgroundColor: '#ecfdf5',
-            borderRadius: '0.5rem',
-            padding: '1rem'
-          }}>
-            <h3 style={{
-              fontWeight: 'bold',
-              color: '#059669',
-              marginBottom: '0.75rem',
-              display: 'flex',
-              alignItems: 'center'
-            }}>
-              🥇 Premier Tour
-              <span style={{
-                marginLeft: '0.5rem',
-                fontSize: '0.875rem',
-                fontWeight: 'normal'
-              }}>
+          <div className="rounded-2xl bg-success-50 p-4">
+            <h3 className="mb-3 flex flex-wrap items-center gap-2 font-bold text-success-700">
+              <Trophy size={18} aria-hidden="true" />
+              Premier Tour
+              <span className="text-sm font-normal text-success-600">
                 ({resultat.premierTour.length} personnes)
               </span>
             </h3>
-            <div style={{
-              backgroundColor: 'white',
-              borderRadius: '0.25rem',
-              border: '1px solid #e5e7eb',
-              maxHeight: '24rem',
-              overflowY: 'auto'
-            }}>
+            <div className="max-h-96 overflow-y-auto rounded-lg border border-ink-200 bg-white">
               {formatListe(resultat.premierTour)}
             </div>
 
-            <div style={{
-              marginTop: '0.75rem',
-              padding: '0.5rem',
-              backgroundColor: '#e0f2fe',
-              borderRadius: '0.25rem',
-              fontSize: '0.875rem',
-              color: '#0277bd'
-            }}>
-              <strong>✅ Tous les médecins inclus automatiquement</strong>
+            <div className="mt-3 flex items-center gap-2 rounded-lg bg-primary-50 p-2 text-sm font-semibold text-primary-700">
+              <CheckCircle2 size={16} aria-hidden="true" />
+              Tous les médecins inclus automatiquement
             </div>
           </div>
 
           {/* Deuxième tour */}
-          <div style={{
-            backgroundColor: '#fff7ed',
-            borderRadius: '0.5rem',
-            padding: '1rem'
-          }}>
-            <h3 style={{
-              fontWeight: 'bold',
-              color: '#ea580c',
-              marginBottom: '0.75rem',
-              display: 'flex',
-              alignItems: 'center'
-            }}>
-              🥈 Deuxième Tour
-              <span style={{
-                marginLeft: '0.5rem',
-                fontSize: '0.875rem',
-                fontWeight: 'normal'
-              }}>
+          <div className="rounded-2xl bg-orange-50 p-4">
+            <h3 className="mb-3 flex flex-wrap items-center gap-2 font-bold text-orange-700">
+              <Medal size={18} aria-hidden="true" />
+              Deuxième Tour
+              <span className="text-sm font-normal text-orange-600">
                 (ordre inversé)
               </span>
             </h3>
-            <div style={{
-              backgroundColor: 'white',
-              borderRadius: '0.25rem',
-              border: '1px solid #e5e7eb',
-              maxHeight: '24rem',
-              overflowY: 'auto'
-            }}>
+            <div className="max-h-96 overflow-y-auto rounded-lg border border-ink-200 bg-white">
               {formatListe(resultat.deuxiemeTour)}
             </div>
           </div>
 
           {/* Statistiques */}
-          <div style={{
-            gridColumn: window.innerWidth > 768 ? 'span 2' : 'span 1',
-            backgroundColor: '#f9fafb',
-            borderRadius: '0.5rem',
-            padding: '1rem'
-          }}>
-            <h3 style={{
-              fontWeight: 'bold',
-              color: '#1f2937',
-              marginBottom: '0.75rem'
-            }}>
-              📊 Statistiques
+          <div className="rounded-2xl bg-ink-50 p-4 lg:col-span-2">
+            <h3 className="mb-4 flex items-center gap-2 font-bold text-ink-900">
+              <BarChart3 size={18} aria-hidden="true" />
+              Statistiques
             </h3>
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-              gap: '1rem',
-              fontSize: '0.875rem'
-            }}>
-              <div style={{
-                textAlign: 'center',
-                padding: '0.75rem',
-                backgroundColor: 'white',
-                borderRadius: '0.25rem'
-              }}>
-                <div style={{
-                  fontSize: '2rem',
-                  fontWeight: 'bold',
-                  color: '#2563eb'
-                }}>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <StatCard
+                tone="blue"
+                icon={<Users size={22} aria-hidden="true" />}
+                label="Total médecins"
+              >
+                <p className="text-3xl font-extrabold text-ink-900">
                   {resultat.stats.totalMedecins}
-                </div>
-                <div style={{ color: '#6b7280' }}>Total médecins</div>
-              </div>
-              <div style={{
-                textAlign: 'center',
-                padding: '0.75rem',
-                backgroundColor: 'white',
-                borderRadius: '0.25rem'
-              }}>
-                <div style={{
-                  fontSize: '2rem',
-                  fontWeight: 'bold',
-                  color: '#059669'
-                }}>
-                  100%
-                </div>
-                <div style={{ color: '#6b7280' }}>Médecins inclus</div>
-              </div>
-              <div style={{
-                textAlign: 'center',
-                padding: '0.75rem',
-                backgroundColor: 'white',
-                borderRadius: '0.25rem'
-              }}>
-                <div style={{
-                  fontSize: '2rem',
-                  fontWeight: 'bold',
-                  color: '#7c3aed'
-                }}>
+                </p>
+              </StatCard>
+
+              <StatCard
+                tone="green"
+                icon={<CheckCircle2 size={22} aria-hidden="true" />}
+                label="Médecins inclus"
+              >
+                <p className="text-3xl font-extrabold text-ink-900">100%</p>
+              </StatCard>
+
+              <StatCard
+                tone="purple"
+                icon={<Layers size={22} aria-hidden="true" />}
+                label="Médecins par tiers"
+              >
+                <p className="text-3xl font-extrabold text-ink-900">
                   {resultat.stats.tailleTiers}
-                </div>
-                <div style={{ color: '#6b7280' }}>Médecins par tiers</div>
-              </div>
-              <div style={{
-                textAlign: 'center',
-                padding: '0.75rem',
-                backgroundColor: 'white',
-                borderRadius: '0.25rem'
-              }}>
-                <div style={{
-                  fontSize: '2rem',
-                  fontWeight: 'bold',
-                  color: '#ea580c'
-                }}>
-                  ✓
-                </div>
-                <div style={{ color: '#6b7280' }}>Auto-généré</div>
-              </div>
+                </p>
+              </StatCard>
+
+              <StatCard
+                tone="orange"
+                icon={<RefreshCw size={22} aria-hidden="true" />}
+                label="Auto-généré"
+              >
+                <p className="text-3xl font-extrabold text-ink-900">Oui</p>
+              </StatCard>
             </div>
           </div>
         </div>

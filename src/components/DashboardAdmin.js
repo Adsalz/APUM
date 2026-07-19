@@ -1,6 +1,6 @@
 // src/components/DashboardAdmin.js
 import React, { useState, useEffect } from 'react';
-import { useHistory } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import {
   Users,
   Calendar,
@@ -22,7 +22,7 @@ function DashboardAdmin() {
   const [planning, setPlanning] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const history = useHistory();
+  const navigate = useNavigate();
 
   useEffect(() => {
     let cancelled = false;
@@ -114,35 +114,35 @@ function DashboardAdmin() {
               icon={<Users size={24} />}
               title="Gérer les utilisateurs"
               description="Ajouter ou modifier des utilisateurs"
-              onClick={() => history.push('/gestion-utilisateurs')}
+              onClick={() => navigate('/gestion-utilisateurs')}
             />
             <ActionCard
               tone="purple"
               icon={<Calendar size={24} />}
               title="Gérer le planning"
               description="Générer et modifier le planning"
-              onClick={() => history.push('/gestion-planning-admin')}
+              onClick={() => navigate('/gestion-planning-admin')}
             />
             <ActionCard
               tone="green"
               icon={<ClipboardList size={24} />}
               title="Période de saisie"
               description="Définir la période de saisie des desiderata"
-              onClick={() => history.push('/gestion-periode-saisie')}
+              onClick={() => navigate('/gestion-periode-saisie')}
             />
             <ActionCard
               tone="orange"
               icon={<CheckSquare size={24} />}
               title="État des desiderata"
               description="Suivre la saisie des desiderata"
-              onClick={() => history.push('/gestion-desiderata')}
+              onClick={() => navigate('/gestion-desiderata')}
             />
             <ActionCard
               tone="red"
               icon={<UserPlus size={24} />}
               title="Remplir desiderata"
               description="Saisir les desiderata pour un médecin"
-              onClick={() => history.push('/desiderata-admin')}
+              onClick={() => navigate('/desiderata-admin')}
             />
           </div>
       </main>

@@ -82,7 +82,7 @@ function QuickFill({ creneaux, onApply, periodeSaisie }) {
           </span>
           <span className="font-bold text-ink-900">Remplissage rapide</span>
         </span>
-        <span className="flex items-center gap-1.5 text-sm font-medium text-ink-400">
+        <span className="flex items-center gap-1.5 text-sm font-medium text-ink-500">
           {isExpanded ? 'Replier' : 'Déplier'}
           <ChevronDown size={18} className={twMerge('transition-transform', isExpanded && 'rotate-180')} />
         </span>
@@ -95,8 +95,9 @@ function QuickFill({ creneaux, onApply, periodeSaisie }) {
             <label className="mb-1.5 block text-sm font-semibold text-ink-700">Période de remplissage</label>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
               <div className="flex-1">
-                <span className="mb-1 block text-xs text-ink-500">Du</span>
+                <label htmlFor="quickfill-start" className="mb-1 block text-xs text-ink-500">Du</label>
                 <input
+                  id="quickfill-start"
                   type="date"
                   value={startDate}
                   onChange={(e) => { setValidationError(''); setStartDate(e.target.value); }}
@@ -104,8 +105,9 @@ function QuickFill({ creneaux, onApply, periodeSaisie }) {
                 />
               </div>
               <div className="flex-1">
-                <span className="mb-1 block text-xs text-ink-500">Au</span>
+                <label htmlFor="quickfill-end" className="mb-1 block text-xs text-ink-500">Au</label>
                 <input
+                  id="quickfill-end"
                   type="date"
                   value={endDate}
                   onChange={(e) => { setValidationError(''); setEndDate(e.target.value); }}
@@ -163,8 +165,9 @@ function QuickFill({ creneaux, onApply, periodeSaisie }) {
 
           {/* Disponibilité */}
           <div>
-            <label className="mb-1.5 block text-sm font-semibold text-ink-700">Disponibilité à appliquer</label>
+            <label htmlFor="quickfill-dispo" className="mb-1.5 block text-sm font-semibold text-ink-700">Disponibilité à appliquer</label>
             <Select
+              id="quickfill-dispo"
               value={selectedDispo}
               onChange={(e) => { setValidationError(''); setSelectedDispo(e.target.value); }}
               className="sm:max-w-xs"

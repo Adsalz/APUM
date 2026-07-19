@@ -25,7 +25,16 @@ desiderata-*.json
 desiderata.txt
 desiderata_individuels/
 Desideratas papiers/
-DESIDERATA*.xlsx
+# Aucun classeur/données ne doit être versionné (exports générés, données médicales)
+*.xlsx
+*.xls
+
+# Scripts d'administration : dépendances + clés de compte de service (JAMAIS versionnées)
+scripts/node_modules/
+*serviceaccount*.json
+*service-account*.json
+serviceAccountKey.json
+*firebase-adminsdk*.json
 
 # Système / IDE
 .DS_Store
