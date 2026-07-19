@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { getAllUsers, createUser, deleteUser } from '../services/userService';
 import { registerUser } from '../services/authService';
+import { syncAnnuaire } from '../services/annuaireService';
 import {
   Search,
   Trash2,
@@ -9,7 +10,8 @@ import {
   List,
   UserPlus,
   Mail,
-  Users
+  Users,
+  RefreshCw
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -59,6 +61,9 @@ function GestionUtilisateurs() {
   // État pour la confirmation
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [userToDelete, setUserToDelete] = useState(null);
+
+  // État pour la synchronisation de l'annuaire de connexion
+  const [syncing, setSyncing] = useState(false);
 
   // Effet pour charger les données
   useEffect(() => {
@@ -133,6 +138,20 @@ function GestionUtilisateurs() {
         role: newUser.role
       });
 
+      // Reconstruire l'annuaire public de connexion (labels recalculés pour
+      // gérer les homonymes + réconciliation). Non bloquant : si la synchro
+      // échoue, l'utilisateur est créé et pourra se connecter via le repli
+      // email ; l'admin relancera « Synchroniser l'annuaire ».
+      try {
+        await syncAnnuaire();
+      } catch (syncError) {
+        logger.error('Synchro annuaire après ajout échouée:', syncError);
+        toast.error(
+          'Utilisateur créé, mais l\'annuaire de connexion n\'a pas pu être synchronisé. ' +
+          'Cliquez sur « Synchroniser l\'annuaire ».'
+        );
+      }
+
       setNewUser({ nom: '', prenom: '', email: '', role: 'medecin' });
       setShowAddForm(false);
       await fetchUsers();
@@ -166,6 +185,25 @@ function GestionUtilisateurs() {
     } catch (error) {
       logger.error('Erreur lors de la suppression:', error);
       toast.error('Erreur lors de la suppression de l\'utilisateur');
+    }
+  };
+
+  // Reconstruit l'annuaire public de connexion à partir des médecins.
+  // Sert au peuplement initial (médecins déjà existants) et à toute
+  // resynchronisation manuelle. Idempotent + réconciliation des orphelins.
+  const handleSyncAnnuaire = async () => {
+    setSyncing(true);
+    try {
+      const { synced, removed } = await syncAnnuaire();
+      toast.success(
+        `Annuaire synchronisé : ${synced} médecin(s)` +
+        (removed > 0 ? `, ${removed} entrée(s) obsolète(s) retirée(s)` : '') + '.'
+      );
+    } catch (error) {
+      logger.error('Erreur lors de la synchronisation de l\'annuaire:', error);
+      toast.error('Erreur lors de la synchronisation de l\'annuaire de connexion.');
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -206,14 +244,27 @@ function GestionUtilisateurs() {
       <AppHeader
         backTo="/dashboard-admin"
         actions={
-          <Button
-            variant="primary"
-            size="sm"
-            icon={<UserPlus size={18} aria-hidden="true" />}
-            onClick={() => setShowAddForm(true)}
-          >
-            Ajouter un utilisateur
-          </Button>
+          <>
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<RefreshCw size={18} aria-hidden="true" />}
+              onClick={handleSyncAnnuaire}
+              loading={syncing}
+              aria-label="Synchroniser l'annuaire"
+              title="Reconstruit la liste déroulante de connexion des médecins"
+            >
+              <span className="hidden sm:inline">Synchroniser l'annuaire</span>
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              icon={<UserPlus size={18} aria-hidden="true" />}
+              onClick={() => setShowAddForm(true)}
+            >
+              Ajouter un utilisateur
+            </Button>
+          </>
         }
       />
 

@@ -38,3 +38,28 @@ Options :
 
 Alternative sans script : Console Firebase → **Authentication** → rechercher
 l'email → **Supprimer le compte**.
+
+## `synchroniser-annuaire.js` — peupler l'annuaire de connexion
+
+Reconstruit la collection publique `annuaire` (liste déroulante de connexion des
+médecins) à partir des utilisateurs de rôle `medecin`. Équivalent, hors
+interface, du bouton **« Synchroniser l'annuaire »**. Sert surtout au
+**peuplement initial** des médecins déjà existants (indispensable pour que la
+liste déroulante ne soit pas vide après passage au nouveau login).
+
+Idempotent : réécrit chaque entrée `annuaire/{uid} = { label, email }` et
+supprime les orphelins (uid qui n'est plus médecin). Réexécutable à volonté.
+
+```bash
+# Aperçu sans écrire (recommandé une première fois) :
+GOOGLE_APPLICATION_CREDENTIALS="/chemin/absolu/vers/cle.json" \
+  node synchroniser-annuaire.js --dry-run
+
+# Synchronisation réelle :
+GOOGLE_APPLICATION_CREDENTIALS="/chemin/absolu/vers/cle.json" \
+  node synchroniser-annuaire.js
+```
+
+Alternative sans script : se connecter en **administrateur** dans l'app →
+*Gestion des utilisateurs* → **« Synchroniser l'annuaire »** (nécessite que le
+nouveau frontend soit déployé).

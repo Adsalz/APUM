@@ -60,7 +60,7 @@ function AppHeader({ backTo, backLabel = 'Retour', actions = null }) {
               className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-sm font-medium text-ink-500 transition-colors hover:bg-ink-100 hover:text-ink-800"
             >
               <Key size={17} aria-hidden="true" />
-              <span className="hidden md:inline">Mot de passe</span>
+              <span className="hidden md:inline">Mon code</span>
             </button>
             <button
               type="button"

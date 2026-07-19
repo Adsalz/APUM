@@ -3,7 +3,9 @@ import {
   signInWithEmailAndPassword,
   signOut,
   updatePassword,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  reauthenticateWithCredential,
+  EmailAuthProvider
 } from 'firebase/auth';
 import { getUser } from './userService';
 import logger from '../utils/logger';
@@ -11,7 +13,8 @@ import logger from '../utils/logger';
 // Génère un mot de passe temporaire robuste (>= 12 caractères) via
 // crypto.getRandomValues, avec au moins une minuscule, une majuscule et un
 // chiffre pour respecter les règles de complexité de Firebase Auth.
-const generateTempPassword = (length = 16) => {
+// Exporté aussi pour proposer aux médecins un « code fort » généré.
+export const generateTempPassword = (length = 16) => {
   const lower = 'abcdefghijkmnpqrstuvwxyz';
   const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
   const digits = '23456789';
@@ -141,6 +144,34 @@ export const updateUserPassword = async (newPassword) => {
     }
   } catch (error) {
     logger.error('Erreur lors de la mise à jour du mot de passe:', error);
+    throw error;
+  }
+};
+
+// Change le code (mot de passe) de l'utilisateur connecté APRÈS avoir vérifié
+// son code actuel via une réauthentification.
+//
+// Deux raisons :
+//  1) Sécurité : sans réauth, une session détournée (appareil laissé connecté,
+//     token volé) permettrait de changer le code sans connaître l'ancien, donc
+//     de verrouiller le propriétaire hors de son compte.
+//  2) Fiabilité : updatePassword seul échoue avec `auth/requires-recent-login`
+//     dès que la session n'est plus récente ; la réauthentification lève ce cas.
+//
+// Propage l'erreur Firebase (`.code` auth/*) pour que l'UI distingue un code
+// actuel erroné (`auth/wrong-password`) des autres échecs.
+export const reauthenticateAndUpdatePassword = async (currentPassword, newPassword) => {
+  const user = auth.currentUser;
+  if (!user) {
+    throw new Error('Aucun utilisateur connecté');
+  }
+  try {
+    const credential = EmailAuthProvider.credential(user.email, currentPassword);
+    await reauthenticateWithCredential(user, credential);
+    await updatePassword(user, newPassword);
+    logger.debug('Code mis à jour avec succès (après réauthentification)');
+  } catch (error) {
+    logger.error('Erreur lors de la mise à jour du code:', error);
     throw error;
   }
 };

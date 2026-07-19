@@ -10,8 +10,12 @@ let fieldCounter = 0;
  * d'erreur relié via aria-describedby.
  *
  * Tous les autres props sont transmis à l'<input>.
+ * forwardRef : la ref pointe sur l'<input> natif (focus programmatique).
  */
-function FormField({ label, error = '', hint = '', className = '', id: providedId, ...inputProps }) {
+const FormField = React.forwardRef(function FormField(
+  { label, error = '', hint = '', className = '', id: providedId, ...inputProps },
+  ref
+) {
   const idRef = useRef(null);
   if (idRef.current === null) {
     fieldCounter += 1;
@@ -28,6 +32,7 @@ function FormField({ label, error = '', hint = '', className = '', id: providedI
         </label>
       )}
       <input
+        ref={ref}
         id={id}
         aria-invalid={error ? 'true' : undefined}
         aria-describedby={error ? errorId : undefined}
@@ -48,6 +53,6 @@ function FormField({ label, error = '', hint = '', className = '', id: providedI
       )}
     </div>
   );
-}
+});
 
 export default FormField;

@@ -62,8 +62,14 @@ service cloud.firestore {
     match /planning/{planningId} {
       // Écriture : admins uniquement
       allow write: if isAdmin();
-      // Lecture : tout utilisateur authentifié avec un rôle reconnu
-      allow read: if isAdmin() || isMedecin();
+      // Lecture : tout utilisateur authentifié avec un rôle reconnu.
+      // Exception : le document `periode_saisie` (uniquement { startDate, endDate })
+      // est lisible PUBLIQUEMENT afin d'afficher la période de saisie en cours sur
+      // la page de connexion (avant authentification). La condition `planningId ==
+      // 'periode_saisie'` n'autorise QUE la lecture de ce document précis (un `get`) ;
+      // elle ne rend PAS la collection listable publiquement, et ne touche ni à
+      // l'écriture (admins seuls) ni aux autres documents planning.
+      allow read: if isAdmin() || isMedecin() || planningId == 'periode_saisie';
     }
 
     // ---------- Queue d'emails ----------
@@ -84,6 +90,30 @@ service cloud.firestore {
       // TODO: épingler from == '<adresse de rôle>' une fois l'adresse de service définie
 
       // Suppression réservée aux admins
+      allow delete: if isAdmin();
+    }
+
+    // ---------- Annuaire public (liste de connexion des médecins) ----------
+    // Lecture PUBLIQUE et non authentifiée : la liste déroulante de login est
+    // peuplée AVANT toute connexion (request.auth == null). NE JAMAIS remplacer
+    // `if true` par isMedecin() ou une fonction appelant get(users/uid) : cela
+    // déclencherait get(users/null) et REFUSERAIT la lecture, cassant le login
+    // pour tout le monde. `read` couvre get ET list (getDocs). Le catch-all
+    // `if false` plus bas ne l'annule pas (Firestore combine les règles en OR).
+    match /annuaire/{docId} {
+      allow read: if true;
+
+      // Écriture réservée aux admins, avec validation stricte des champs
+      // (uniquement label + email, tous deux des chaînes non vides). Empêche
+      // tout médecin d'empoisonner l'annuaire (redirection de login d'un
+      // confrère vers un autre email, labels trompeurs).
+      allow create, update: if isAdmin() &&
+        request.resource.data.keys().hasOnly(['label', 'email']) &&
+        request.resource.data.label is string &&
+        request.resource.data.label.size() > 0 &&
+        request.resource.data.email is string &&
+        request.resource.data.email.size() > 0;
+
       allow delete: if isAdmin();
     }
 

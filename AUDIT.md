@@ -228,3 +228,71 @@ est écartée (son déploiement exigerait le plan Blaze).
   Alternative sans script : console Firebase → Authentication.
 
 Vérifié : **lint OK, 53 tests, build OK**.
+
+---
+
+## Vague 6 — juillet 2026 : connexion médecin sans email (liste déroulante + code)
+
+Objectif : **supprimer la friction du mot de passe**. Le médecin ne saisit plus
+d'email : il **choisit son nom dans une liste déroulante** et tape son **code**
+(= son mot de passe Firebase, qu'il gère lui-même : il peut le changer, et
+« Définir / réinitialiser mon code » lui envoie un lien s'il l'oublie). Design
+durci en amont par une revue multi-agents (sécurité, règles Firestore, UX,
+migration) avant implémentation.
+
+**Contrainte de plan** : reste sur **Spark** (gratuit). Aucune Cloud Function ni
+Admin SDK côté app. Le renouvellement du code est **self-service** (le médecin),
+pas piloté par l'admin.
+
+- **Annuaire public** (`src/services/annuaireService.js` + collection
+  `annuaire/{uid}`) : projection minimale `{ label: "Prénom N.", email }` de
+  `users` (rôle médecin), en **lecture publique** (la liste déroulante est
+  peuplée *avant* toute connexion), **écriture admin uniquement** avec
+  validation stricte des champs (`hasOnly(['label','email'])`). `syncAnnuaire()`
+  est idempotent et **réconcilie les orphelins**.
+- **Labels désambiguïsés** : « Prénom N. » élargi (« Prénom Dup. », nom complet,
+  puis suffixe `(1)/(2)`) pour les homonymes ; la clé de sélection reste l'**uid**
+  (jamais le label) → aucune résolution vers le mauvais compte. Couvert par
+  `src/services/__tests__/annuaireService.test.js` (5 tests).
+- **Login** (`src/components/Login.js`) : liste déroulante + code, avec états
+  **chargement / erreur / vide** et **repli « connexion par email »** toujours
+  disponible (pas de médecin bloqué dehors si l'annuaire est indisponible). Les
+  **admins** utilisent ce mode email (lien « Espace administrateur »). Erreurs
+  différenciées (`too-many-requests`, réseau) sans énumération ; champ
+  `username` caché pour les gestionnaires de mots de passe ; `<select>` avec
+  label accessible.
+- **Changement de code** (`ChangePasswordModal` + `authService`
+  `reauthenticateAndUpdatePassword`) : **réauthentification** avant `updatePassword`
+  → corrige un bug latent (`auth/requires-recent-login`) **et** une faille (une
+  session détournée ne peut plus changer le code sans connaître l'ancien).
+  Minimum **12 caractères** + bouton « générer un code fort ».
+- **Révocation** (`userService.deleteUser`) : suppression **atomique** (writeBatch)
+  du document `users/{uid}` **et** de son entrée `annuaire/{uid}` (le médecin
+  révoqué disparaît de la liste de connexion). `GestionUtilisateurs` resynchronise
+  l'annuaire à la création et expose un bouton **« Synchroniser l'annuaire »**
+  (peuplement initial des médecins existants + réconciliation).
+
+**Compromis assumés par le propriétaire** : les noms des médecins sont publics
+(affichage minimisé « Prénom N. ») et l'email de connexion devient techniquement
+résolvable (jamais affiché).
+
+**Risques résiduels à connaître** (plan gratuit) : pas de verrouillage de compte
+ni de CAPTCHA sur l'endpoint d'authentification Firebase → l'**entropie du code**
+est la seule vraie barrière anti-brute-force ; l'annuaire public permet
+d'énumérer les emails ; « Code oublié » est scriptable (quota d'emails). À
+surveiller (pics d'échecs d'auth) ; durcissements optionnels : App Check
+reCAPTCHA v3 (gratuit), et à terme retrait de `|| isMedecin()` de la règle de
+lecture `users` **après** avoir sevré la vue planning médecin de `getMedecins()`
+(aujourd'hui `PlanningVisualisation` en dépend, donc conservé).
+
+### Actions requises côté propriétaire (vague 6)
+
+1. **Déployer les règles Firestore** (collection `annuaire`) :
+   `npx firebase deploy --only firestore:rules`.
+2. **Peupler l'annuaire** une première fois : se connecter en admin →
+   *Gestion des utilisateurs* → **« Synchroniser l'annuaire »** (indispensable
+   pour que la liste déroulante affiche les médecins déjà existants).
+3. (Optionnel) Personnaliser le **template d'email** Firebase (console → Authentication)
+   pour parler de « code de connexion » et marquer « Planning APUM ».
+
+Vérifié : **lint OK, 58 tests, build OK**.

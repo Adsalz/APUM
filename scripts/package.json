@@ -4,7 +4,8 @@
   "private": true,
   "description": "Scripts d'administration APUM (exécution locale via le SDK Admin Firebase)",
   "scripts": {
-    "supprimer-compte": "node supprimer-compte-auth.js"
+    "supprimer-compte": "node supprimer-compte-auth.js",
+    "synchroniser-annuaire": "node synchroniser-annuaire.js"
   },
   "dependencies": {
     "firebase-admin": "^12.0.0"

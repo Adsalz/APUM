@@ -4,15 +4,16 @@ import {
   getDoc,
   setDoc,
   updateDoc,
-  deleteDoc,
   getDocs,
   collection,
   query,
-  where
+  where,
+  writeBatch
 } from 'firebase/firestore';
 import logger from '../utils/logger';
 
 const USERS_COLLECTION = 'users';
+const ANNUAIRE_COLLECTION = 'annuaire';
 
 export const createUser = async (uid, userData) => {
   try {
@@ -58,9 +59,14 @@ export const updateUser = async (uid, userData) => {
 
 // Suppression d'un utilisateur.
 //
-// On supprime le document Firestore `users/{uid}` : les règles de sécurité
-// révoquent alors IMMÉDIATEMENT tout accès à ce compte (plus aucun rôle valide
-// → toutes les opérations sont refusées). L'accès est donc bien coupé.
+// On supprime EN UN SEUL BATCH le document `users/{uid}` ET son entrée
+// `annuaire/{uid}` :
+//  - la suppression de `users/{uid}` révoque IMMÉDIATEMENT tout accès (plus
+//    aucun rôle valide → toutes les opérations sont refusées) ;
+//  - la suppression de `annuaire/{uid}` retire le médecin de la liste
+//    déroulante de connexion (sinon il resterait sélectionnable publiquement
+//    et son email resterait résolvable). Un delete sur un doc annuaire
+//    inexistant est un no-op inoffensif.
 //
 // Le compte de connexion Firebase Auth (email), lui, n'est PAS supprimable
 // depuis l'app : seule une opération serveur (SDK Admin) le permet, ce qui
@@ -69,8 +75,11 @@ export const updateUser = async (uid, userData) => {
 // dans la console Firebase → Authentication, ou via scripts/supprimer-compte-auth.js.
 export const deleteUser = async (uid) => {
   try {
-    await deleteDoc(doc(db, USERS_COLLECTION, uid));
-    logger.debug('Document utilisateur supprimé — accès révoqué');
+    const batch = writeBatch(db);
+    batch.delete(doc(db, USERS_COLLECTION, uid));
+    batch.delete(doc(db, ANNUAIRE_COLLECTION, uid));
+    await batch.commit();
+    logger.debug('Document utilisateur + entrée annuaire supprimés — accès révoqué');
   } catch (error) {
     logger.error('Erreur lors de la suppression de l\'utilisateur:', error);
     throw error;
