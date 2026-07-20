@@ -4,6 +4,10 @@ import { getAllUsers, createUser, deleteUser } from '../services/userService';
 import { registerUser } from '../services/authService';
 import { syncAnnuaire } from '../services/annuaireService';
 import {
+  getInscriptionOuverte,
+  setInscriptionOuverte as saveInscriptionOuverte,
+} from '../services/inscriptionService';
+import {
   Search,
   Trash2,
   Grid,
@@ -11,7 +15,9 @@ import {
   UserPlus,
   Mail,
   Users,
-  RefreshCw
+  RefreshCw,
+  Lock,
+  Unlock
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -65,6 +71,10 @@ function GestionUtilisateurs() {
   // État pour la synchronisation de l'annuaire de connexion
   const [syncing, setSyncing] = useState(false);
 
+  // État de la fenêtre d'inscription (réclamation « premier code = le sien »)
+  const [inscriptionOuverte, setInscriptionOuverte] = useState(null);
+  const [inscriptionBusy, setInscriptionBusy] = useState(false);
+
   // Effet pour charger les données
   useEffect(() => {
     const fetchData = async () => {
@@ -79,6 +89,9 @@ function GestionUtilisateurs() {
     };
 
     fetchData();
+    getInscriptionOuverte()
+      .then((open) => setInscriptionOuverte(open))
+      .catch(() => setInscriptionOuverte(false));
   }, []);
 
   // Fonction pour récupérer les utilisateurs
@@ -188,6 +201,23 @@ function GestionUtilisateurs() {
     }
   };
 
+  // Ouvre / ferme la fenêtre d'inscription (réclamation des codes médecin).
+  const toggleInscription = async () => {
+    if (inscriptionOuverte === null) return;
+    const next = !inscriptionOuverte;
+    setInscriptionBusy(true);
+    try {
+      await saveInscriptionOuverte(next);
+      setInscriptionOuverte(next);
+      toast.success(next ? 'Inscriptions ouvertes.' : 'Inscriptions fermées.');
+    } catch (error) {
+      logger.error('Erreur lors du changement d\'état des inscriptions:', error);
+      toast.error('Erreur lors du changement d\'état des inscriptions.');
+    } finally {
+      setInscriptionBusy(false);
+    }
+  };
+
   // Reconstruit l'annuaire public de connexion à partir des médecins.
   // Sert au peuplement initial (médecins déjà existants) et à toute
   // resynchronisation manuelle. Idempotent + réconciliation des orphelins.
@@ -270,6 +300,45 @@ function GestionUtilisateurs() {
 
       {/* Contenu principal */}
       <main className="mx-auto max-w-7xl px-4 pb-12 pt-24 sm:px-6 animate-fade-up">
+        {/* Fenêtre d'inscription (réclamation des codes médecin) */}
+        <Card
+          className={`mb-6 flex flex-wrap items-center justify-between gap-3 p-4 ${
+            inscriptionOuverte ? 'border-success-300 bg-success-50' : ''
+          }`}
+        >
+          <div className="flex items-start gap-2.5">
+            {inscriptionOuverte ? (
+              <Unlock size={20} className="mt-0.5 flex-shrink-0 text-success-600" aria-hidden="true" />
+            ) : (
+              <Lock size={20} className="mt-0.5 flex-shrink-0 text-ink-400" aria-hidden="true" />
+            )}
+            <div>
+              <p className="font-semibold text-ink-900">
+                Inscriptions&nbsp;
+                {inscriptionOuverte === null
+                  ? '…'
+                  : inscriptionOuverte
+                  ? 'ouvertes'
+                  : 'fermées'}
+              </p>
+              <p className="mt-0.5 max-w-xl text-xs text-ink-500">
+                {inscriptionOuverte
+                  ? 'Les médecins peuvent définir leur code à la première connexion (le premier code saisi devient le leur). Refermez une fois que tout le monde a le sien.'
+                  : 'Ouvrez pour permettre aux médecins de définir leur code à leur première connexion, puis refermez.'}
+              </p>
+            </div>
+          </div>
+          <Button
+            variant={inscriptionOuverte ? 'secondary' : 'primary'}
+            size="sm"
+            loading={inscriptionBusy}
+            disabled={inscriptionOuverte === null}
+            onClick={toggleInscription}
+          >
+            {inscriptionOuverte ? 'Fermer les inscriptions' : 'Ouvrir les inscriptions'}
+          </Button>
+        </Card>
+
         {/* Barre d'outils */}
         <Card className="mb-6 flex flex-wrap items-center justify-between gap-4 p-4">
           {/* Barre de recherche */}

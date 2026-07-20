@@ -63,3 +63,34 @@ GOOGLE_APPLICATION_CREDENTIALS="/chemin/absolu/vers/cle.json" \
 Alternative sans script : se connecter en **administrateur** dans l'app →
 *Gestion des utilisateurs* → **« Synchroniser l'annuaire »** (nécessite que le
 nouveau frontend soit déployé).
+
+## `reinitialiser-comptes-a-reclamer.js` — passage aux codes à 6 chiffres (rollout)
+
+À lancer **une seule fois**, au passage au système « code à 6 chiffres / premier
+code = le sien ». Met **tous** les comptes médecin dans l'état « à réclamer » :
+leur mot de passe actuel est remplacé par le code de réclamation partagé, puis
+chaque médecin définit son code à 6 chiffres à sa première connexion.
+
+⚠️ Invalide les mots de passe actuels : **préviens les médecins avant**, et
+n'**ouvre la fenêtre d'inscription** (app → *Gestion des utilisateurs*) que
+quand tu es prêt.
+
+```bash
+GOOGLE_APPLICATION_CREDENTIALS="/chemin/absolu/vers/cle.json" \
+  node reinitialiser-comptes-a-reclamer.js --dry-run   # aperçu
+GOOGLE_APPLICATION_CREDENTIALS="/chemin/absolu/vers/cle.json" \
+  node reinitialiser-comptes-a-reclamer.js             # réel
+```
+
+## `reinitialiser-code.js` — réinitialiser le code d'un médecin (oubli)
+
+Remet **un** médecin dans l'état « à réclamer » (il redéfinira un code à sa
+prochaine connexion) **et efface ses desiderata** (réinitialiser le code =
+repartir de zéro sur les choix).
+
+```bash
+GOOGLE_APPLICATION_CREDENTIALS="/chemin/absolu/vers/cle.json" \
+  node reinitialiser-code.js dr.dupont@example.com
+```
+
+La **fenêtre d'inscription** doit être ouverte pour qu'il puisse redéfinir son code.

@@ -14,6 +14,8 @@ import {
   verifierContraintes,
   evaluerPlanning,
   buildDesiderataMap,
+  effectifPour,
+  typeDeJour,
 } from './planningCore';
 
 const genererPlanning = async (debut, fin) => {
@@ -41,4 +43,6 @@ export {
   compterGardesParSemaine,
   verifierContraintes,
   evaluerPlanning,
+  effectifPour,
+  typeDeJour,
 };

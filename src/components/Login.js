@@ -4,22 +4,24 @@ import { useNavigate, Navigate } from 'react-router-dom';
 import { Calendar, ArrowLeft } from 'lucide-react';
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { auth } from '../firebase';
-import { loginUser } from '../services/authService';
+import { loginUser, loginMedecin } from '../services/authService';
 import { getUser } from '../services/userService';
 import { getAnnuaire } from '../services/annuaireService';
 import { getPeriodeSaisie } from '../services/planningService';
+import { getInscriptionOuverte } from '../services/inscriptionService';
+import { CODE_MEDECIN_LONGUEUR, CODE_MEDECIN_REGEX } from '../constants/claim';
 import { useAuth } from '../contexts/AuthContext';
-import { Alert, Button, Card, FormField, Modal, Select } from './ui';
+import { Alert, Button, Card, CodePad, FormField, Modal, Select } from './ui';
 import logger from '../utils/logger';
 
-// Message générique volontairement identique pour mot de passe erroné / compte
+// Message générique volontairement identique pour code erroné / compte
 // inexistant / compte désactivé : ne pas permettre de savoir si un compte
 // existe (anti-énumération). Les cas « trop de tentatives » et « réseau » sont
 // distingués car informatifs sans révéler l'existence d'un compte.
 const mapAuthError = (err) => {
   switch (err && err.code) {
     case 'auth/too-many-requests':
-      return 'Trop de tentatives. Réessayez dans quelques minutes ou réinitialisez votre code.';
+      return 'Trop de tentatives. Réessayez dans quelques minutes.';
     case 'auth/network-request-failed':
       return 'Connexion impossible. Vérifiez votre connexion internet.';
     default:
@@ -31,9 +33,9 @@ function Login() {
   const { firebaseUser, role, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
-  // 'medecin' = liste déroulante (parcours par défaut, sans email)
-  // 'email'   = email + mot de passe (administrateurs ET repli médecin si
-  //             l'annuaire est indisponible)
+  // 'medecin' = liste déroulante + code à 6 chiffres (parcours par défaut)
+  // 'email'   = email + mot de passe (administrateurs ET repli si l'annuaire
+  //             est indisponible)
   const [mode, setMode] = useState('medecin');
 
   // Annuaire public (liste déroulante)
@@ -41,8 +43,11 @@ function Login() {
   const [annuaireLoading, setAnnuaireLoading] = useState(true);
   const [annuaireError, setAnnuaireError] = useState(false);
 
-  // Période de saisie en cours (lecture publique du doc planning/periode_saisie)
+  // Période de saisie (lecture publique du doc planning/periode_saisie)
   const [periode, setPeriode] = useState(null);
+
+  // Fenêtre d'inscription (null = inconnue/chargement, true/false ensuite)
+  const [inscriptionOuverte, setInscriptionOuverte] = useState(null);
 
   // Champs médecin
   const [selectedUid, setSelectedUid] = useState('');
@@ -55,12 +60,7 @@ function Login() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // Réinitialisation inline (parcours médecin)
-  const [resetInfo, setResetInfo] = useState('');
-  const [resetErr, setResetErr] = useState('');
-  const [resetLoading, setResetLoading] = useState(false);
-
-  // Modale de réinitialisation (parcours email)
+  // Modale de réinitialisation par email (parcours admin uniquement)
   const [showResetModal, setShowResetModal] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
   const [modalResetError, setModalResetError] = useState('');
@@ -73,23 +73,22 @@ function Login() {
   const selectedEntry = annuaire.find((a) => a.id === selectedUid) || null;
   const selectedEmail = selectedEntry ? selectedEntry.email : '';
 
-  // Bandeau de période de saisie. On affiche la fenêtre configurée sans prétendre
-  // bloquer la saisie (l'app ne verrouille pas par date) : « ouverte jusqu'au… »
-  // pendant la fenêtre, « à venir » avant, et rien une fois la fenêtre passée.
+  // Bandeau de période. [start, end] est la PÉRIODE À PLANIFIER (le trimestre
+  // sur lequel les médecins expriment leurs desiderata), et NON la fenêtre de
+  // saisie : on n'affiche le rappel que tant que la période n'a pas commencé.
   const periodeInfo = useMemo(() => {
     if (!periode || !periode.startDate || !periode.endDate) return null;
     const start = new Date(periode.startDate);
     const end = new Date(periode.endDate);
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null;
-    end.setHours(23, 59, 59, 999); // fin de journée incluse
     const now = new Date();
-    if (now > end) return null;
+    if (now >= start) return null;
     const fmt = (d) =>
       d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
-    if (now < start) {
-      return { kind: 'info', text: `Prochaine saisie des desiderata : du ${fmt(start)} au ${fmt(end)}.` };
-    }
-    return { kind: 'success', text: `Saisie des desiderata ouverte jusqu'au ${fmt(end)}.` };
+    return {
+      kind: 'info',
+      text: `Desiderata pour la période du ${fmt(start)} au ${fmt(end)}.`,
+    };
   }, [periode]);
 
   const loadAnnuaire = useCallback(async () => {
@@ -110,26 +109,25 @@ function Login() {
     loadAnnuaire();
   }, [loadAnnuaire]);
 
-  // Charge la période de saisie pour l'afficher (best-effort : en cas d'échec,
-  // simplement pas de bandeau — jamais bloquant pour la connexion).
+  // Période de saisie + état des inscriptions (best-effort : en cas d'échec,
+  // pas de bandeau / inscriptions considérées fermées — jamais bloquant).
   useEffect(() => {
     getPeriodeSaisie()
       .then((p) => setPeriode(p))
       .catch(() => setPeriode(null));
+    getInscriptionOuverte()
+      .then((open) => setInscriptionOuverte(open))
+      .catch(() => setInscriptionOuverte(false));
   }, []);
 
-  // Focus du champ email quand on bascule en mode email (le champ n'est jamais
-  // désactivé, focalisable immédiatement).
+  // Focus du champ email quand on bascule en mode email.
   useEffect(() => {
     if (mode === 'email') {
       emailRef.current?.focus();
     }
   }, [mode]);
 
-  // Focus du <select> médecin seulement une fois l'annuaire chargé ET le
-  // contrôle activé : au montage il est `disabled` pendant le chargement, et
-  // focus() sur un élément désactivé est ignoré. On dépend donc aussi de l'état
-  // de chargement pour focaliser dès que le select devient utilisable.
+  // Focus du <select> médecin une fois l'annuaire chargé ET le contrôle activé.
   useEffect(() => {
     if (mode === 'medecin' && !annuaireLoading && !annuaireError && annuaire.length > 0) {
       selectRef.current?.focus();
@@ -140,8 +138,6 @@ function Login() {
     setMode(nextMode);
     setError('');
     setIsLoading(false);
-    setResetInfo('');
-    setResetErr('');
   };
 
   // Redirige vers le bon tableau de bord après une connexion réussie.
@@ -175,10 +171,14 @@ function Login() {
       logger.error('Entrée annuaire sans email', { uid: selectedUid });
       return;
     }
+    if (!CODE_MEDECIN_REGEX.test(code)) {
+      setError(`Le code doit comporter ${CODE_MEDECIN_LONGUEUR} chiffres.`);
+      return;
+    }
 
     setIsLoading(true);
     try {
-      const userCredential = await loginUser(selectedEmail, code);
+      const userCredential = await loginMedecin(selectedEmail, code, inscriptionOuverte === true);
       if (!userCredential || !userCredential.user) {
         throw new Error('Échec de l\'authentification');
       }
@@ -204,29 +204,6 @@ function Login() {
       logger.error('Erreur de connexion (email):', err);
       setError(mapAuthError(err));
       setIsLoading(false);
-    }
-  };
-
-  // Réinitialisation médecin : envoie le lien à l'email du médecin sélectionné.
-  // Message de succès générique et constant (ne révèle pas l'état du compte).
-  const handleMedecinReset = async () => {
-    setResetInfo('');
-    setResetErr('');
-    if (!selectedEntry || !selectedEmail) {
-      setResetErr('Sélectionnez d\'abord votre nom.');
-      return;
-    }
-    setResetLoading(true);
-    try {
-      await sendPasswordResetEmail(auth, selectedEmail);
-      setResetInfo(
-        'Si un compte existe pour ce médecin, un email pour définir votre code vient d\'être envoyé.'
-      );
-    } catch (err) {
-      logger.error('Erreur lors de l\'envoi du lien de définition du code:', err);
-      setResetErr('Erreur lors de l\'envoi de l\'email. Réessayez plus tard.');
-    } finally {
-      setResetLoading(false);
     }
   };
 
@@ -256,14 +233,24 @@ function Login() {
     }
   };
 
-  // Utilisateur déjà connecté : renvoi direct vers son tableau de bord
-  if (!authLoading && firebaseUser && role) {
+  // Utilisateur déjà connecté : renvoi direct vers son tableau de bord.
+  // On EXCLUT le cas d'une soumission en cours (isLoading) : sur le parcours de
+  // réclamation, la connexion au code de réclamation déclenche onAuthStateChanged
+  // AVANT que updatePassword ne soit résolu ; sans ce garde, on redirigerait avec
+  // une session encore au code de réclamation. La navigation est alors pilotée
+  // uniquement par finishLogin, après réclamation réussie.
+  if (!authLoading && firebaseUser && role && !isLoading) {
     return (
       <Navigate to={role === 'admin' ? '/dashboard-admin' : '/dashboard-medecin'} replace />
     );
   }
 
-  const medecinSubmitDisabled = isLoading || annuaireLoading || !selectedUid || !code;
+  const medecinSubmitDisabled =
+    isLoading ||
+    annuaireLoading ||
+    inscriptionOuverte === null ||
+    !selectedUid ||
+    !CODE_MEDECIN_REGEX.test(code);
 
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-ink-100 p-6">
@@ -284,14 +271,14 @@ function Login() {
           </p>
         </div>
 
-        {/* Bandeau période de saisie en cours (lecture publique) */}
+        {/* Bandeau période de saisie (lecture publique) */}
         {periodeInfo && (
           <div className="px-6 pt-5">
             <Alert kind={periodeInfo.kind}>{periodeInfo.text}</Alert>
           </div>
         )}
 
-        {/* ---------- Parcours médecin (liste déroulante) ---------- */}
+        {/* ---------- Parcours médecin (liste déroulante + code à 6 chiffres) ---------- */}
         {mode === 'medecin' ? (
           <form onSubmit={handleMedecinSubmit} className="p-6">
             {annuaireError ? (
@@ -329,8 +316,6 @@ function Login() {
                 onChange={(e) => {
                   setSelectedUid(e.target.value);
                   setError('');
-                  setResetInfo('');
-                  setResetErr('');
                 }}
                 disabled={annuaireLoading || annuaireError || annuaire.length === 0}
                 required
@@ -346,54 +331,26 @@ function Login() {
               </Select>
             </div>
 
-            {/* Ancre pour les gestionnaires de mots de passe : un <select> n'est
-                pas un champ credential reconnu, cet input caché associe le code
-                enregistré à l'email du médecin sélectionné. */}
-            <input
-              type="email"
-              name="username"
-              autoComplete="username"
-              value={selectedEmail}
-              readOnly
-              tabIndex={-1}
-              aria-hidden="true"
-              className="sr-only"
-            />
+            {/* Pavé numérique cliquable (souris/doigt) + saisie clavier,
+                affichage masqué. Fonctionne sur ordinateur comme sur mobile. */}
+            <div className="mb-2">
+              <span className="mb-3 block text-center text-sm font-semibold text-ink-700">
+                Code à 6 chiffres
+              </span>
+              <CodePad
+                value={code}
+                onChange={setCode}
+                length={CODE_MEDECIN_LONGUEUR}
+                ariaLabel="Saisie du code à 6 chiffres"
+                describedById={inscriptionOuverte === true ? 'code-hint' : undefined}
+              />
+            </div>
 
-            <FormField
-              label="Code"
-              type="password"
-              required
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              autoComplete="current-password"
-              className="mb-2"
-            />
-
-            <p className="mb-3 text-xs text-ink-500">
-              Première connexion ou code oublié&nbsp;? Sélectionnez votre nom puis
-              «&nbsp;Définir / réinitialiser mon code&nbsp;».
-            </p>
-
-            {resetErr && (
-              <Alert kind="error" className="mb-3">
-                {resetErr}
-              </Alert>
+            {inscriptionOuverte === true && (
+              <p id="code-hint" className="mb-4 mt-3 text-center text-xs text-ink-500">
+                Première connexion&nbsp;? Le code que vous saisissez devient le vôtre — notez-le bien.
+              </p>
             )}
-            {resetInfo && (
-              <Alert kind="success" className="mb-3">
-                {resetInfo}
-              </Alert>
-            )}
-
-            <button
-              type="button"
-              onClick={handleMedecinReset}
-              disabled={!selectedUid || resetLoading}
-              className="mb-4 w-full text-center text-sm font-semibold text-primary-600 hover:text-primary-700 hover:underline disabled:cursor-not-allowed disabled:text-ink-400 disabled:no-underline"
-            >
-              {resetLoading ? 'Envoi…' : 'Définir / réinitialiser mon code'}
-            </button>
 
             {error && (
               <Alert kind="error" className="mb-4">
@@ -463,7 +420,7 @@ function Login() {
         )}
       </Card>
 
-      {/* Modale de réinitialisation (parcours email) */}
+      {/* Modale de réinitialisation par email (parcours administrateur) */}
       <Modal
         open={showResetModal}
         onClose={closeResetModal}

@@ -1,16 +1,9 @@
 // src/components/ChangePasswordModal.js
 import React, { useState } from 'react';
-import { Sparkles } from 'lucide-react';
-import { reauthenticateAndUpdatePassword, generateTempPassword } from '../services/authService';
+import { reauthenticateAndUpdatePassword } from '../services/authService';
+import { nettoyerCode, CODE_MEDECIN_LONGUEUR, CODE_MEDECIN_REGEX } from '../constants/claim';
 import { Modal, Button, FormField, Alert } from './ui';
 import logger from '../utils/logger';
-
-// Longueur minimale du code. La validation côté client est indicative
-// (contournable via l'API REST) mais couvre le cas courant et évite qu'un
-// médecin ne remplace un code fort par un code trivial. Sans plan Blaze
-// (Identity Platform), l'entropie du code est la seule vraie protection
-// contre le brute-force.
-const MIN_CODE_LENGTH = 12;
 
 // Traduit les erreurs Firebase Auth en messages lisibles.
 const mapError = (error) => {
@@ -18,8 +11,6 @@ const mapError = (error) => {
     case 'auth/wrong-password':
     case 'auth/invalid-credential':
       return 'Code actuel incorrect.';
-    case 'auth/weak-password':
-      return `Code trop faible (au moins ${MIN_CODE_LENGTH} caractères).`;
     case 'auth/too-many-requests':
       return 'Trop de tentatives. Réessayez dans quelques minutes.';
     case 'auth/requires-recent-login':
@@ -30,44 +21,34 @@ const mapError = (error) => {
 };
 
 function ChangePasswordModal({ onClose }) {
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [generated, setGenerated] = useState('');
+  const [currentCode, setCurrentCode] = useState('');
+  const [newCode, setNewCode] = useState('');
+  const [confirmCode, setConfirmCode] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-
-  const handleGenerate = () => {
-    const g = generateTempPassword(16);
-    setNewPassword(g);
-    setConfirmPassword(g);
-    setGenerated(g);
-    setError('');
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setSuccess('');
 
-    if (newPassword.length < MIN_CODE_LENGTH) {
-      setError(`Le nouveau code doit contenir au moins ${MIN_CODE_LENGTH} caractères.`);
+    if (!CODE_MEDECIN_REGEX.test(newCode)) {
+      setError(`Le nouveau code doit comporter ${CODE_MEDECIN_LONGUEUR} chiffres.`);
       return;
     }
-    if (newPassword !== confirmPassword) {
+    if (newCode !== confirmCode) {
       setError('Les nouveaux codes ne correspondent pas.');
       return;
     }
 
     setIsLoading(true);
     try {
-      await reauthenticateAndUpdatePassword(currentPassword, newPassword);
+      await reauthenticateAndUpdatePassword(currentCode, newCode);
       setSuccess('Code mis à jour avec succès.');
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-      setGenerated('');
+      setCurrentCode('');
+      setNewCode('');
+      setConfirmCode('');
       setTimeout(onClose, 2000);
     } catch (err) {
       logger.error('Erreur lors de la mise à jour du code:', err);
@@ -104,48 +85,47 @@ function ChangePasswordModal({ onClose }) {
           {success}
         </Alert>
       )}
-      {generated && !success && (
-        <Alert kind="info" className="mb-4">
-          Nouveau code généré&nbsp;: <strong className="font-mono">{generated}</strong>
-          <br />
-          Notez-le maintenant, il ne sera plus affiché après validation.
-        </Alert>
-      )}
 
+      {/* type="text" + inputMode/pattern numériques pour afficher le pavé
+          numérique sur mobile ; masquage conservé via -webkit-text-security. */}
       <form id="change-password-form" onSubmit={handleSubmit}>
         <FormField
           label="Code actuel"
-          type="password"
-          value={currentPassword}
-          onChange={(e) => setCurrentPassword(e.target.value)}
+          type="text"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          value={currentCode}
+          onChange={(e) => setCurrentCode(nettoyerCode(e.target.value))}
+          maxLength={CODE_MEDECIN_LONGUEUR}
           autoComplete="current-password"
           required
+          style={{ WebkitTextSecurity: 'disc' }}
         />
         <FormField
-          label={`Nouveau code (${MIN_CODE_LENGTH} caractères minimum)`}
-          type="password"
-          value={newPassword}
-          onChange={(e) => { setNewPassword(e.target.value); setGenerated(''); }}
+          label="Nouveau code (6 chiffres)"
+          type="text"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          value={newCode}
+          onChange={(e) => setNewCode(nettoyerCode(e.target.value))}
+          maxLength={CODE_MEDECIN_LONGUEUR}
           autoComplete="new-password"
           required
+          style={{ WebkitTextSecurity: 'disc' }}
         />
         <FormField
           label="Confirmer le nouveau code"
-          type="password"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
+          type="text"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          value={confirmCode}
+          onChange={(e) => setConfirmCode(nettoyerCode(e.target.value))}
+          maxLength={CODE_MEDECIN_LONGUEUR}
           autoComplete="new-password"
           required
-          className="mb-2"
+          className="mb-0"
+          style={{ WebkitTextSecurity: 'disc' }}
         />
-        <button
-          type="button"
-          onClick={handleGenerate}
-          className="mb-0 inline-flex items-center gap-1.5 text-sm font-semibold text-primary-600 hover:text-primary-700 hover:underline"
-        >
-          <Sparkles size={15} aria-hidden="true" />
-          Générer un code fort
-        </button>
       </form>
     </Modal>
   );

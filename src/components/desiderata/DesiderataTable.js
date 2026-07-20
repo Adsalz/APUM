@@ -113,7 +113,10 @@ function DesiderataTable({ dates, creneaux, desiderata, onChange }) {
                   </td>
                   {creneaux.map((creneau) => {
                     const value = desiderata[dateString]?.[creneau.id] || '';
-                    const disabled = creneau.samediOnly && date.getDay() !== 6;
+                    // Le renfort 10h/13h n'existe que le SAMEDI, et jamais un jour
+                    // férié (un samedi férié suit les effectifs d'un dimanche) →
+                    // cohérent avec effectifPour côté génération.
+                    const disabled = creneau.samediOnly && (date.getDay() !== 6 || estJourFerie(dateString));
                     return (
                       <td
                         key={`${dateString}-${creneau.id}`}

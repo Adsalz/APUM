@@ -73,8 +73,12 @@ export default function useDesiderataForm(periodeSaisie) {
 
   const handleApplyPattern = useCallback((pattern, startDate, endDate) => {
     setIsDirty(true);
+    // Heure fixée à midi (comme generateDates) : neutralise le passage heure
+    // d'été↔hiver quand la date devient une clé 'YYYY-MM-DD' via toISOString.
     const start = new Date(startDate);
+    start.setHours(12, 0, 0, 0);
     const end = new Date(endDate);
+    end.setHours(12, 0, 0, 0);
     setDesiderata((prev) => {
       const next = { ...prev };
       const currentDate = new Date(start);
