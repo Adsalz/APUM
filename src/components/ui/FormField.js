@@ -13,7 +13,7 @@ let fieldCounter = 0;
  * forwardRef : la ref pointe sur l'<input> natif (focus programmatique).
  */
 const FormField = React.forwardRef(function FormField(
-  { label, error = '', hint = '', className = '', id: providedId, ...inputProps },
+  { label, error = '', hint = '', className = '', id: providedId, describedById, ...inputProps },
   ref
 ) {
   const idRef = useRef(null);
@@ -23,6 +23,10 @@ const FormField = React.forwardRef(function FormField(
   }
   const id = providedId || idRef.current;
   const errorId = `${id}-error`;
+  // Associe au champ à la fois le message d'erreur et un éventuel texte d'aide
+  // externe (describedById), pour l'annonce par les lecteurs d'écran.
+  const describedBy =
+    [error ? errorId : null, describedById || null].filter(Boolean).join(' ') || undefined;
 
   return (
     <div className={twMerge('mb-4', className)}>
@@ -35,7 +39,7 @@ const FormField = React.forwardRef(function FormField(
         ref={ref}
         id={id}
         aria-invalid={error ? 'true' : undefined}
-        aria-describedby={error ? errorId : undefined}
+        aria-describedby={describedBy}
         className={twMerge(
           'w-full rounded-lg border bg-white px-3 py-2.5 text-sm text-ink-900 placeholder-ink-400 shadow-sm',
           'transition-colors focus:outline-none focus:ring-2',

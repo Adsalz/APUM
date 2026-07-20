@@ -6,6 +6,7 @@ export { default as Badge } from './Badge';
 export { default as Button } from './Button';
 export { default as Card } from './Card';
 export { default as Checkbox } from './Checkbox';
+export { default as CodePad } from './CodePad';
 export { default as EmptyState } from './EmptyState';
 export { default as ErrorScreen } from './ErrorScreen';
 export { default as FormField } from './FormField';

@@ -296,3 +296,117 @@ lecture `users` **après** avoir sevré la vue planning médecin de `getMedecins
    pour parler de « code de connexion » et marquer « Planning APUM ».
 
 Vérifié : **lint OK, 58 tests, build OK**.
+
+---
+
+## Vague 7 — juillet 2026 : code à 6 chiffres + « premier code = le sien »
+
+À la demande du propriétaire, la connexion médecin passe à un **code à 6 chiffres**
+(pavé numérique) que le médecin **définit lui-même à sa première connexion**
+(modèle TOFU, « premier code saisi = le sien »), sans email.
+
+- **Login** : champ **code à 6 chiffres** (`inputMode="numeric"`, masqué). Le bouton
+  de réinitialisation par email côté médecin est retiré. Le repli « connexion par
+  email » (admins + annuaire indisponible) est conservé.
+- **Réclamation** (`authService.loginMedecin`) : un compte « à réclamer » a pour mot
+  de passe le **code de réclamation partagé** (`src/constants/claim.js`). À la
+  première connexion, si les inscriptions sont ouvertes, l'app se connecte avec ce
+  code puis fixe le code choisi (`updatePassword`). Les nouveaux comptes sont créés
+  « à réclamer » (`registerUser`, plus d'email).
+- **Fenêtre d'inscription** (`config/inscription.open`, `inscriptionService`) :
+  interrupteur admin (*Gestion des utilisateurs*) qui autorise ou non la réclamation.
+  Lecture publique (la page de login en a besoin), écriture admin.
+- **Changement de code** (connecté) : `ChangePasswordModal` → 6 chiffres, avec
+  réauthentification (inchangé côté sécurité).
+- **Code oublié / rollout** : scripts Admin locaux
+  `reinitialiser-comptes-a-reclamer.js` (met tous les médecins « à réclamer » — à
+  lancer une fois) et `reinitialiser-code.js` (réinitialise UN médecin **et efface
+  ses desiderata**).
+
+### ⚠️ Risque de sécurité ASSUMÉ par le propriétaire
+
+Ce modèle affaiblit volontairement la sécurité, en connaissance de cause :
+
+1. **Code à 6 chiffres** = 10⁶ combinaisons. Avec la liste d'emails publique
+   (annuaire) et l'absence de blocage de compte sur le plan gratuit (seul un
+   throttling best-effort existe), un acteur technique pourrait forcer un code.
+2. **« Premier code = le sien »** repose sur un **code de réclamation partagé
+   présent dans le bundle (public)**. La *fenêtre d'inscription* borne la
+   réclamation côté application, mais ce n'est **PAS une barrière serveur** :
+   pendant qu'un compte n'est pas encore réclamé, un tiers connaissant ce code
+   pourrait le réclamer à la place du médecin.
+
+Ces deux points ont été explicitement présentés et **acceptés** (priorité à
+l'absence de friction, groupe de confiance restreint). Atténuation retenue : la
+fenêtre d'inscription (ouverte brièvement au lancement, puis refermée).
+Renforcement possible ultérieur : plan Blaze (Identity Platform → lockout/CAPTCHA),
+codes plus longs, App Check.
+
+### Actions requises côté propriétaire (vague 7)
+
+1. **Déployer** règles Firestore + hosting.
+2. **Prévenir les médecins**, puis lancer le rollout :
+   `node scripts/reinitialiser-comptes-a-reclamer.js` (met tous les comptes « à
+   réclamer »).
+3. **Ouvrir la fenêtre d'inscription** (*Gestion des utilisateurs*) le temps que
+   chacun se connecte et choisisse son code, puis la **refermer**.
+
+Vérifié : **lint OK, 58 tests, build OK**.
+
+---
+
+## Vague 8 — juillet 2026 : export du planning en Excel (feuille de garde mensuelle)
+
+À la demande du propriétaire : pouvoir **générer une feuille de garde par mois**
+(comme la feuille papier APUM) à partir du planning déjà calculé par l'algo.
+
+- **Service** (`excelExportService.js`) : nouvelle fonction `exportPlanningToExcel`
+  qui **découpe le planning par mois** (un onglet Excel par mois) en **calquant à
+  l'identique le fichier de référence** *TABLEAUX MOIS PAR MOIS* fourni par le
+  propriétaire — mise en page relevée cellule par cellule sur ce fichier :
+  - **17 colonnes A→Q** : DATES | 1er QUART (B,C) | 2ème QUART (D–G, fusionné) |
+    RENFORT 10h/13h (H) | 3ème QUART (I–L, fusionné) | RENFORT 20H/00H (M) |
+    4ème QUART (N,O,P) | **colonne DATES miroir** (Q) ;
+  - **couleurs identiques** : rose `FFFF99FF` sur les renforts (20H tous les jours,
+    10h/13h les samedis) ; **date en rouge uniquement les jours fériés**
+    (`joursFeries.js`) — conforme au fichier (les week-ends ne sont pas rougis) ;
+  - titre `MOIS <MOIS>  <ANNÉE>`, dates réelles au format `ddd dd mmm`, polices
+    Calibri (titre 55 / en-têtes 22 / dates 26 / noms 24), bordures fines,
+    **paysage A4 ajusté à la page** ; homonymes désambiguïsés par le prénom
+    (« MARCHAND France »). Les quarts ont une colonne « en trop » (G, L) laissée
+    libre pour des annotations manuelles, comme dans le fichier de référence.
+- **UI** : bouton **« Exporter planning »** dans l'en-tête de *Gestion du planning*
+  (visible dès qu'un planning existe) ouvrant `ExportPlanningModal` — sélection des
+  mois à inclure (tous cochés par défaut, « découpe la période existante »).
+- **Contenu modifiable** : l'export part du planning affiché ; l'admin peut ajuster
+  les affectations (mode Modifier) avant d'exporter.
+- **Tests** : 6 tests unitaires sur la logique pure de découpage mensuel
+  (`groupPlanningByMonth`, `formatMonthTitle`, `sheetNameForMonth`). Fidélité de la
+  mise en page **vérifiée par diff automatique contre le fichier de référence**
+  (nom d'onglet, titre, fusions, libellés d'en-têtes, roses, largeurs de colonnes,
+  format de date, férié rouge : 17/17).
+- **Effectifs variables par type de jour** (`planningCore.js`) : le nombre de
+  médecins par garde n'est plus fixe. Un tableau `EFFECTIFS_PAR_TYPE_JOUR`
+  (semaine / samedi / dimanche) — **déduit de la feuille de référence** — pilote la
+  taille de chaque créneau ; un **jour férié compte comme un dimanche** (vérifié :
+  le 15/08, un samedi, n'a pas de renfort 10h/13h). Concrètement : 2ème/3ème quart
+  passent à 4 le week-end/férié, 4ème quart réduit à 2 le samedi, renfort 10h/13h
+  uniquement le samedi (hors férié). Branché sur les **deux modes de génération**
+  (`effectifPour`/`typeDeJour`), l'**affichage admin** (`PlanningTable` rend le
+  nombre réel de places) et l'**édition** (`GestionPlanning`). Vue médecin et
+  grilles de desiderata inchangées. 13 tests unitaires
+  (`effectifs.test.js`, dont les tailles générées par jour).
+- **Export des desiderata au format de référence** : `createMedecinWorksheet`
+  (`excelExportService.js`) réécrit pour reproduire **à l'identique** le fichier
+  *DESIDERATA ASO26* (export « mes desiderata » côté médecin, `FormulaireDesirata`)
+  — onglet unique « Désidératas », bloc jaune « À COMPLÉTER », en-tête **Comic Sans
+  MS** (RENFORT SAMEDI + 3ème quart en **orange FFED7D31**), **légende Oui/Non/
+  Possible en colonne K** servant de source à la liste déroulante (`$K$10:$K$12`),
+  dates réelles en **rouge gras** (format `[$-F800]dddd, mmmm dd, yyyy`), largeurs et
+  bordures d'origine ; préférences saisies colorées selon la légende. Fidélité
+  **vérifiée par diff automatique contre le fichier de référence (18/18)**.
+
+Aucune action de déploiement particulière (fonctionnalité purement front, aucun
+changement de règles Firestore).
+
+Vérifié : **lint OK, 64 tests, build OK**.

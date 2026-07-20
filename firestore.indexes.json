@@ -1,0 +1,14 @@
+{
+  "indexes": [
+    {
+      "//": "Requête getDesiderataForPeriod (planningService.js) : deux filtres d'inégalité (startDate <= fin ET endDate >= debut) sur des champs différents → index composite obligatoire, sinon la requête échoue en production.",
+      "collectionGroup": "desiderata",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "startDate", "order": "ASCENDING" },
+        { "fieldPath": "endDate", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

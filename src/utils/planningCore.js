@@ -5,6 +5,7 @@
 // planningGeneratorPriorite.js (source unique). La couche I/O (récupération des
 // desiderata/médecins) reste dans ces deux fichiers.
 import logger from './logger';
+import { estJourFerie } from './joursFeries';
 
 export const creneaux = [
   { id: 'QUART_1', label: '1er QUART (1h - 7h)', medecins: 2 },
@@ -14,6 +15,45 @@ export const creneaux = [
   { id: 'RENFORT_2', label: 'RENFORT 20H / 00H', medecins: 1 },
   { id: 'QUART_4', label: '4ème QUART (19h - 1h)', medecins: 3 }
 ];
+
+// Effectifs cibles par TYPE DE JOUR, déduits de la feuille de garde de référence
+// APUM (« TABLEAUX MOIS PAR MOIS »). Un JOUR FÉRIÉ compte comme un DIMANCHE
+// (vérifié sur la référence : le 15/08, pourtant un samedi, n'a pas de renfort
+// 10h/13h et suit les effectifs d'un dimanche).
+// 0 = le créneau n'existe pas ce jour-là (ex. renfort 10h/13h hors samedi).
+// NB : le SOUS-EFFECTIF d'AOÛT (congés d'été) est un facteur SAISONNIER, PAS une
+// règle de type de jour → ne PAS l'encoder ici. Il émerge naturellement des
+// desiderata (médecins indisponibles en août laissant des créneaux non pourvus).
+// Pour ajuster le nombre de médecins par garde, modifier UNIQUEMENT ce tableau.
+const EFFECTIFS_PAR_TYPE_JOUR = {
+  //             semaine     samedi      dimanche (= férié)
+  QUART_1:   { semaine: 2, samedi: 2, dimanche: 2 },
+  QUART_2:   { semaine: 3, samedi: 3, dimanche: 4 },
+  RENFORT_1: { semaine: 0, samedi: 1, dimanche: 0 },
+  QUART_3:   { semaine: 3, samedi: 4, dimanche: 4 },
+  RENFORT_2: { semaine: 1, samedi: 1, dimanche: 1 },
+  QUART_4:   { semaine: 3, samedi: 2, dimanche: 3 },
+};
+
+// Type de jour pour les effectifs : 'samedi' | 'dimanche' | 'semaine'.
+// Les jours fériés sont assimilés aux dimanches.
+export const typeDeJour = (dateString) => {
+  if (estJourFerie(dateString)) {
+    return 'dimanche';
+  }
+  // getUTCDay pour rester cohérent avec les clés de date (toISOString = UTC).
+  const jour = new Date(dateString).getUTCDay();
+  if (jour === 6) { return 'samedi'; }
+  if (jour === 0) { return 'dimanche'; }
+  return 'semaine';
+};
+
+// Nombre de médecins à affecter pour un créneau à une date donnée
+// (0 → le créneau n'est pas ouvert ce jour-là).
+export const effectifPour = (creneauId, dateString) => {
+  const parType = EFFECTIFS_PAR_TYPE_JOUR[creneauId];
+  return parType ? (parType[typeDeJour(dateString)] || 0) : 0;
+};
 
 const creneauxChevauchants = {
   'QUART_2': ['RENFORT_1'],
@@ -31,11 +71,14 @@ export const aCreneauxChevauchants = (medecinId, date, creneauId, planning) => {
   );
 };
 
+// Numéro de semaine ISO-8601, calculé entièrement en UTC pour être insensible
+// au fuseau et au passage heure d'été↔hiver (cohérent avec les clés de date
+// 'YYYY-MM-DD' du planning).
 export const getWeekNumber = (date) => {
   const d = new Date(date);
-  d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() + 4 - (d.getDay() || 7));
-  const yearStart = new Date(d.getFullYear(), 0, 1);
+  d.setUTCHours(0, 0, 0, 0);
+  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
   return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
 };
 
@@ -106,18 +149,19 @@ const genererPlanningSolution = (debut, fin, desiderata, medecins) => {
 
     ordreCreneaux.forEach(creneauId => {
       const creneau = creneaux.find(c => c.id === creneauId);
-      if (creneau && (!creneau.samediOnly || currentDate.getDay() === 6)) {
-        planning[dateString][creneauId] = assignerMedecins(dateString, creneau, desiderata, medecins, planning);
+      const effectif = effectifPour(creneauId, dateString);
+      if (creneau && effectif > 0) {
+        planning[dateString][creneauId] = assignerMedecins(dateString, creneau, effectif, desiderata, medecins, planning);
       }
     });
 
-    currentDate.setDate(currentDate.getDate() + 1);
+    currentDate.setUTCDate(currentDate.getUTCDate() + 1);
   }
 
   return planning;
 };
 
-const assignerMedecins = (date, creneau, desiderata, medecins, planning) => {
+const assignerMedecins = (date, creneau, effectif, desiderata, medecins, planning) => {
   const medecinsDispo = medecins.filter(medecinId => {
     const choix = desiderata[medecinId]?.preferences[date]?.[creneau.id];
     const gardesParSemaine = compterGardesParSemaine(medecinId, date, planning);
@@ -129,16 +173,12 @@ const assignerMedecins = (date, creneau, desiderata, medecins, planning) => {
            !aChevauchement;
   });
 
-  const medecinsPriorises = medecinsDispo.sort((a, b) => {
-    const choixA = desiderata[a]?.preferences[date]?.[creneau.id];
-    const choixB = desiderata[b]?.preferences[date]?.[creneau.id];
-    if (choixA === 'Oui' && choixB !== 'Oui') { return -1; }
-    if (choixB === 'Oui' && choixA !== 'Oui') { return 1; }
-    return 0;
-  });
+  // Le classement fin est fait par score dans choisirMedecin (le score « Oui »
+  // (+3) prime déjà « Possible » (+1)) : on part directement des disponibles.
+  const medecinsPriorises = medecinsDispo;
 
   const assignes = [];
-  for (let i = 0; i < creneau.medecins; i++) {
+  for (let i = 0; i < effectif; i++) {
     if (medecinsPriorises.length > 0) {
       const medecinChoisi = choisirMedecin(medecinsPriorises, date, creneau, desiderata, planning);
       if (medecinChoisi) {
@@ -187,10 +227,12 @@ const calculerScoreMedecin = (medecinId, date, creneau, desiderata, planning, mo
   else if (prefMedecin.preferences[date]?.[creneau.id] === 'Possible') { score += 1; }
   else if (prefMedecin.preferences[date]?.[creneau.id] === 'Non') { score -= 5; }
 
-  // Nombre de gardes souhaitées
+  // Nombre de gardes souhaitées (objectif MENSUEL). Défaut 0 si non renseigné,
+  // pour éviter un score NaN qui casserait le tri des candidats.
+  const gardesSouhaitees = prefMedecin.nombreGardesSouhaitees || 0;
   const gardesDuMois = compterGardesMois(medecinId, planning, mois);
-  if (gardesDuMois < prefMedecin.nombreGardesSouhaitees) { score += 2; }
-  else { score -= (gardesDuMois - prefMedecin.nombreGardesSouhaitees) * 2; }
+  if (gardesDuMois < gardesSouhaitees) { score += 2; }
+  else { score -= (gardesDuMois - gardesSouhaitees) * 2; }
 
   // Gardes groupées
   if (prefMedecin.gardesGroupees && estWeekEnd(date) && aGardeWeekEnd(medecinId, date, planning)) {
@@ -216,16 +258,17 @@ const compterGardesMois = (medecinId, planning, mois) => {
 };
 
 const estWeekEnd = (date) => {
-  const jour = new Date(date).getDay();
+  const jour = new Date(date).getUTCDay();
   return jour === 0 || jour === 6;
 };
 
 const aGardeWeekEnd = (medecinId, date, planning) => {
   const dateObj = new Date(date);
-  const debutWeekEnd = new Date(dateObj.setDate(dateObj.getDate() - dateObj.getDay()));
-  const finWeekEnd = new Date(dateObj.setDate(dateObj.getDate() - dateObj.getDay() + 6));
+  const jour = dateObj.getUTCDay();
+  const debutWeekEnd = new Date(dateObj); debutWeekEnd.setUTCDate(dateObj.getUTCDate() - jour);
+  const finWeekEnd = new Date(dateObj); finWeekEnd.setUTCDate(dateObj.getUTCDate() - jour + 6);
 
-  for (let d = new Date(debutWeekEnd); d <= finWeekEnd; d.setDate(d.getDate() + 1)) {
+  for (let d = new Date(debutWeekEnd); d <= finWeekEnd; d.setUTCDate(d.getUTCDate() + 1)) {
     const dateString = d.toISOString().split('T')[0];
     if (planning[dateString] && Object.values(planning[dateString]).flat().includes(medecinId)) {
       return true;
@@ -284,6 +327,11 @@ const genererVoisins = (planning, medecins, desiderata) => {
   const index = Math.floor(Math.random() * planning[date][creneauId].length);
 
   for (const medecin of medecins) {
+    // Contrainte DURE : ne jamais placer un médecin non volontaire sur ce
+    // créneau (préférence « Non » ou non renseignée).
+    const choix = desiderata[medecin]?.preferences[date]?.[creneauId];
+    if (choix !== 'Oui' && choix !== 'Possible') { continue; }
+
     if (!planning[date][creneauId].includes(medecin)) {
       const nouveauPlanning = JSON.parse(JSON.stringify(planning));
       nouveauPlanning[date][creneauId][index] = medecin;
@@ -292,7 +340,7 @@ const genererVoisins = (planning, medecins, desiderata) => {
       const gardesParSemaine = compterGardesParSemaine(medecin, date, nouveauPlanning);
       const maxGardes = desiderata[medecin]?.nombreGardesMaxParSemaine || 7;
       const aChevauchement = aCreneauxChevauchants(medecin, date, creneauId, nouveauPlanning);
-      if (gardesParSemaine <= maxGardes && !aChevauchement && verifierContraintes(nouveauPlanning)) {
+      if (gardesParSemaine <= maxGardes && !aChevauchement && verifierContraintes(nouveauPlanning, desiderata)) {
         voisins.push(nouveauPlanning);
       }
     }
@@ -300,7 +348,7 @@ const genererVoisins = (planning, medecins, desiderata) => {
 
   const planningRetrait = JSON.parse(JSON.stringify(planning));
   planningRetrait[date][creneauId][index] = null;
-  if (verifierContraintes(planningRetrait)) {
+  if (verifierContraintes(planningRetrait, desiderata)) {
     voisins.push(planningRetrait);
   }
 
@@ -309,8 +357,8 @@ const genererVoisins = (planning, medecins, desiderata) => {
 
 export const evaluerPlanning = (planning, desiderata) => {
   let score = 0;
-  const gardesParMedecin = {};
   const gardesParMedecinParSemaine = {};
+  const gardesParMedecinParMois = {};
 
   for (const date in planning) {
     for (const creneauId in planning[date]) {
@@ -338,8 +386,11 @@ export const evaluerPlanning = (planning, desiderata) => {
           score -= 50;
         }
 
-        if (!gardesParMedecin[medecinId]) { gardesParMedecin[medecinId] = 0; }
-        gardesParMedecin[medecinId]++;
+        // Comptage par mois (l'objectif « gardes souhaitées » est mensuel).
+        const mois = date.slice(0, 7);
+        if (!gardesParMedecinParMois[medecinId]) { gardesParMedecinParMois[medecinId] = {}; }
+        if (!gardesParMedecinParMois[medecinId][mois]) { gardesParMedecinParMois[medecinId][mois] = 0; }
+        gardesParMedecinParMois[medecinId][mois]++;
 
         const choix = desiderata[medecinId]?.preferences[date]?.[creneauId];
         if (choix === 'Oui') { score += 3; }
@@ -360,24 +411,29 @@ export const evaluerPlanning = (planning, desiderata) => {
     }
   }
 
-  // Évaluation du nombre de gardes souhaitées par mois
-  for (const medecinId in gardesParMedecin) {
-    const diff = Math.abs(gardesParMedecin[medecinId] - desiderata[medecinId]?.nombreGardesSouhaitees);
-    score -= diff * 2;
+  // Écart au nombre de gardes souhaitées, évalué PAR MOIS (le réglage
+  // « Gardes souhaitées par mois » est un objectif mensuel). Défaut 0.
+  for (const medecinId in gardesParMedecinParMois) {
+    const souhaitees = desiderata[medecinId]?.nombreGardesSouhaitees || 0;
+    for (const mois in gardesParMedecinParMois[medecinId]) {
+      const diff = Math.abs(gardesParMedecinParMois[medecinId][mois] - souhaitees);
+      score -= diff * 2;
+    }
   }
 
   return score;
 };
 
-export const verifierContraintes = (planning) => {
+export const verifierContraintes = (planning, desiderata = {}) => {
   const dates = Object.keys(planning).sort();
   const gardesParMedecinParSemaine = {};
 
   for (let i = 0; i < dates.length; i++) {
     const date = dates[i];
+    const semaine = getWeekNumber(date);
     const medecinsDuJour = new Set();
 
-    // Vérifier les chevauchements de créneaux
+    // Chevauchements + comptage des gardes (occurrences de créneaux) par semaine
     for (const creneauId in planning[date]) {
       const medecins = planning[date][creneauId];
       for (const medecinId of medecins) {
@@ -388,10 +444,18 @@ export const verifierContraintes = (planning) => {
         }
 
         medecinsDuJour.add(medecinId);
+
+        if (!gardesParMedecinParSemaine[medecinId]) {
+          gardesParMedecinParSemaine[medecinId] = {};
+        }
+        if (!gardesParMedecinParSemaine[medecinId][semaine]) {
+          gardesParMedecinParSemaine[medecinId][semaine] = 0;
+        }
+        gardesParMedecinParSemaine[medecinId][semaine]++;
       }
     }
 
-    // Vérifier les gardes consécutives
+    // Vérifier les gardes consécutives (pas plus de 2 jours d'affilée)
     for (const medecinId of medecinsDuJour) {
       if (i >= 2) {
         const hierMedecins = new Set();
@@ -409,23 +473,14 @@ export const verifierContraintes = (planning) => {
           return false;
         }
       }
-
-      // Vérifier le nombre de gardes par semaine
-      const semaine = getWeekNumber(date);
-      if (!gardesParMedecinParSemaine[medecinId]) {
-        gardesParMedecinParSemaine[medecinId] = {};
-      }
-      if (!gardesParMedecinParSemaine[medecinId][semaine]) {
-        gardesParMedecinParSemaine[medecinId][semaine] = 0;
-      }
-      gardesParMedecinParSemaine[medecinId][semaine]++;
     }
   }
 
-  // Vérifier le respect du nombre maximum de gardes par semaine
+  // Respect du nombre maximum de gardes par semaine, PROPRE À CHAQUE MÉDECIN
+  // (défaut 7 si le desiderata n'est pas fourni).
   for (const medecinId in gardesParMedecinParSemaine) {
+    const maxGardesParSemaine = desiderata[medecinId]?.nombreGardesMaxParSemaine || 7;
     for (const semaine in gardesParMedecinParSemaine[medecinId]) {
-      const maxGardesParSemaine = 7;  // Valeur par défaut
       if (gardesParMedecinParSemaine[medecinId][semaine] > maxGardesParSemaine) {
         return false;
       }
@@ -446,13 +501,28 @@ export const computeClassique = (debut, fin, desiderata, medecins) => {
 // Génération « par ordre de priorité »
 // ============================================================================
 
+// Renvoie true si affecter ce médecin à cette date créerait un 3ème jour de
+// garde consécutif (il a déjà une garde la veille ET l'avant-veille). La
+// vérification porte sur l'objet planning courant (dates UTC).
+const auraitTroisJoursConsecutifs = (medecinId, dateString, planning) => {
+  const jour = new Date(dateString);
+  const veille = new Date(jour); veille.setUTCDate(veille.getUTCDate() - 1);
+  const avantVeille = new Date(jour); avantVeille.setUTCDate(avantVeille.getUTCDate() - 2);
+  const veilleStr = veille.toISOString().split('T')[0];
+  const avantVeilleStr = avantVeille.toISOString().split('T')[0];
+  return aGardeJour(medecinId, veilleStr, planning) && aGardeJour(medecinId, avantVeilleStr, planning);
+};
+
 const attribuerCreneauxParPreference = (
   medecinId, dateString, preferenceType, nombreGardesSouhaitees, maxGardesParSemaine,
   desiderata, planning, gardesAttribuees
 ) => {
-  // Respect strict du quota demandé
-  if (gardesAttribuees[medecinId] >= nombreGardesSouhaitees) {
-    return; // Quota atteint
+  const mois = dateString.slice(0, 7);
+  const compteur = gardesAttribuees[medecinId] || (gardesAttribuees[medecinId] = {});
+
+  // Respect strict du quota MENSUEL demandé (« gardes souhaitées par mois »).
+  if ((compteur[mois] || 0) >= nombreGardesSouhaitees) {
+    return; // Quota du mois atteint
   }
 
   const gardesParSemaine = compterGardesParSemaine(medecinId, dateString, planning);
@@ -460,12 +530,17 @@ const attribuerCreneauxParPreference = (
     return; // Limite hebdomadaire atteinte
   }
 
+  // Pas plus de 2 jours de garde consécutifs.
+  if (auraitTroisJoursConsecutifs(medecinId, dateString, planning)) {
+    return;
+  }
+
   const preferencesJour = desiderata[medecinId].preferences[dateString] || {};
 
   // Parcourir tous les créneaux pour cette préférence
   for (const creneau of creneaux) {
     // Vérifier à nouveau le quota à chaque attribution
-    if (gardesAttribuees[medecinId] >= nombreGardesSouhaitees) {
+    if ((compteur[mois] || 0) >= nombreGardesSouhaitees) {
       break;
     }
 
@@ -489,7 +564,7 @@ const attribuerCreneauxParPreference = (
     const indexLibre = planning[dateString][creneau.id].findIndex(m => m === null);
     if (indexLibre !== -1) {
       planning[dateString][creneau.id][indexLibre] = medecinId;
-      gardesAttribuees[medecinId]++;
+      compteur[mois] = (compteur[mois] || 0) + 1;
     }
   }
 };
@@ -533,6 +608,11 @@ const remplirCreneauxVidesAvecDisponibles = (dateString, ordrePriorite, mapMedec
           continue;
         }
 
+        // Pas plus de 2 jours de garde consécutifs.
+        if (auraitTroisJoursConsecutifs(medecinId, dateString, planning)) {
+          continue;
+        }
+
         // Vérifier qu'il n'est pas déjà assigné ce jour-là
         const dejaAssigneAujourdhui = Object.values(planning[dateString]).some(medecins =>
           medecins.includes(medecinId)
@@ -555,7 +635,7 @@ export const diviserPeriode = (debut, fin) => {
 
   const premierTourDays = Math.min(45, Math.floor(totalDays / 2));
   const deuxiemeTourStart = new Date(startDate);
-  deuxiemeTourStart.setDate(deuxiemeTourStart.getDate() + premierTourDays);
+  deuxiemeTourStart.setUTCDate(deuxiemeTourStart.getUTCDate() + premierTourDays);
 
   return {
     premierTour: {
@@ -569,29 +649,21 @@ export const diviserPeriode = (debut, fin) => {
   };
 };
 
-const genererPlanningPourPeriode = (debut, fin, ordrePriorite, mapMedecinNomVersId, desiderata) => {
-  const planning = {};
+const genererPlanningPourPeriode = (debut, fin, ordrePriorite, mapMedecinNomVersId, desiderata, gardesAttribuees, planning) => {
   const currentDate = new Date(debut);
   const endDate = new Date(fin);
-
-  // Compteur de gardes attribuées par médecin
-  const gardesAttribuees = {};
-  ordrePriorite.forEach(nomMedecin => {
-    const medecinId = mapMedecinNomVersId[nomMedecin];
-    if (medecinId) {
-      gardesAttribuees[medecinId] = 0;
-    }
-  });
 
   // Générer jour par jour
   while (currentDate <= endDate) {
     const dateString = currentDate.toISOString().split('T')[0];
     planning[dateString] = {};
 
-    // Initialiser tous les créneaux pour ce jour
+    // Initialiser tous les créneaux ouverts ce jour (effectif variable par
+    // type de jour : semaine / samedi / dimanche / férié).
     creneaux.forEach(creneau => {
-      if (!creneau.samediOnly || currentDate.getDay() === 6) {
-        planning[dateString][creneau.id] = Array(creneau.medecins).fill(null);
+      const effectif = effectifPour(creneau.id, dateString);
+      if (effectif > 0) {
+        planning[dateString][creneau.id] = Array(effectif).fill(null);
       }
     });
 
@@ -622,27 +694,8 @@ const genererPlanningPourPeriode = (debut, fin, ordrePriorite, mapMedecinNomVers
     // Phase 3: FALLBACK - Remplir les créneaux vides avec les médecins disponibles (Oui/Possible)
     remplirCreneauxVidesAvecDisponibles(dateString, ordrePriorite, mapMedecinNomVersId, desiderata, planning);
 
-    currentDate.setDate(currentDate.getDate() + 1);
+    currentDate.setUTCDate(currentDate.getUTCDate() + 1);
   }
-
-  // Debug : vérifier la répartition des gardes
-  logger.info('Répartition des gardes attribuées:', gardesAttribuees);
-
-  // Compter les créneaux vides
-  let creneauxVides = 0;
-  let creneauxTotal = 0;
-  Object.values(planning).forEach(joursCreneaux => {
-    Object.values(joursCreneaux).forEach(medecins => {
-      medecins.forEach(medecin => {
-        creneauxTotal++;
-        if (medecin === null) {
-          creneauxVides++;
-        }
-      });
-    });
-  });
-
-  logger.info(`Créneaux non pourvus: ${creneauxVides}/${creneauxTotal}`);
 
   return planning;
 };
@@ -651,21 +704,48 @@ const genererPlanningPourPeriode = (debut, fin, ordrePriorite, mapMedecinNomVers
 export const computePriorite = (debut, fin, desiderata, mapMedecinNomVersId, listePriorite) => {
   const periodes = diviserPeriode(debut, fin);
 
-  const planningPremierTour = genererPlanningPourPeriode(
+  // Compteur PARTAGÉ entre les deux tours, indexé par médecin PUIS par mois :
+  // le quota « gardes souhaitées par mois » est ainsi respecté sur le mois réel
+  // (et non réinitialisé à chaque tour, ce qui doublait les gardes). Le planning
+  // est également partagé pour assurer la continuité entre les tours (comptage
+  // hebdomadaire et règle des jours consécutifs au passage d'un tour à l'autre).
+  const gardesAttribuees = {};
+  const planning = {};
+
+  genererPlanningPourPeriode(
     periodes.premierTour.debut,
     periodes.premierTour.fin,
     listePriorite.premierTour,
     mapMedecinNomVersId,
-    desiderata
+    desiderata,
+    gardesAttribuees,
+    planning
   );
 
-  const planningDeuxiemeTour = genererPlanningPourPeriode(
+  genererPlanningPourPeriode(
     periodes.deuxiemeTour.debut,
     periodes.deuxiemeTour.fin,
     listePriorite.deuxiemeTour,
     mapMedecinNomVersId,
-    desiderata
+    desiderata,
+    gardesAttribuees,
+    planning
   );
 
-  return { ...planningPremierTour, ...planningDeuxiemeTour };
+  logger.info('Répartition des gardes attribuées (par mois):', gardesAttribuees);
+
+  // Compter les créneaux non pourvus (diagnostic).
+  let creneauxVides = 0;
+  let creneauxTotal = 0;
+  Object.values(planning).forEach(joursCreneaux => {
+    Object.values(joursCreneaux).forEach(medecins => {
+      medecins.forEach(medecin => {
+        creneauxTotal++;
+        if (medecin === null) { creneauxVides++; }
+      });
+    });
+  });
+  logger.info(`Créneaux non pourvus: ${creneauxVides}/${creneauxTotal}`);
+
+  return planning;
 };

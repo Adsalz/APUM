@@ -93,6 +93,18 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // ---------- Config publique : fenêtre d'inscription ----------
+    // Le document config/inscription porte l'unique champ `open` (booléen) qui
+    // indique si la réclamation des comptes médecin (« premier code = le sien »)
+    // est ouverte. Lecture PUBLIQUE : la page de connexion en a besoin avant
+    // toute authentification. Écriture admin uniquement.
+    match /config/inscription {
+      allow read: if true;
+      allow write: if isAdmin() &&
+        request.resource.data.keys().hasOnly(['open']) &&
+        request.resource.data.open is bool;
+    }
+
     // ---------- Annuaire public (liste de connexion des médecins) ----------
     // Lecture PUBLIQUE et non authentifiée : la liste déroulante de login est
     // peuplée AVANT toute connexion (request.auth == null). NE JAMAIS remplacer

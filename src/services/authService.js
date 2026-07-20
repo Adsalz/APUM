@@ -3,46 +3,12 @@ import {
   signInWithEmailAndPassword,
   signOut,
   updatePassword,
-  sendPasswordResetEmail,
   reauthenticateWithCredential,
   EmailAuthProvider
 } from 'firebase/auth';
 import { getUser } from './userService';
+import { CODE_A_RECLAMER } from '../constants/claim';
 import logger from '../utils/logger';
-
-// Génère un mot de passe temporaire robuste (>= 12 caractères) via
-// crypto.getRandomValues, avec au moins une minuscule, une majuscule et un
-// chiffre pour respecter les règles de complexité de Firebase Auth.
-// Exporté aussi pour proposer aux médecins un « code fort » généré.
-export const generateTempPassword = (length = 16) => {
-  const lower = 'abcdefghijkmnpqrstuvwxyz';
-  const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
-  const digits = '23456789';
-  const all = lower + upper + digits;
-
-  const randomValues = new Uint32Array(length * 2);
-  window.crypto.getRandomValues(randomValues);
-
-  const pick = (charset, value) => charset[value % charset.length];
-
-  // Garantir la présence de chaque classe de caractères exigée par Firebase
-  const chars = [
-    pick(lower, randomValues[0]),
-    pick(upper, randomValues[1]),
-    pick(digits, randomValues[2])
-  ];
-  for (let i = 3; i < length; i++) {
-    chars.push(pick(all, randomValues[i]));
-  }
-
-  // Mélange de Fisher-Yates pour masquer la position des caractères garantis
-  for (let i = chars.length - 1; i > 0; i--) {
-    const j = randomValues[length + i] % (i + 1);
-    [chars[i], chars[j]] = [chars[j], chars[i]];
-  }
-
-  return chars.join('');
-};
 
 // Traduit les erreurs de l'API REST Firebase Identity Toolkit en Error dont le
 // `.code` suit la convention `auth/*` attendue par les handlers UI.
@@ -70,13 +36,12 @@ const mapFirebaseSignUpError = (data) => {
   return error;
 };
 
+// Crée un compte médecin « à réclamer » : son mot de passe initial est le code
+// de réclamation partagé (CODE_A_RECLAMER). Aucun email n'est envoyé — le
+// médecin choisira son code à 6 chiffres à sa première connexion via
+// loginMedecin (« premier code = le sien »).
 export const registerUser = async (email) => {
   try {
-    // Générer un mot de passe temporaire robuste (l'utilisateur le réinitialise
-    // ensuite via l'email de réinitialisation ci-dessous).
-    const tempPassword = generateTempPassword();
-
-    // Utiliser l'API REST Firebase pour créer l'utilisateur
     const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${process.env.REACT_APP_FIREBASE_API_KEY}`, {
       method: 'POST',
       headers: {
@@ -84,7 +49,7 @@ export const registerUser = async (email) => {
       },
       body: JSON.stringify({
         email: email,
-        password: tempPassword,
+        password: CODE_A_RECLAMER,
         returnSecureToken: true
       })
     });
@@ -95,9 +60,6 @@ export const registerUser = async (email) => {
       // Propager la vraie cause Firebase (avec un `.code` auth/*) au handler UI
       throw mapFirebaseSignUpError(data);
     }
-
-    // Envoyer l'email de réinitialisation de mot de passe
-    await sendPasswordResetEmail(auth, email);
 
     return {
       user: {
@@ -111,6 +73,7 @@ export const registerUser = async (email) => {
   }
 };
 
+// Connexion classique par email + mot de passe (espace administrateur).
 export const loginUser = async (email, password) => {
   try {
     const userCredential = await signInWithEmailAndPassword(auth, email, password);
@@ -123,27 +86,58 @@ export const loginUser = async (email, password) => {
   }
 };
 
+// Connexion médecin par code à 6 chiffres, avec réclamation « premier code = le sien ».
+//
+//  1. On tente le code saisi comme mot de passe : si ça marche, le compte est
+//     déjà réclamé et le code est correct → connexion.
+//  2. Sinon, et SEULEMENT si les inscriptions sont ouvertes, on tente de se
+//     connecter avec le code de réclamation partagé :
+//       - succès → le compte était « à réclamer » : on adopte le code choisi
+//         (updatePassword) → le compte est désormais réclamé avec ce code ;
+//       - échec → le compte est déjà réclamé (le code saisi est simplement
+//         incorrect) : on propage l'erreur initiale.
+//  3. Si les inscriptions sont fermées, on ne tente pas la réclamation :
+//     échec = code incorrect.
+export const loginMedecin = async (email, code, inscriptionsOuvertes) => {
+  try {
+    return await signInWithEmailAndPassword(auth, email, code);
+  } catch (error) {
+    // On ne tente la réclamation que si les inscriptions sont ouvertes ET que
+    // l'échec est bien un problème d'identifiant (pas un throttling ni une
+    // erreur réseau) : évite de brûler une 2ᵉ tentative de sign-in inutile
+    // (et donc d'accélérer le verrou auth/too-many-requests).
+    const isCredentialError =
+      error && (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential');
+    if (!inscriptionsOuvertes || !isCredentialError) {
+      throw error;
+    }
+    let claimCredential;
+    try {
+      claimCredential = await signInWithEmailAndPassword(auth, email, CODE_A_RECLAMER);
+    } catch (claimError) {
+      // Compte déjà réclamé (ou autre) : le code saisi est simplement incorrect.
+      throw error;
+    }
+    // Compte « à réclamer » : on fixe le code choisi par le médecin. Si
+    // updatePassword échoue, on déconnecte pour ne pas laisser une session
+    // « à moitié réclamée » (connecté mais code encore au code de réclamation).
+    try {
+      await updatePassword(claimCredential.user, code);
+    } catch (updateError) {
+      await signOut(auth).catch((e) => logger.error('signOut après échec de réclamation:', e));
+      throw updateError;
+    }
+    logger.debug('Compte réclamé — premier code défini');
+    return claimCredential;
+  }
+};
+
 export const logoutUser = async () => {
   try {
     await signOut(auth);
     logger.debug('Utilisateur déconnecté');
   } catch (error) {
     logger.error('Erreur lors de la déconnexion:', error);
-    throw error;
-  }
-};
-
-export const updateUserPassword = async (newPassword) => {
-  try {
-    const user = auth.currentUser;
-    if (user) {
-      await updatePassword(user, newPassword);
-      logger.debug('Mot de passe mis à jour avec succès');
-    } else {
-      throw new Error('Aucun utilisateur connecté');
-    }
-  } catch (error) {
-    logger.error('Erreur lors de la mise à jour du mot de passe:', error);
     throw error;
   }
 };

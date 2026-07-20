@@ -5,6 +5,7 @@ import {
   getPreferenceStyle,
   getMedecinPreference
 } from '../../utils/planningUtils';
+import { effectifPour } from '../../utils/planningCore';
 import { Select } from '../ui';
 
 // Classes de pastille sémantiques dérivées de la préférence (présentation)
@@ -163,9 +164,6 @@ const PlanningTable = ({
                   <div className="mt-0.5 text-[0.7rem] font-normal text-ink-500">
                     {creneau.hours}
                   </div>
-                  <div className="text-[0.7rem] font-normal text-ink-500">
-                    {creneau.medecins} médecin{creneau.medecins > 1 ? 's' : ''}
-                  </div>
                 </th>
               ))}
             </tr>
@@ -186,13 +184,18 @@ const PlanningTable = ({
                       : '';
                     const selBg = selectedMedecin !== 'all' ? preferenceCellBg(selPreference) : '';
                     const cellBg = selBg || (weekend ? 'bg-primary-50/40' : '');
+                    // Nombre de places réel ce jour-là : longueur du planning si
+                    // présent, sinon l'effectif cible du type de jour (0 = créneau
+                    // non ouvert, ex. renfort 10h/13h hors samedi).
+                    const nbSlots = planning.planning[date]?.[creneau.id]?.length
+                      ?? effectifPour(creneau.id, date);
 
                     return (
                       <td
                         key={`${date}-${creneau.id}`}
                         className={`relative border-b border-ink-100 px-4 py-3 align-top ${cellBg}`}
                       >
-                        {(!creneau.samediOnly || new Date(date).getDay() === 6) && (
+                        {nbSlots > 0 && (
                           <>
                             {selectedMedecin !== 'all' && (
                               <PreferenceIndicator
@@ -205,7 +208,7 @@ const PlanningTable = ({
                               />
                             )}
                             <div className="flex flex-col gap-1.5">
-                              {Array.from({ length: creneau.medecins }).map((_, index) => (
+                              {Array.from({ length: nbSlots }).map((_, index) => (
                                 <div key={index}>
                                   {editMode ? (
                                     <MedecinSelect

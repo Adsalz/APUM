@@ -17,6 +17,7 @@ import {
 } from './ui';
 import { useAuth } from '../contexts/AuthContext';
 import logger from '../utils/logger';
+import { estJourFerie } from '../utils/joursFeries';
 // Créneaux (avec teinte `chip`) : source unique partagée avec les formulaires.
 import { CRENEAUX as creneaux } from '../constants/creneaux';
 
@@ -287,7 +288,9 @@ function PlanningVisualisation() {
                         </td>
                         {creneaux.map(creneau => {
                           const ids = cellIds(date, creneau.id);
-                          const disabled = creneau.samediOnly && new Date(date).getDay() !== 6;
+                          // Renfort 10h/13h : samedi uniquement, jamais un férié
+                          // (samedi férié = effectifs d'un dimanche).
+                          const disabled = creneau.samediOnly && (new Date(date).getDay() !== 6 || estJourFerie(date));
                           return (
                             <td key={`${date}-${creneau.id}`} className="border-b border-l border-ink-100 px-3 py-2 align-top">
                               {!disabled && ids.length > 0 ? (

@@ -11,7 +11,7 @@ import {
   getPublishedPlanning,
   getPeriodeSaisie
 } from '../../services/planningService';
-import { genererPlanning, creneaux } from '../../utils/planningGenerator';
+import { genererPlanning, creneaux, effectifPour } from '../../utils/planningGenerator';
 import { genererPlanningPriorite } from '../../utils/planningGeneratorPriorite';
 import { LoadingScreen, Alert } from '../ui';
 import logger from '../../utils/logger';
@@ -27,6 +27,7 @@ import GeneratePlanningModal from './modals/GeneratePlanningModal';
 import PublishPlanningModal from './modals/PublishPlanningModal';
 import DiscardChangesModal from './modals/DiscardChangesModal';
 import ExportDesiderataModal from '../ExportDesiderataModal';
+import ExportPlanningModal from '../ExportPlanningModal';
 
 function GestionPlanning() {
   // États pour les données
@@ -55,6 +56,7 @@ function GestionPlanning() {
   const [showPublishConfirm, setShowPublishConfirm] = useState(false);
   const [showDiscardChanges, setShowDiscardChanges] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showExportPlanningModal, setShowExportPlanningModal] = useState(false);
   // Navigation en attente d'une confirmation d'abandon des modifications.
   const [pendingBack, setPendingBack] = useState(false);
 
@@ -230,7 +232,7 @@ function GestionPlanning() {
       }
       if (!newPlanning.planning[date][creneau]) {
         newPlanning.planning[date][creneau] = Array(
-          creneaux.find(c => c.id === creneau)?.medecins || 0
+          effectifPour(creneau, date)
         ).fill(null);
       }
       newPlanning.planning[date][creneau][index] = medecinId || null;
@@ -274,6 +276,7 @@ function GestionPlanning() {
         onSaveChanges={handleSaveChanges}
         onBackClick={handleBack}
         onExportClick={() => setShowExportModal(true)}
+        onExportPlanningClick={() => setShowExportPlanningModal(true)}
         planning={planning}
       />
 
@@ -376,6 +379,13 @@ function GestionPlanning() {
         desiderata={desiderata}
         periodeSaisie={periodeSaisie}
         creneaux={creneaux}
+      />
+
+      <ExportPlanningModal
+        isOpen={showExportPlanningModal}
+        onClose={() => setShowExportPlanningModal(false)}
+        planning={planning}
+        medecins={medecins}
       />
     </div>
   );

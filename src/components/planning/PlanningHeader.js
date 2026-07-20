@@ -8,7 +8,8 @@ import {
   RefreshCcw,
   Edit2,
   X,
-  Download
+  Download,
+  FileSpreadsheet
 } from 'lucide-react';
 import { Button } from '../ui';
 
@@ -21,6 +22,7 @@ const PlanningHeader = ({
   onSaveChanges,
   onBackClick,
   onExportClick,
+  onExportPlanningClick,
   planning
 }) => {
   return (
@@ -52,6 +54,16 @@ const PlanningHeader = ({
               >
                 Exporter desiderata
               </Button>
+              {planning && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  icon={<FileSpreadsheet size={16} aria-hidden="true" />}
+                  onClick={onExportPlanningClick}
+                >
+                  Exporter planning
+                </Button>
+              )}
               <Button
                 variant="secondary"
                 size="sm"
