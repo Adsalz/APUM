@@ -1,12 +1,12 @@
 {
   "indexes": [
     {
-      "//": "Requête getDesiderataForPeriod (planningService.js) : deux filtres d'inégalité (startDate <= fin ET endDate >= debut) sur des champs différents → index composite obligatoire, sinon la requête échoue en production.",
+      "//": "Requête getDesiderataForPeriod (planningService.js) : deux filtres d'inégalité (startDate <= fin ET endDate >= debut) → index composite obligatoire. L'ordre des champs (endDate puis startDate) reflète EXACTEMENT l'index déjà présent en production dans apum-8cfa4 ; ce fichier ne fait que le versionner (aucune modification en prod).",
       "collectionGroup": "desiderata",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "startDate", "order": "ASCENDING" },
-        { "fieldPath": "endDate", "order": "ASCENDING" }
+        { "fieldPath": "endDate", "order": "ASCENDING" },
+        { "fieldPath": "startDate", "order": "ASCENDING" }
       ]
     }
   ],
