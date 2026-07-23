@@ -157,3 +157,79 @@ describe('planningCore — computePriorite (déterministe + invariants)', () => 
     }
   });
 });
+
+describe('planningCore — correctifs d’audit (B1 consécutifs, B3 plafond/jour, B2 sur-service borné)', () => {
+  // B1 : la passe LARGEUR (exécutée en dernier, sur des dates déjà remplies) ne doit
+  // PAS créer une série de 3 jours consécutifs en comblant une place restée vide
+  // alors que J+1 et J+2 sont déjà des gardes. Cas réaliste : frontière de mois, le
+  // quota mensuel qui bloque le 31/08 se réinitialise en septembre.
+  it('B1 — la passe largeur ne crée jamais 3 jours consécutifs (frontière de mois)', () => {
+    const noms = { X: 'X' };
+    const listePriorite = { premierTour: ['X'], deuxiemeTour: ['X'] };
+    const desiderata = {
+      X: {
+        nombreGardesSouhaitees: 2,
+        nombreGardesMaxParSemaine: 3,
+        preferences: {
+          '2026-08-03': { QUART_1: 'Oui' },
+          '2026-08-05': { QUART_1: 'Oui' },
+          '2026-08-31': { QUART_1: 'Oui' },
+          '2026-09-01': { QUART_1: 'Oui' },
+          '2026-09-02': { QUART_1: 'Oui' },
+        },
+      },
+    };
+    const planning = computePriorite('2026-08-01', '2026-09-05', desiderata, noms, listePriorite);
+    // Le validateur symétrique (contrainte dure) doit être satisfait.
+    expect(verifierContraintes(planning, desiderata)).toBe(true);
+    // X ne doit pas cumuler les trois jours 31/08 + 01/09 + 02/09.
+    const surX = (d) => Object.values(planning[d] || {}).some((s) => s.includes('X'));
+    expect(surX('2026-08-31') && surX('2026-09-01') && surX('2026-09-02')).toBe(false);
+  });
+
+  // B3 : aucun médecin ne cumule plus de 2 créneaux (MAX_CRENEAUX_PAR_JOUR) le même jour.
+  it('B3 — ne cumule jamais plus de 2 créneaux le même jour', () => {
+    const ids = ['a', 'b', 'c'];
+    const noms = { A: 'a', B: 'b', C: 'c' };
+    const ordre = ['A', 'B', 'C'];
+    const listePriorite = { premierTour: ordre, deuxiemeTour: [...ordre].reverse() };
+    const desiderata = desiderataUniforme(ids, '2026-06-01', '2026-06-20', 'Oui', { souhaitees: 100, max: 7 });
+    const planning = computePriorite('2026-06-01', '2026-06-20', desiderata, noms, listePriorite);
+    for (const date in planning) {
+      ids.forEach((id) => {
+        const nb = Object.values(planning[date]).filter((s) => s.includes(id)).length;
+        expect(nb).toBeLessThanOrEqual(2);
+      });
+    }
+  });
+
+  // B2 : le quota mensuel EXPLICITE d'un médecin n'est JAMAIS dépassé, même par la
+  // passe largeur, même s'il est le seul disponible (le créneau reste vide sinon).
+  it('B2 — aucune passe ne dépasse le quota donné par le médecin', () => {
+    const noms = { A: 'a', B: 'b' };
+    const listePriorite = { premierTour: ['A', 'B'], deuxiemeTour: ['B', 'A'] };
+    const desiderata = {
+      ...desiderataUniforme(['a'], '2026-06-01', '2026-06-20', 'Oui', { souhaitees: 1, max: 7 }),
+      ...desiderataUniforme(['b'], '2026-06-01', '2026-06-20', 'Non', { souhaitees: 1, max: 7 }),
+    };
+    const planning = computePriorite('2026-06-01', '2026-06-20', desiderata, noms, listePriorite);
+    const totalA = Object.values(planning).reduce((n, jour) =>
+      n + Object.values(jour).filter((s) => s.includes('a')).length, 0);
+    expect(totalA).toBe(1); // exactement son souhait, jamais plus
+  });
+
+  // B2bis : un médecin SANS souhait explicite (0) n'est PAS bloqué — il comble les
+  // vacances (le quota par défaut ne s'applique qu'à la passe principale).
+  it('B2bis — un médecin sans souhait explicite peut dépasser le quota par défaut', () => {
+    const noms = { A: 'a', B: 'b' };
+    const listePriorite = { premierTour: ['A', 'B'], deuxiemeTour: ['B', 'A'] };
+    const desiderata = {
+      ...desiderataUniforme(['a'], '2026-06-01', '2026-06-20', 'Oui', { souhaitees: 0, max: 7 }),
+      ...desiderataUniforme(['b'], '2026-06-01', '2026-06-20', 'Non', { souhaitees: 0, max: 7 }),
+    };
+    const planning = computePriorite('2026-06-01', '2026-06-20', desiderata, noms, listePriorite);
+    const totalA = Object.values(planning).reduce((n, jour) =>
+      n + Object.values(jour).filter((s) => s.includes('a')).length, 0);
+    expect(totalA).toBeGreaterThan(8); // dépasse le DEFAUT_GARDES_MENSUEL (comble les vacances)
+  });
+});
