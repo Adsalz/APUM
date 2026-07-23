@@ -1,15 +1,22 @@
 // src/components/GestionPeriodeSaisie.js
 import React, { useState, useEffect } from 'react';
 import { setPeriodeSaisie, getPeriodeSaisie } from '../services/planningService';
-import { Save } from 'lucide-react';
+import { Save, Mail } from 'lucide-react';
 import { AppHeader, LoadingScreen, Button, Card, Alert, useToast } from './ui';
+import CampagneMailModal from './CampagneMailModal';
 import logger from '../utils/logger';
 
 function GestionPeriodeSaisie() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  // Période réellement PERSISTÉE (dernières dates enregistrées). Sert de source
+  // à la campagne : le modèle envoyé doit correspondre à la période en vigueur
+  // pour les médecins, pas à des dates saisies mais non enregistrées.
+  const [savedStartDate, setSavedStartDate] = useState('');
+  const [savedEndDate, setSavedEndDate] = useState('');
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [showCampagne, setShowCampagne] = useState(false);
   const toast = useToast();
 
   // Auth/rôle garantis par ProtectedRoute : on charge uniquement la période
@@ -18,8 +25,12 @@ function GestionPeriodeSaisie() {
       try {
         const periode = await getPeriodeSaisie();
         if (periode) {
-          setStartDate(periode.startDate.split('T')[0]);
-          setEndDate(periode.endDate.split('T')[0]);
+          const s = periode.startDate.split('T')[0];
+          const e = periode.endDate.split('T')[0];
+          setStartDate(s);
+          setEndDate(e);
+          setSavedStartDate(s);
+          setSavedEndDate(e);
         }
       } catch (error) {
         logger.error('Erreur lors du chargement de la période de saisie:', error);
@@ -39,6 +50,8 @@ function GestionPeriodeSaisie() {
     setIsSaving(true);
     try {
       await setPeriodeSaisie(startDate, endDate);
+      setSavedStartDate(startDate);
+      setSavedEndDate(endDate);
       toast.success('Période de saisie mise à jour avec succès ! Les desiderata obsolètes ont été supprimés.');
     } catch (error) {
       logger.error('Erreur lors de la mise à jour de la période de saisie:', error);
@@ -46,6 +59,25 @@ function GestionPeriodeSaisie() {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  // Ouvre la campagne uniquement pour une période valide ET enregistrée : ainsi
+  // le modèle Excel joint et les mois annoncés collent à la période en vigueur.
+  const dirty = startDate !== savedStartDate || endDate !== savedEndDate;
+  const openCampagne = () => {
+    if (!startDate || !endDate) {
+      toast.error('Définissez la période (début et fin) avant de lancer la campagne.');
+      return;
+    }
+    if (startDate > endDate) {
+      toast.error('La date de début doit être antérieure à la date de fin.');
+      return;
+    }
+    if (dirty) {
+      toast.error('Enregistrez d\'abord la période : la campagne joint le modèle de cette période.');
+      return;
+    }
+    setShowCampagne(true);
   };
 
   if (loading) {
@@ -58,15 +90,25 @@ function GestionPeriodeSaisie() {
       <AppHeader
         backTo="/dashboard-admin"
         actions={
-          <Button
-            variant="primary"
-            size="sm"
-            icon={<Save size={16} />}
-            loading={isSaving}
-            onClick={handleSubmit}
-          >
-            Enregistrer
-          </Button>
+          <>
+            <Button
+              variant="secondary"
+              size="sm"
+              icon={<Mail size={16} />}
+              onClick={openCampagne}
+            >
+              Campagne mail
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              icon={<Save size={16} />}
+              loading={isSaving}
+              onClick={handleSubmit}
+            >
+              Enregistrer
+            </Button>
+          </>
         }
       />
 
@@ -128,8 +170,33 @@ function GestionPeriodeSaisie() {
               desiderata obsolètes.
             </Alert>
           </form>
+
+          <div className="mt-6 flex flex-col gap-3 border-t border-ink-100 pt-5 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-ink-500">
+              Prévenez les médecins : envoyez la campagne mail avec le modèle de desiderata
+              (Excel) de cette période en pièce jointe.
+              {dirty && (
+                <span className="mt-1 block font-semibold text-warning-700">
+                  Enregistrez la période avant de lancer la campagne.
+                </span>
+              )}
+            </p>
+            <Button
+              variant="secondary"
+              icon={<Mail size={16} />}
+              onClick={openCampagne}
+            >
+              Lancer la campagne mail
+            </Button>
+          </div>
         </Card>
       </main>
+
+      <CampagneMailModal
+        isOpen={showCampagne}
+        onClose={() => setShowCampagne(false)}
+        periode={{ startDate: savedStartDate, endDate: savedEndDate }}
+      />
     </div>
   );
 }
