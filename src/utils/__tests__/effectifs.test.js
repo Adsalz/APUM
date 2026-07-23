@@ -1,6 +1,6 @@
 // Tests des effectifs par type de jour (déduits de la feuille de garde APUM).
 // planningCore est PUR (pas de Firebase) : importable directement, sans mock.
-import { typeDeJour, effectifPour, computeClassique } from '../planningCore';
+import { typeDeJour, effectifPour, computePriorite } from '../planningCore';
 
 // Rendre getDay() déterministe quel que soit le fuseau de la machine.
 process.env.TZ = 'UTC';
@@ -53,10 +53,10 @@ describe('effectifPour', () => {
   });
 });
 
-describe('génération classique — tailles des créneaux selon le type de jour', () => {
+describe('génération — tailles des créneaux selon le type de jour', () => {
   // Sans médecins ni desiderata : la structure (tailles de tableaux) reste
   // déterministe, seul le remplissage varie.
-  const planning = computeClassique('2026-07-01', '2026-07-14', {}, []);
+  const planning = computePriorite('2026-07-01', '2026-07-14', {}, {}, { premierTour: [], deuxiemeTour: [] });
 
   it('semaine (mer 01/07) : effectif de base, pas de renfort 10h/13h', () => {
     const jour = planning['2026-07-01'];

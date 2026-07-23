@@ -1,16 +1,5 @@
-// Tests unitaires pour les helpers PURS de src/utils/planningGenerator.js.
-//
-// Le module importe des services (planningService / userService) qui, en
-// cascade, importent src/firebase.js — lequel LÈVE une exception à
-// l'import si la config Firebase est absente. On neutralise donc ces
-// services par des mocks factory : leur vrai code (et donc Firebase)
-// n'est jamais chargé. Voir la note « ATTENTION » de la consigne.
-jest.mock('../../services/planningService', () => ({
-  getDesiderataForPeriod: jest.fn()
-}));
-jest.mock('../../services/userService', () => ({
-  getAllUsers: jest.fn()
-}));
+// Tests unitaires pour les helpers PURS de src/utils/planningCore.js.
+// planningCore est PUR (aucun accès Firebase) : importable directement, sans mock.
 
 import {
   getWeekNumber,
@@ -18,7 +7,7 @@ import {
   compterGardesParSemaine,
   verifierContraintes,
   evaluerPlanning
-} from '../planningGenerator';
+} from '../planningCore';
 
 // Rendre les calculs de dates déterministes quel que soit le fuseau de la machine.
 process.env.TZ = 'UTC';

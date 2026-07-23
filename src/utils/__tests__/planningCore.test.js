@@ -3,7 +3,6 @@
 import {
   verifierContraintes,
   evaluerPlanning,
-  computeClassique,
   computePriorite,
 } from '../planningCore';
 
@@ -104,18 +103,6 @@ describe('planningCore — evaluerPlanning (quota évalué PAR MOIS)', () => {
     };
     // |3 - 1| * 2 = 4 de pénalité (mois de juin uniquement).
     expect(evaluerPlanning(planning, desiderata)).toBe(-4);
-  });
-});
-
-describe('planningCore — computeClassique (dispo = contrainte dure, y compris en tabou)', () => {
-  it('ne place JAMAIS un médecin ayant répondu « Non » partout', () => {
-    const ids = ['dOui', 'dNon'];
-    const desiderata = {
-      ...desiderataUniforme(['dOui'], '2025-06-01', '2025-06-03', 'Oui'),
-      ...desiderataUniforme(['dNon'], '2025-06-01', '2025-06-03', 'Non'),
-    };
-    const planning = computeClassique('2025-06-01', '2025-06-03', desiderata, ids);
-    expect(tousLesMedecinsAffectes(planning).has('dNon')).toBe(false);
   });
 });
 

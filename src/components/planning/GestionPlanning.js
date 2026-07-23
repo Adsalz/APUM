@@ -11,7 +11,7 @@ import {
   getPublishedPlanning,
   getPeriodeSaisie
 } from '../../services/planningService';
-import { genererPlanning, creneaux, effectifPour } from '../../utils/planningGenerator';
+import { creneaux, effectifPour } from '../../utils/planningCore';
 import { genererPlanningPriorite } from '../../utils/planningGeneratorPriorite';
 import { LoadingScreen, Alert } from '../ui';
 import logger from '../../utils/logger';
@@ -128,29 +128,22 @@ function GestionPlanning() {
   };
 
   // Handlers pour les actions principales
-  const handleGeneratePlanning = async (modeGeneration = 'classique', listePriorite = null) => {
+  const handleGeneratePlanning = async (listePriorite = null) => {
     setLoading(true);
     try {
       if (!periodeSaisie) {
         throw new Error('Période de saisie non définie');
       }
-
-      let newPlanningData;
-
-      if (modeGeneration === 'priorite' && listePriorite) {
-        newPlanningData = await genererPlanningPriorite(
-          periodeSaisie.startDate,
-          periodeSaisie.endDate,
-          listePriorite
-        );
-        logger.info('Planning généré en mode priorité', { listePriorite });
-      } else {
-        newPlanningData = await genererPlanning(
-          periodeSaisie.startDate,
-          periodeSaisie.endDate
-        );
-        logger.info('Planning généré en mode classique');
+      if (!listePriorite) {
+        throw new Error("Liste d'ordre de choix manquante");
       }
+
+      const newPlanningData = await genererPlanningPriorite(
+        periodeSaisie.startDate,
+        periodeSaisie.endDate,
+        listePriorite
+      );
+      logger.info('Planning généré par ordre de priorité', { listePriorite });
 
       if (planning && planning.id) {
         const updatedPlanning = {
@@ -171,8 +164,7 @@ function GestionPlanning() {
         });
       }
 
-      const modeMessage = modeGeneration === 'priorite' ? 'par ordre de priorité' : 'en mode classique';
-      showNotification(`Planning généré avec succès ${modeMessage}`);
+      showNotification('Planning généré avec succès par ordre de priorité');
       setModified(false);
       setShowGenerateConfirm(false);
     } catch (error) {

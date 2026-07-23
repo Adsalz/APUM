@@ -1,6 +1,6 @@
 // src/components/planning/modals/GeneratePlanningModal.js
 import React, { useState } from 'react';
-import { ArrowLeft, Calculator, ListOrdered, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, CheckCircle2 } from 'lucide-react';
 import GenerateurTrimestre from '../../GenerateurTrimestre';
 import { Modal, Button, Alert } from '../../ui';
 
@@ -11,23 +11,17 @@ const GeneratePlanningModal = ({
   planning,
   medecins = []
 }) => {
-  const [modeGeneration, setModeGeneration] = useState('classique');
   const [listePriorite, setListePriorite] = useState(null);
   const [showGenerator, setShowGenerator] = useState(false);
 
   const handleConfirm = () => {
-    onConfirm(modeGeneration, listePriorite);
+    onConfirm(listePriorite);
   };
 
   const handleListeGenere = (nouvelleListe) => {
     setListePriorite(nouvelleListe);
     setShowGenerator(false);
   };
-
-  const modeOptionClass = (active) =>
-    `flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition-colors ${
-      active ? 'border-primary-300 bg-primary-50' : 'border-ink-200 hover:bg-ink-50'
-    }`;
 
   return (
     <Modal
@@ -43,7 +37,7 @@ const GeneratePlanningModal = ({
           <Button
             variant="primary"
             onClick={handleConfirm}
-            disabled={modeGeneration === 'priorite' && !listePriorite}
+            disabled={!listePriorite}
           >
             Générer le planning
           </Button>
@@ -77,58 +71,18 @@ const GeneratePlanningModal = ({
 
           <div>
             <label className="mb-2 block text-sm font-semibold text-ink-700">
-              Mode de génération
+              Attribution par ordre de choix
             </label>
+            <p className="mb-3 text-sm text-ink-500">
+              Le planning est généré en attribuant les gardes séquentiellement selon la liste
+              d&apos;ordre de choix trimestrielle (deux tours).
+            </p>
 
-            <div className="space-y-2">
-              <label className={modeOptionClass(modeGeneration === 'classique')}>
-                <input
-                  type="radio"
-                  name="modeGeneration"
-                  value="classique"
-                  checked={modeGeneration === 'classique'}
-                  onChange={(e) => setModeGeneration(e.target.value)}
-                  className="mt-1 accent-primary-600"
-                />
-                <span className="flex items-start gap-2">
-                  <Calculator size={18} aria-hidden="true" className="mt-0.5 text-ink-400" />
-                  <span>
-                    <span className="block font-semibold text-ink-800">Mode classique</span>
-                    <span className="block text-sm text-ink-500">
-                      Algorithme de score avec optimisation automatique
-                    </span>
-                  </span>
-                </span>
-              </label>
-
-              <label className={modeOptionClass(modeGeneration === 'priorite')}>
-                <input
-                  type="radio"
-                  name="modeGeneration"
-                  value="priorite"
-                  checked={modeGeneration === 'priorite'}
-                  onChange={(e) => setModeGeneration(e.target.value)}
-                  className="mt-1 accent-primary-600"
-                />
-                <span className="flex items-start gap-2">
-                  <ListOrdered size={18} aria-hidden="true" className="mt-0.5 text-ink-400" />
-                  <span>
-                    <span className="block font-semibold text-ink-800">Mode ordre de priorité</span>
-                    <span className="block text-sm text-ink-500">
-                      Attribution séquentielle selon la liste trimestrielle
-                    </span>
-                  </span>
-                </span>
-              </label>
-            </div>
-          </div>
-
-          {modeGeneration === 'priorite' && (
             <div className="rounded-xl bg-ink-50 p-4">
               {!listePriorite ? (
                 <div className="text-center">
                   <p className="mb-3 text-sm text-ink-500">
-                    Vous devez d&apos;abord générer ou fournir une liste de priorité
+                    Vous devez d&apos;abord générer ou fournir une liste d&apos;ordre de choix.
                   </p>
                   <Button variant="primary" size="sm" onClick={() => setShowGenerator(true)}>
                     Générer la liste trimestrielle
@@ -139,7 +93,7 @@ const GeneratePlanningModal = ({
                   <div className="mb-1 flex items-center justify-between gap-2">
                     <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-success-700">
                       <CheckCircle2 size={16} aria-hidden="true" />
-                      Liste de priorité configurée
+                      Liste d&apos;ordre de choix configurée
                     </span>
                     <Button variant="ghost" size="sm" onClick={() => setShowGenerator(true)}>
                       Modifier
@@ -152,7 +106,7 @@ const GeneratePlanningModal = ({
                 </div>
               )}
             </div>
-          )}
+          </div>
         </div>
       )}
     </Modal>

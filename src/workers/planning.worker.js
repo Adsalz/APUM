@@ -2,16 +2,13 @@
 // Web Worker : exécute le calcul (lourd) de génération de planning hors du
 // thread principal pour ne pas geler l'interface. Ne reçoit que des données
 // pures (aucun accès Firebase ici).
-import { computeClassique, computePriorite } from '../utils/planningCore';
+import { computePriorite } from '../utils/planningCore';
 
 // eslint-disable-next-line no-restricted-globals
 self.onmessage = (e) => {
-  const { mode, debut, fin, desiderata, medecins, mapMedecinNomVersId, listePriorite } = e.data || {};
+  const { debut, fin, desiderata, mapMedecinNomVersId, listePriorite } = e.data || {};
   try {
-    const planning =
-      mode === 'priorite'
-        ? computePriorite(debut, fin, desiderata, mapMedecinNomVersId, listePriorite)
-        : computeClassique(debut, fin, desiderata, medecins);
+    const planning = computePriorite(debut, fin, desiderata, mapMedecinNomVersId, listePriorite);
     // eslint-disable-next-line no-restricted-globals
     self.postMessage({ ok: true, planning });
   } catch (err) {

@@ -4,11 +4,9 @@
 // Workers ne sont pas disponibles ou si le worker échoue à démarrer.
 
 async function computeSync(payload) {
-  const { computeClassique, computePriorite } = await import('./planningCore');
-  const { mode, debut, fin, desiderata, medecins, mapMedecinNomVersId, listePriorite } = payload;
-  return mode === 'priorite'
-    ? computePriorite(debut, fin, desiderata, mapMedecinNomVersId, listePriorite)
-    : computeClassique(debut, fin, desiderata, medecins);
+  const { computePriorite } = await import('./planningCore');
+  const { debut, fin, desiderata, mapMedecinNomVersId, listePriorite } = payload;
+  return computePriorite(debut, fin, desiderata, mapMedecinNomVersId, listePriorite);
 }
 
 export default function runPlanningWorker(payload) {
