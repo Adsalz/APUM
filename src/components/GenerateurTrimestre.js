@@ -1,232 +1,219 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   RefreshCw,
   Users,
-  Search,
-  Trophy,
-  Medal,
-  BarChart3,
+  Info,
   CheckCircle2,
-  Layers,
+  ChevronUp,
+  ChevronDown,
+  ArrowDownToLine,
+  Sparkles,
+  UserMinus,
 } from 'lucide-react';
-import { Button, StatCard } from './ui';
+import { Button, Alert } from './ui';
+import { genererProchainOrdreChoix, N_BASCULE } from '../utils/ordreChoix';
+import { getOrdreChoix, saveOrdreChoix } from '../services/ordreChoixService';
+import logger from '../utils/logger';
 
 const GenerateurTrimestre = ({ onListeGenere, medecins = [] }) => {
-  const [resultat, setResultat] = useState(null);
-  const [listeActuelleTriee, setListeActuelleTriee] = useState([]);
+  const [liste, setListe] = useState([]);           // 1er tour proposé (éditable)
+  const [nouveaux, setNouveaux] = useState([]);
+  const [partis, setPartis] = useState([]);
+  const [precedentExiste, setPrecedentExiste] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [erreur, setErreur] = useState(null);
 
-  // Générer automatiquement la liste depuis TOUS les médecins de la base
-  React.useEffect(() => {
-    if (medecins.length > 0) {
-      // Trier par nom pour un ordre reproductible
-      const medecinsTries = [...medecins].sort((a, b) =>
-        `${a.nom} ${a.prenom}`.localeCompare(`${b.nom} ${b.prenom}`)
-      );
-      setListeActuelleTriee(medecinsTries);
+  const construireProposition = useCallback(async () => {
+    setLoading(true);
+    setErreur(null);
+    try {
+      const precedent = await getOrdreChoix();
+      const noms = medecins.map((m) => `${m.nom} ${m.prenom}`.trim());
+      const res = genererProchainOrdreChoix(precedent?.premierTour, noms);
+      setListe(res.premierTour);
+      setNouveaux(res.nouveaux);
+      setPartis(res.partis);
+      setPrecedentExiste(Boolean(precedent?.premierTour?.length));
+    } catch (e) {
+      logger.error('Génération de l’ordre de choix impossible:', e);
+      setErreur('Impossible de charger l’ordre de choix précédent.');
+    } finally {
+      setLoading(false);
     }
   }, [medecins]);
 
-  const genererProchainTrimestre = () => {
-    if (listeActuelleTriee.length === 0) {
-      return;
+  useEffect(() => {
+    if (medecins.length > 0) {
+      construireProposition();
+    } else {
+      setLoading(false);
     }
+  }, [medecins, construireProposition]);
 
-    // Utiliser TOUS les médecins de la base (pas de saisie manuelle)
-    const nomsMedecins = listeActuelleTriee.map(m => `${m.nom} ${m.prenom}`);
-    const total = nomsMedecins.length;
-    const tailleTiers = Math.ceil(total / 3);
+  const deplacer = (index, delta) => {
+    setListe((prev) => {
+      const cible = index + delta;
+      if (cible < 0 || cible >= prev.length) { return prev; }
+      const copie = [...prev];
+      [copie[index], copie[cible]] = [copie[cible], copie[index]];
+      return copie;
+    });
+  };
 
-    // Division en 3 tiers
-    const tiers1 = nomsMedecins.slice(0, tailleTiers);
-    const tiers2 = nomsMedecins.slice(tailleTiers, tailleTiers * 2);
-    const tiers3 = nomsMedecins.slice(tailleTiers * 2);
+  const envoyerEnBas = (index) => {
+    setListe((prev) => {
+      const copie = [...prev];
+      const [item] = copie.splice(index, 1);
+      copie.push(item);
+      return copie;
+    });
+  };
 
-    // Rotation : tiers3 -> tiers1 -> tiers2 -> tiers3
-    const nouvelleListe = [...tiers3, ...tiers1, ...tiers2];
-
-    // Génération des deux tours
-    const deuxiemeTour = [...nouvelleListe].reverse();
-
-    const resultatGenere = {
-      premierTour: nouvelleListe,
-      deuxiemeTour: deuxiemeTour,
-      stats: {
-        totalMedecins: total,
-        tailleTiers: tailleTiers
-      },
-      medecinsInclus: listeActuelleTriee
-    };
-
-    setResultat(resultatGenere);
-
-    // Notifier le parent
-    if (onListeGenere) {
-      onListeGenere(resultatGenere);
+  const valider = async () => {
+    setSaving(true);
+    setErreur(null);
+    try {
+      const premierTour = liste;
+      const deuxiemeTour = [...liste].reverse();
+      await saveOrdreChoix({ premierTour, deuxiemeTour });
+      if (onListeGenere) {
+        onListeGenere({
+          premierTour,
+          deuxiemeTour,
+          stats: { totalMedecins: premierTour.length },
+          medecinsInclus: medecins,
+        });
+      }
+    } catch (e) {
+      logger.error('Sauvegarde de l’ordre de choix impossible:', e);
+      setErreur('La sauvegarde de l’ordre de choix a échoué.');
+    } finally {
+      setSaving(false);
     }
   };
 
-  const formatListe = (liste) => {
-    return liste.map((nom, index) => (
-      <div
-        key={index}
-        className={`flex justify-between px-2 py-1 ${
-          index % 2 === 0 ? 'bg-ink-50' : 'bg-white'
-        }`}
-      >
-        <span className="w-8 font-mono text-sm text-ink-500">{index + 1}.</span>
-        <span className="ml-2 flex-1 text-ink-800">{nom}</span>
-      </div>
-    ));
-  };
+  const estNouveau = (nom) => nouveaux.includes(nom);
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
-      <h2 className="flex items-center justify-center gap-2 text-center text-2xl font-bold text-ink-900">
-        <RefreshCw size={22} aria-hidden="true" />
-        Générateur de Liste Trimestrielle
+    <div className="mx-auto max-w-3xl space-y-5">
+      <h2 className="flex items-center justify-center gap-2 text-center text-xl font-bold text-ink-900">
+        <RefreshCw size={20} aria-hidden="true" />
+        Ordre de choix — proposition
       </h2>
 
-      {/* Liste automatique des médecins */}
-      <div className="rounded-2xl bg-ink-50 p-6">
-        <h3 className="mb-4 flex items-center gap-2 text-lg font-bold text-ink-900">
-          <Users size={20} aria-hidden="true" />
-          Médecins détectés dans la base
-        </h3>
-
-        {listeActuelleTriee.length > 0 ? (
-          <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {listeActuelleTriee.map((medecin, index) => (
-              <div
-                key={medecin.id}
-                className="rounded-lg bg-white p-2 text-sm"
-              >
-                <span className="font-medium text-ink-800">
-                  {index + 1}. {medecin.nom} {medecin.prenom}
-                </span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="mb-4 italic text-ink-500">
-            Aucun médecin trouvé dans la base de données
-          </p>
-        )}
-
-        <Button
-          variant="primary"
-          onClick={genererProchainTrimestre}
-          disabled={listeActuelleTriee.length === 0}
-          icon={<RefreshCw size={18} aria-hidden="true" />}
-          className="w-full"
-        >
-          Générer la liste trimestrielle ({listeActuelleTriee.length} médecins)
-        </Button>
-      </div>
-
-      {/* Explication */}
-      <div className="rounded-2xl bg-primary-50 p-4">
-        <h3 className="mb-3 flex items-center gap-2 font-bold text-primary-800">
-          <Search size={18} aria-hidden="true" />
-          Fonctionnement
-        </h3>
-        <div className="flex flex-col gap-2 text-sm text-primary-800">
-          <p><strong>1. Rotation par tiers :</strong> La liste est divisée en 3 parties égales</p>
-          <p><strong>2. Avancement :</strong> Chaque tiers avance d&apos;une position</p>
-          <p><strong>3. Nouveaux :</strong> Ajoutés automatiquement en fin de liste</p>
-          <p><strong>4. Équité :</strong> Tout le monde passe en tête tous les 3 trimestres</p>
+      <Alert kind="info">
+        <div className="flex items-start gap-2">
+          <Info size={16} aria-hidden="true" className="mt-0.5 shrink-0" />
+          <span className="text-sm">
+            {precedentExiste ? (
+              <>Basé sur l’ordre de choix précédent : les <strong>{N_BASCULE} premiers</strong> basculent
+              en bas, les nouveaux sont insérés avant ce bloc, les partis retirés. Le 2ᵉ tour sera l’inverse.
+              <strong> Ajuste au besoin</strong> avant de valider.</>
+            ) : (
+              <>Aucun ordre de choix précédent enregistré : proposition en ordre alphabétique.
+              Réordonne-la puis valide — elle servira de base aux prochaines périodes.</>
+            )}
+          </span>
         </div>
+      </Alert>
 
-        <div className="mt-4 rounded-lg border-l-4 border-primary-500 bg-white p-3">
-          <p className="font-mono text-xs text-ink-500">
-            Tiers 3 → Tiers 1<br />
-            Tiers 1 → Tiers 2<br />
-            Tiers 2 → Tiers 3
-          </p>
-        </div>
-      </div>
-
-      {/* Résultats */}
-      {resultat && (
-        <div className="grid gap-6 lg:grid-cols-2">
-          {/* Premier tour */}
-          <div className="rounded-2xl bg-success-50 p-4">
-            <h3 className="mb-3 flex flex-wrap items-center gap-2 font-bold text-success-700">
-              <Trophy size={18} aria-hidden="true" />
-              Premier Tour
-              <span className="text-sm font-normal text-success-600">
-                ({resultat.premierTour.length} personnes)
-              </span>
-            </h3>
-            <div className="max-h-96 overflow-y-auto rounded-lg border border-ink-200 bg-white">
-              {formatListe(resultat.premierTour)}
-            </div>
-
-            <div className="mt-3 flex items-center gap-2 rounded-lg bg-primary-50 p-2 text-sm font-semibold text-primary-700">
-              <CheckCircle2 size={16} aria-hidden="true" />
-              Tous les médecins inclus automatiquement
-            </div>
-          </div>
-
-          {/* Deuxième tour */}
-          <div className="rounded-2xl bg-orange-50 p-4">
-            <h3 className="mb-3 flex flex-wrap items-center gap-2 font-bold text-orange-700">
-              <Medal size={18} aria-hidden="true" />
-              Deuxième Tour
-              <span className="text-sm font-normal text-orange-600">
-                (ordre inversé)
-              </span>
-            </h3>
-            <div className="max-h-96 overflow-y-auto rounded-lg border border-ink-200 bg-white">
-              {formatListe(resultat.deuxiemeTour)}
-            </div>
-          </div>
-
-          {/* Statistiques */}
-          <div className="rounded-2xl bg-ink-50 p-4 lg:col-span-2">
-            <h3 className="mb-4 flex items-center gap-2 font-bold text-ink-900">
-              <BarChart3 size={18} aria-hidden="true" />
-              Statistiques
-            </h3>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <StatCard
-                tone="blue"
-                icon={<Users size={22} aria-hidden="true" />}
-                label="Total médecins"
-              >
-                <p className="text-3xl font-extrabold text-ink-900">
-                  {resultat.stats.totalMedecins}
-                </p>
-              </StatCard>
-
-              <StatCard
-                tone="green"
-                icon={<CheckCircle2 size={22} aria-hidden="true" />}
-                label="Médecins inclus"
-              >
-                <p className="text-3xl font-extrabold text-ink-900">100%</p>
-              </StatCard>
-
-              <StatCard
-                tone="purple"
-                icon={<Layers size={22} aria-hidden="true" />}
-                label="Médecins par tiers"
-              >
-                <p className="text-3xl font-extrabold text-ink-900">
-                  {resultat.stats.tailleTiers}
-                </p>
-              </StatCard>
-
-              <StatCard
-                tone="orange"
-                icon={<RefreshCw size={22} aria-hidden="true" />}
-                label="Auto-généré"
-              >
-                <p className="text-3xl font-extrabold text-ink-900">Oui</p>
-              </StatCard>
-            </div>
-          </div>
+      {(nouveaux.length > 0 || partis.length > 0) && (
+        <div className="flex flex-wrap gap-3 text-sm">
+          {nouveaux.length > 0 && (
+            <span className="inline-flex items-center gap-1 rounded-lg bg-success-50 px-2 py-1 text-success-700">
+              <Sparkles size={14} aria-hidden="true" /> {nouveaux.length} nouveau(x) : {nouveaux.join(', ')}
+            </span>
+          )}
+          {partis.length > 0 && (
+            <span className="inline-flex items-center gap-1 rounded-lg bg-ink-100 px-2 py-1 text-ink-600">
+              <UserMinus size={14} aria-hidden="true" /> {partis.length} retiré(s) : {partis.join(', ')}
+            </span>
+          )}
         </div>
       )}
+
+      {erreur && <Alert kind="danger">{erreur}</Alert>}
+
+      {loading ? (
+        <p className="py-8 text-center italic text-ink-500">Chargement…</p>
+      ) : liste.length === 0 ? (
+        <p className="py-8 text-center italic text-ink-500">Aucun médecin dans la base.</p>
+      ) : (
+        <div className="rounded-2xl border border-ink-200 bg-white">
+          <div className="flex items-center justify-between border-b border-ink-100 px-3 py-2 text-sm font-semibold text-ink-700">
+            <span className="flex items-center gap-1.5"><Users size={16} aria-hidden="true" /> 1er tour ({liste.length})</span>
+            <span className="text-xs font-normal text-ink-400">2ᵉ tour = inverse</span>
+          </div>
+          <ol className="max-h-96 overflow-y-auto">
+            {liste.map((nom, i) => (
+              <li
+                key={nom}
+                className={`flex items-center gap-2 px-3 py-1.5 ${i % 2 === 0 ? 'bg-ink-50' : 'bg-white'}`}
+              >
+                <span className="w-7 shrink-0 font-mono text-xs text-ink-400">{i + 1}.</span>
+                <span className="flex-1 text-sm text-ink-800">
+                  {nom}
+                  {estNouveau(nom) && (
+                    <span className="ml-2 inline-flex items-center gap-1 rounded bg-success-100 px-1.5 py-0.5 text-xs text-success-700">
+                      <Sparkles size={11} aria-hidden="true" /> nouveau
+                    </span>
+                  )}
+                </span>
+                <div className="flex shrink-0 items-center gap-0.5">
+                  <button
+                    type="button"
+                    onClick={() => deplacer(i, -1)}
+                    disabled={i === 0}
+                    aria-label={`Monter ${nom}`}
+                    className="rounded p-1 text-ink-400 hover:bg-ink-100 hover:text-ink-700 disabled:opacity-30"
+                  >
+                    <ChevronUp size={16} aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => deplacer(i, 1)}
+                    disabled={i === liste.length - 1}
+                    aria-label={`Descendre ${nom}`}
+                    className="rounded p-1 text-ink-400 hover:bg-ink-100 hover:text-ink-700 disabled:opacity-30"
+                  >
+                    <ChevronDown size={16} aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => envoyerEnBas(i)}
+                    disabled={i === liste.length - 1}
+                    aria-label={`Envoyer ${nom} en bas`}
+                    title="Envoyer en bas de liste"
+                    className="rounded p-1 text-ink-400 hover:bg-ink-100 hover:text-ink-700 disabled:opacity-30"
+                  >
+                    <ArrowDownToLine size={16} aria-hidden="true" />
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <Button
+          variant="secondary"
+          onClick={construireProposition}
+          disabled={loading || saving}
+          icon={<RefreshCw size={16} aria-hidden="true" />}
+        >
+          Réinitialiser la proposition
+        </Button>
+        <Button
+          variant="primary"
+          onClick={valider}
+          disabled={loading || saving || liste.length === 0}
+          icon={<CheckCircle2 size={16} aria-hidden="true" />}
+        >
+          {saving ? 'Enregistrement…' : 'Valider cet ordre de choix'}
+        </Button>
+      </div>
     </div>
   );
 };
