@@ -5,6 +5,41 @@ import { estJourFerie } from '../utils/joursFeries';
 // alourdir le bundle initial : il n'est utile qu'au moment d'un export.
 const loadExcelJS = async () => (await import('exceljs')).default;
 
+// Type MIME d'un classeur .xlsx (téléchargement navigateur + pièce jointe mail).
+const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+/**
+ * Déclenche le téléchargement navigateur d'un buffer Excel.
+ * Isolé du calcul du buffer pour que la génération reste réutilisable côté
+ * mail (pièce jointe) sans effet de bord DOM.
+ */
+const triggerBrowserDownload = (buffer, fileName) => {
+  const blob = new Blob([buffer], { type: XLSX_MIME });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  window.URL.revokeObjectURL(url);
+};
+
+/**
+ * Convertit un buffer binaire (ArrayBuffer/Uint8Array/Buffer) en chaîne base64,
+ * côté navigateur (sans Buffer Node). Découpé en tranches pour éviter le
+ * dépassement de pile de String.fromCharCode sur les gros tableaux.
+ */
+export const arrayBufferToBase64 = (buffer) => {
+  const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+  let binary = '';
+  const CHUNK = 0x8000; // 32 Ko
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(binary);
+};
+
 /**
  * Service pour l'export des desiderata au format Excel
  * Reproduit exactement le format du modèle APUM
@@ -41,22 +76,9 @@ export const exportDesiderataToExcel = async (medecins, desiderataList, periode)
       await createMedecinWorksheet(worksheet, medecin, medecinDesiderata, datesList);
     }
 
-    // Générer le buffer Excel
+    // Générer le buffer Excel et déclencher le téléchargement
     const buffer = await workbook.xlsx.writeBuffer();
-
-    // Créer un blob et déclencher le téléchargement
-    const blob = new Blob([buffer], {
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    });
-
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
+    triggerBrowserDownload(buffer, fileName);
 
     return {
       success: true,
@@ -84,6 +106,11 @@ const DESID_ORANGE = 'FFED7D31';   // en-tête RENFORT SAMEDI + 3ème QUART
 const DESID_RED = 'FFFF0000';      // dates, questions
 const DESID_GREEN = 'FF00B050';    // légende « Oui »
 const DESID_AMBER = 'FFFFC000';    // légende « Possible »
+// Fills des cases de saisie, calqués sur la mise en forme du fichier de référence
+// (couleurs de thème + teintes converties en ARGB exacts, cf. thème Office 2013).
+const DESID_GREY = 'FFD9D9D9';        // cases de week-end (samedi + dimanche)
+const DESID_RENFORT_SAT = 'FFC55A11'; // colonne RENFORT SAMEDI le samedi (orange foncé)
+const DESID_BLACK = 'FF000000';       // colonne RENFORT SAMEDI hors samedi (neutralisée)
 
 // Colonnes B→G du tableau (ordre exact du modèle) : créneau + libellé d'en-tête.
 // Les créneaux « RENFORT SAMEDI » (D) et « 3ème QUART » (E) ont un en-tête orange.
@@ -103,14 +130,6 @@ const DESID_COLONNES = [
   { col: 7, creneauId: 'RENFORT_2', header: 'RENFORT 20H / 00H' },
 ];
 
-// Couleur de police d'une préférence (cohérente avec la légende du modèle).
-const desidPrefColor = (pref) => {
-  if (pref === 'Oui') { return DESID_GREEN; }
-  if (pref === 'Possible') { return DESID_AMBER; }
-  if (pref === 'Non') { return DESID_RED; }
-  return null;
-};
-
 const createMedecinWorksheet = async (worksheet, medecin, desiderata, datesList) => {
   const THIN = {
     top: { style: 'thin' }, left: { style: 'thin' },
@@ -126,10 +145,12 @@ const createMedecinWorksheet = async (worksheet, medecin, desiderata, datesList)
     { width: 11.42578125 }, { width: 11.42578125 }, { width: 11.42578125 }, { width: 11.42578125 },
   ];
 
-  // LIGNE 1 — NOM et Prénom
+  // LIGNE 1 — NOM et Prénom.
+  // medecin peut être vide (modèle vierge envoyé en campagne) : on tolère
+  // l'absence de prénom/nom → « NOM et Prénom : » comme dans le fichier de référence.
   worksheet.getRow(1).height = 36;
   const nomCell = worksheet.getCell('A1');
-  nomCell.value = `NOM et Prénom : ${medecin.prenom} ${(medecin.nom || '').toUpperCase()}`;
+  nomCell.value = `NOM et Prénom : ${medecin?.prenom ?? ''} ${(medecin?.nom || '').toUpperCase()}`.trimEnd();
   nomCell.font = { name: 'Calibri', bold: true, size: 28 };
   nomCell.alignment = { horizontal: 'left', vertical: 'middle' };
 
@@ -197,6 +218,11 @@ const createMedecinWorksheet = async (worksheet, medecin, desiderata, datesList)
   datesList.forEach((date) => {
     worksheet.getRow(currentRow).height = 32.1;
 
+    // Type de jour (UTC, cohérent avec la clé de date) : samedi / dimanche
+    const jour = date.getUTCDay();
+    const samedi = jour === 6;
+    const weekend = jour === 0 || jour === 6;
+
     // Colonne A — date réelle, rouge gras, format long français
     const dateCell = worksheet.getCell(currentRow, 1);
     dateCell.value = date;
@@ -213,6 +239,21 @@ const createMedecinWorksheet = async (worksheet, medecin, desiderata, datesList)
       const cell = worksheet.getCell(currentRow, col);
       cell.border = THIN;
       cell.alignment = { horizontal: 'center', vertical: 'middle' };
+
+      // RENFORT SAMEDI (colonne D) : orange le samedi (saisie possible),
+      // noir les autres jours (créneau inexistant → case neutralisée, sans saisie).
+      if (creneauId === 'RENFORT_1') {
+        if (samedi) {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: DESID_RENFORT_SAT } };
+        } else {
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: DESID_BLACK } };
+          return;
+        }
+      } else if (weekend) {
+        // Week-end (samedi + dimanche) : cases grisées.
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: DESID_GREY } };
+      }
+
       cell.dataValidation = {
         type: 'list',
         allowBlank: true,
@@ -220,16 +261,31 @@ const createMedecinWorksheet = async (worksheet, medecin, desiderata, datesList)
         showErrorMessage: true,
         formulae: ['$K$10:$K$12'],
       };
+      // La couleur du texte est gérée par la mise en forme conditionnelle
+      // ci-dessous (elle suit la valeur choisie, comme le fichier d'origine).
       const pref = dayData?.[creneauId];
       if (pref) {
         cell.value = pref;
-        const couleur = desidPrefColor(pref);
-        cell.font = { name: 'Calibri', bold: true, size: 14, color: couleur ? { argb: couleur } : undefined };
       }
     });
 
     currentRow++;
   });
+
+  // Coloration automatique du texte selon la valeur choisie dans la liste
+  // déroulante (reproduit la mise en forme conditionnelle du fichier d'origine) :
+  // « Oui » → vert, « Non » → rouge, « Possible » → orange.
+  const lastRow = currentRow - 1;
+  if (lastRow >= 11) {
+    worksheet.addConditionalFormatting({
+      ref: `B11:G${lastRow}`,
+      rules: [
+        { type: 'containsText', operator: 'containsText', text: 'non', priority: 1, style: { font: { color: { argb: DESID_RED } } } },
+        { type: 'containsText', operator: 'containsText', text: 'oui', priority: 2, style: { font: { color: { argb: DESID_GREEN } } } },
+        { type: 'containsText', operator: 'containsText', text: 'possible', priority: 3, style: { font: { color: { argb: DESID_AMBER } } } },
+      ],
+    });
+  }
 };
 
 /**
@@ -297,38 +353,9 @@ const generateFileName = (periode) => {
  */
 export const exportMedecinDesiderataToExcel = async (medecin, desiderata, periode) => {
   try {
-    const ExcelJS = await loadExcelJS();
-    // Créer un nouveau workbook
-    const workbook = new ExcelJS.Workbook();
-
-    // Générer le nom de fichier pour le médecin individuel
     const fileName = generateMedecinFileName(medecin, periode);
-
-    // Générer la liste des dates pour la période
-    const datesList = generateDatesList(periode);
-
-    // Une seule feuille, nommée comme le fichier de référence
-    const worksheet = workbook.addWorksheet('Désidératas');
-
-    // Générer le contenu de la feuille
-    await createMedecinWorksheet(worksheet, medecin, desiderata, datesList);
-
-    // Générer le buffer Excel
-    const buffer = await workbook.xlsx.writeBuffer();
-
-    // Créer un blob et déclencher le téléchargement
-    const blob = new Blob([buffer], {
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    });
-
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
+    const buffer = await buildMedecinWorkbookBuffer(medecin, desiderata, periode);
+    triggerBrowserDownload(buffer, fileName);
 
     return {
       success: true,
@@ -340,6 +367,43 @@ export const exportMedecinDesiderataToExcel = async (medecin, desiderata, period
     logger.error('Erreur lors de l\'export Excel individuel:', error);
     throw error;
   }
+};
+
+/**
+ * Construit le classeur d'un médecin (une feuille « Désidératas ») et renvoie
+ * son buffer, SANS effet de bord navigateur — réutilisable pour le
+ * téléchargement comme pour une pièce jointe mail.
+ * @param {Object} medecin - { prenom, nom } (peut être vide pour un modèle vierge)
+ * @param {Object|null} desiderata - desiderata du médecin, ou null pour un modèle vierge
+ * @param {Object} periode - { startDate, endDate }
+ * @returns {Promise<ArrayBuffer>}
+ */
+export const buildMedecinWorkbookBuffer = async (medecin, desiderata, periode) => {
+  const ExcelJS = await loadExcelJS();
+  const workbook = new ExcelJS.Workbook();
+  const datesList = generateDatesList(periode);
+  // Une seule feuille, nommée comme le fichier de référence.
+  const worksheet = workbook.addWorksheet('Désidératas');
+  await createMedecinWorksheet(worksheet, medecin, desiderata, datesList);
+  return workbook.xlsx.writeBuffer();
+};
+
+/**
+ * Génère la pièce jointe « modèle vierge de desiderata » pour la période, au
+ * format nodemailer attendu par l'extension Trigger Email. Le classeur reprend
+ * EXACTEMENT la mise en forme du modèle APUM (couleurs, mise en forme
+ * conditionnelle, listes déroulantes) ; seules les dates suivent la période.
+ * @param {Object} periode - { startDate, endDate }
+ * @returns {Promise<{ filename: string, content: string, encoding: 'base64', contentType: string }>}
+ */
+export const generateBlankDesiderataAttachment = async (periode) => {
+  const buffer = await buildMedecinWorkbookBuffer({ prenom: '', nom: '' }, null, periode);
+  return {
+    filename: generateFileName(periode),
+    content: arrayBufferToBase64(buffer),
+    encoding: 'base64',
+    contentType: XLSX_MIME,
+  };
 };
 
 /**
@@ -660,18 +724,7 @@ export const exportPlanningToExcel = async (planning, medecins, options = {}) =>
 
     const fileName = generatePlanningFileName(moisPlanning.map((m) => m.monthKey));
     const buffer = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer], {
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    });
-
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
+    triggerBrowserDownload(buffer, fileName);
 
     return {
       success: true,

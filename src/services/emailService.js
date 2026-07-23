@@ -10,6 +10,88 @@ export const EMAIL_FROM = process.env.REACT_APP_EMAIL_FROM || 'noreply@apum.fr';
 export const APP_URL = process.env.REACT_APP_PUBLIC_URL || 'https://apum-8cfa4.web.app';
 
 /**
+ * Ajoute un email à la queue de traitement (`email_queue`), consommée par
+ * l'extension Firebase « Trigger Email ». C'est l'UNIQUE point d'écriture :
+ * tous les envois personnalisés (relances, test…) doivent passer par ici pour
+ * garantir un format de document cohérent.
+ *
+ * @param {Object} params
+ * @param {string|string[]} params.to - Destinataire(s) ; normalisé en tableau (requis par l'extension).
+ * @param {string} params.subject - Sujet de l'email.
+ * @param {string} params.text - Version texte du message.
+ * @param {string} [params.html] - Version HTML ; par défaut, `text` avec les retours ligne convertis en <br>.
+ * @param {Array} [params.attachments] - Pièces jointes au format nodemailer
+ *        ([{ filename, content(base64), encoding: 'base64', contentType }]) ; placées
+ *        dans `message.attachments` (l'extension transmet `message` tel quel à nodemailer).
+ * @param {Object} [params.metadata] - Métadonnées applicatives (type, ids…) ; `sentAt` est ajouté automatiquement.
+ */
+export const enqueueEmail = async ({ to, subject, text, html, attachments, metadata = {} }) => {
+  const message = {
+    subject,
+    text,
+    html: html ?? text.replace(/\n/g, '<br>')
+  };
+  // Les pièces jointes vont DANS message (pas à la racine du doc) : nodemailer
+  // ne lit que le sous-objet message transmis par l'extension Trigger Email.
+  if (Array.isArray(attachments) && attachments.length > 0) {
+    message.attachments = attachments;
+  }
+
+  await addDoc(collection(db, EMAIL_QUEUE_COLLECTION), {
+    to: Array.isArray(to) ? to : [to], // TABLEAU requis par l'extension
+    message,
+    from: EMAIL_FROM,
+    metadata: {
+      ...metadata,
+      sentAt: Timestamp.now()
+    },
+    createdAt: Timestamp.now()
+  });
+};
+
+/**
+ * Envoie une campagne (mail identique + pièces jointes) à une liste de médecins,
+ * un mail individuel par médecin (pas de fuite d'adresses entre destinataires).
+ * @param {Array} medecins - Destinataires ({ id, prenom, nom, email }).
+ * @param {Object} mail - { subject, text, html } déjà assemblé.
+ * @param {Array} [attachments] - Pièces jointes communes (format nodemailer base64).
+ * @returns {Promise<{ succes: number, echecs: number, erreurs: Array }>}
+ */
+export const envoyerCampagneEnMasse = async (medecins, mail, attachments = []) => {
+  const resultats = { succes: 0, echecs: 0, erreurs: [] };
+
+  for (const medecin of medecins) {
+    try {
+      await enqueueEmail({
+        to: medecin.email,
+        subject: mail.subject,
+        text: mail.text,
+        html: mail.html,
+        attachments,
+        metadata: {
+          type: 'campagne_desiderata',
+          medecinId: medecin.id,
+          medecinNom: `${medecin.prenom} ${medecin.nom}`,
+          status: 'pending'
+        }
+      });
+      resultats.succes++;
+
+      // Petit délai entre chaque envoi pour ménager la queue / le SMTP.
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    } catch (error) {
+      resultats.echecs++;
+      resultats.erreurs.push({
+        medecin: `${medecin.prenom} ${medecin.nom}`,
+        erreur: error.message
+      });
+    }
+  }
+
+  return resultats;
+};
+
+/**
  * Envoie une relance par email à un médecin
  * @param {Object} medecin - Les données du médecin
  * @param {string} subject - Sujet de l'email
@@ -30,23 +112,16 @@ Merci de votre collaboration.
 L'équipe APUM
     `.trim();
 
-    // Ajouter l'email à la queue de traitement - FORMAT OFFICIEL
-    await addDoc(collection(db, EMAIL_QUEUE_COLLECTION), {
-      to: [medecin.email], // TABLEAU requis !
-      message: {
-        subject: subject,
-        text: defaultMessage,
-        html: defaultMessage.replace(/\n/g, '<br>')
-      },
-      from: EMAIL_FROM,
+    await enqueueEmail({
+      to: medecin.email,
+      subject,
+      text: defaultMessage,
       metadata: {
         type: 'relance_desiderata',
         medecinId: medecin.id,
         medecinNom: `${medecin.prenom} ${medecin.nom}`,
-        sentAt: Timestamp.now(),
         status: 'pending'
-      },
-      createdAt: Timestamp.now()
+      }
     });
 
     logger.debug(`Email de relance programmé pour ${medecin.email}`);

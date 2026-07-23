@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import { Send } from 'lucide-react';
-import { collection, addDoc, Timestamp } from 'firebase/firestore';
-import { db } from '../firebase';
-import { EMAIL_FROM } from '../services/emailService';
+import { enqueueEmail } from '../services/emailService';
 import logger from '../utils/logger';
 import { Modal, Button, FormField, Alert } from './ui';
 
@@ -29,24 +27,13 @@ const TestEmailModal = ({ isOpen, onClose }) => {
           <p><small>Email automatique envoyé depuis l'application APUM</small></p>
         `;
 
-      // Ajouter un email de test à la queue - FORMAT OFFICIEL
-      const emailDoc = {
-        to: [email], // TABLEAU requis !
-        message: {
-          subject: 'Test - Configuration email APUM',
-          text: testMessage,
-          html: htmlMessage
-        },
-        from: EMAIL_FROM,
-        metadata: {
-          type: 'test_email',
-          sentAt: Timestamp.now()
-        },
-        createdAt: Timestamp.now()
-      };
-
-      logger.debug('Document à créer:', emailDoc);
-      await addDoc(collection(db, 'email_queue'), emailDoc);
+      await enqueueEmail({
+        to: email,
+        subject: 'Test - Configuration email APUM',
+        text: testMessage,
+        html: htmlMessage,
+        metadata: { type: 'test_email' }
+      });
 
       setResult({
         success: true,

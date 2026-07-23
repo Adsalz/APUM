@@ -105,6 +105,14 @@ service cloud.firestore {
         request.resource.data.open is bool;
     }
 
+    // ---------- Config campagne mail (contenu éditable du courrier desiderata) ----------
+    // Contenu du mail type envoyé aux médecins à l'ouverture d'une période
+    // (objet, dates de retour/réunion, signature, téléphone…). Aucune donnée
+    // sensible ni besoin de lecture publique : lecture ET écriture admin seules.
+    match /config/campagne_mail {
+      allow read, write: if isAdmin();
+    }
+
     // ---------- Annuaire public (liste de connexion des médecins) ----------
     // Lecture PUBLIQUE et non authentifiée : la liste déroulante de login est
     // peuplée AVANT toute connexion (request.auth == null). NE JAMAIS remplacer
