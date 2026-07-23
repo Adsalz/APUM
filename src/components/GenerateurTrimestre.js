@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   RefreshCw,
   Users,
-  Info,
   CheckCircle2,
   ChevronUp,
   ChevronDown,
@@ -11,7 +10,7 @@ import {
   UserMinus,
 } from 'lucide-react';
 import { Button, Alert } from './ui';
-import { genererProchainOrdreChoix, N_BASCULE } from '../utils/ordreChoix';
+import { genererProchainOrdreChoix } from '../utils/ordreChoix';
 import { getOrdreChoix, saveOrdreChoix } from '../services/ordreChoixService';
 import logger from '../utils/logger';
 
@@ -19,7 +18,6 @@ const GenerateurTrimestre = ({ onListeGenere, medecins = [] }) => {
   const [liste, setListe] = useState([]);           // 1er tour proposé (éditable)
   const [nouveaux, setNouveaux] = useState([]);
   const [partis, setPartis] = useState([]);
-  const [precedentExiste, setPrecedentExiste] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [erreur, setErreur] = useState(null);
@@ -34,7 +32,6 @@ const GenerateurTrimestre = ({ onListeGenere, medecins = [] }) => {
       setListe(res.premierTour);
       setNouveaux(res.nouveaux);
       setPartis(res.partis);
-      setPrecedentExiste(Boolean(precedent?.premierTour?.length));
     } catch (e) {
       logger.error('Génération de l’ordre de choix impossible:', e);
       setErreur('Impossible de charger l’ordre de choix précédent.');
@@ -101,22 +98,6 @@ const GenerateurTrimestre = ({ onListeGenere, medecins = [] }) => {
         <RefreshCw size={20} aria-hidden="true" />
         Ordre de choix — proposition
       </h2>
-
-      <Alert kind="info">
-        <div className="flex items-start gap-2">
-          <Info size={16} aria-hidden="true" className="mt-0.5 shrink-0" />
-          <span className="text-sm">
-            {precedentExiste ? (
-              <>Basé sur l’ordre de choix précédent : les <strong>{N_BASCULE} premiers</strong> basculent
-              en bas, les nouveaux sont insérés avant ce bloc, les partis retirés. Le 2ᵉ tour sera l’inverse.
-              <strong> Ajuste au besoin</strong> avant de valider.</>
-            ) : (
-              <>Aucun ordre de choix précédent enregistré : proposition en ordre alphabétique.
-              Réordonne-la puis valide — elle servira de base aux prochaines périodes.</>
-            )}
-          </span>
-        </div>
-      </Alert>
 
       {(nouveaux.length > 0 || partis.length > 0) && (
         <div className="flex flex-wrap gap-3 text-sm">
