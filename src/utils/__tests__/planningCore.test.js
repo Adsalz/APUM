@@ -218,6 +218,24 @@ describe('planningCore — correctifs d’audit (B1 consécutifs, B3 plafond/jou
     expect(totalA).toBe(1); // exactement son souhait, jamais plus
   });
 
+  // COUVERTURE D'ABORD : avec 2 médecins limités à 1 garde/semaine — A dispo sur
+  // QUART_1 et QUART_2, B dispo sur QUART_1 seul — le glouton empilerait A+B sur
+  // QUART_1 et laisserait QUART_2 VIDE ; le spread couvre les DEUX (A sur le créneau
+  // rare QUART_2, B sur QUART_1).
+  it('couverture d’abord — couvre un créneau que le glouton laisserait vide', () => {
+    const noms = { A: 'a', B: 'b' };
+    const listePriorite = { premierTour: ['A', 'B'], deuxiemeTour: ['B', 'A'] };
+    const desiderata = {
+      a: { nombreGardesSouhaitees: 10, nombreGardesMaxParSemaine: 1, preferences: { '2026-06-01': { QUART_1: 'Oui', QUART_2: 'Oui' } } },
+      b: { nombreGardesSouhaitees: 10, nombreGardesMaxParSemaine: 1, preferences: { '2026-06-01': { QUART_1: 'Oui' } } },
+    };
+    const planning = computePriorite('2026-06-01', '2026-06-01', desiderata, noms, listePriorite);
+    const jour = planning['2026-06-01'];
+    const couvert = (cid) => jour[cid].some((m) => m !== null);
+    expect(couvert('QUART_1')).toBe(true);
+    expect(couvert('QUART_2')).toBe(true); // le point clé : pas laissé vide
+  });
+
   // B2bis : un médecin SANS souhait explicite (0) n'est PAS bloqué — il comble les
   // vacances (le quota par défaut ne s'applique qu'à la passe principale).
   it('B2bis — un médecin sans souhait explicite peut dépasser le quota par défaut', () => {

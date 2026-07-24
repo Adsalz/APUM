@@ -16,11 +16,6 @@ export const creneaux = [
   { id: 'QUART_4', label: '4ème QUART (19h - 1h)', medecins: 3 }
 ];
 
-// Quota mensuel par défaut pour les médecins n'ayant PAS renseigné leur « nombre
-// de gardes souhaitées » (champ vide = 0). Sans ce défaut, ils seraient soit
-// ignorés des tours prioritaires, soit sur-servis sans limite par le fallback.
-const DEFAUT_GARDES_MENSUEL = 8;
-
 // Plafond de créneaux (gardes) qu'un même médecin peut cumuler le MÊME jour.
 // Calibré sur la feuille de référence APUM (« TABLEAUX MOIS PAR MOIS ») : le manuel
 // empile jusqu'à 2 créneaux/jour mais JAMAIS 3 (0 cas sur 854 affectations réelles).
@@ -332,157 +327,72 @@ const creeraitTroisJoursConsecutifs = (medecinId, dateString, planning) => {
   return (avantVeille && veille) || (veille && lendemain) || (lendemain && surlendemain);
 };
 
-const attribuerCreneauxParPreference = (
-  medecinId, dateString, preferenceType, nombreGardesSouhaitees, maxGardesParSemaine,
-  desiderata, planning, gardesAttribuees
-) => {
+// Remplissage « COUVERTURE D'ABORD » d'un jour : on donne d'abord 1 médecin à CHAQUE
+// créneau (round 1) avant d'en donner un 2e (round 2), etc. — et à chaque round on traite
+// le créneau le plus RARE en premier (moins de candidats éligibles). Cette stratégie couvre
+// plus de créneaux distincts que le glouton par médecin (qui remplissait un créneau à fond en
+// laissant les rares à 0), car elle utilise le quota RESTANT de chacun — SANS jamais dépasser
+// le quota mensuel (souhait). Ordre de choix respecté : à créneau donné, priorité au médecin
+// le mieux placé dans l'ordre, préférences « Oui » avant « Possible ». Les médecins sans
+// souhait explicite (0) restent flexibles (bornés par le max hebdo), ils comblent les vacances.
+const remplirJourEnCouverture = (dateString, ordrePriorite, mapMedecinNomVersId, desiderata, planning, gardesAttribuees) => {
   const mois = dateString.slice(0, 7);
-  const compteur = gardesAttribuees[medecinId] || (gardesAttribuees[medecinId] = {});
+  const jour = planning[dateString];
+  const cids = creneaux.map((c) => c.id).filter((id) => jour[id]); // créneaux ouverts ce jour, ordre canonique
 
-  // Respect strict du quota MENSUEL demandé (« gardes souhaitées par mois »).
-  if ((compteur[mois] || 0) >= nombreGardesSouhaitees) {
-    return; // Quota du mois atteint
+  // Liste déterministe des médecins par ordre de choix (rang unique = départage stable).
+  const ids = []; const rank = {}; const vus = new Set();
+  for (const nom of ordrePriorite) {
+    const id = mapMedecinNomVersId[nom];
+    if (id && desiderata[id] && !vus.has(id)) { vus.add(id); rank[id] = ids.length; ids.push(id); }
   }
 
-  const gardesParSemaine = compterGardesParSemaine(medecinId, dateString, planning);
-  if (gardesParSemaine >= maxGardesParSemaine) {
-    return; // Limite hebdomadaire atteinte
-  }
+  const gardesMois = (id) => (gardesAttribuees[id]?.[mois] || 0);
+  const gardesJour = (id) => Object.values(jour).reduce((n, arr) => n + (arr.includes(id) ? 1 : 0), 0);
 
-  // Pas plus de 2 jours de garde consécutifs.
-  if (creeraitTroisJoursConsecutifs(medecinId, dateString, planning)) {
-    return;
-  }
+  // Préférence ('Oui'/'Possible') si le médecin est éligible pour ce créneau ; sinon null.
+  // Mêmes contraintes dures + quota mensuel STRICT (souhait 0 = flexible).
+  const prefEligible = (id, cid) => {
+    if (jour[cid].includes(id)) { return null; }                          // déjà dans ce créneau
+    const pref = desiderata[id].preferences[dateString]?.[cid];
+    if (pref !== 'Oui' && pref !== 'Possible') { return null; }
+    const souhait = desiderata[id].nombreGardesSouhaitees;
+    if (souhait && gardesMois(id) >= souhait) { return null; }            // quota mensuel jamais dépassé
+    const maxSem = desiderata[id].nombreGardesMaxParSemaine || 7;
+    if (compterGardesParSemaine(id, dateString, planning) >= maxSem) { return null; }
+    if (gardesJour(id) >= MAX_CRENEAUX_PAR_JOUR) { return null; }
+    if (aCreneauxChevauchants(id, dateString, cid, planning)) { return null; }
+    if (creeraitTroisJoursConsecutifs(id, dateString, planning)) { return null; }
+    return pref;
+  };
 
-  const preferencesJour = desiderata[medecinId].preferences[dateString] || {};
-
-  // Parcourir tous les créneaux pour cette préférence
-  for (const creneau of creneaux) {
-    // Plafond de créneaux PAR JOUR pour ce médecin (cohérent avec le « 1/jour » des
-    // passes fallback/largeur ; évite les enchaînements de 3 créneaux le même jour).
-    const gardesCeJour = Object.values(planning[dateString])
-      .filter((slots) => slots.includes(medecinId)).length;
-    if (gardesCeJour >= MAX_CRENEAUX_PAR_JOUR) {
-      break;
+  // Candidats éligibles pour un créneau, triés : Oui avant Possible, puis ordre de choix.
+  const candidatsPour = (cid) => {
+    const out = [];
+    for (const id of ids) {
+      const pref = prefEligible(id, cid);
+      if (pref) { out.push({ id, possible: pref === 'Possible' ? 1 : 0 }); }
     }
+    out.sort((a, b) => (a.possible - b.possible) || (rank[a.id] - rank[b.id]));
+    return out;
+  };
 
-    // Vérifier à nouveau le quota à chaque attribution
-    if ((compteur[mois] || 0) >= nombreGardesSouhaitees) {
-      break;
-    }
+  const effectifMax = cids.reduce((m, cid) => Math.max(m, jour[cid].length), 0);
+  for (let r = 1; r <= effectifMax; r++) {
+    // Créneaux qui veulent leur r-ème médecin (exactement r-1 remplis, effectif >= r).
+    const wanting = cids.filter((cid) => jour[cid].filter((m) => m !== null).length === r - 1 && jour[cid].length >= r);
+    // Le plus RARE d'abord (moins de candidats) ; tie-break stable = ordre canonique des créneaux.
+    const nbCand = {};
+    wanting.forEach((cid) => { nbCand[cid] = candidatsPour(cid).length; });
+    wanting.sort((a, b) => (nbCand[a] - nbCand[b]) || (cids.indexOf(a) - cids.indexOf(b)));
 
-    // Vérifier AUSSI le maximum HEBDOMADAIRE à chaque attribution : le contrôle
-    // d'entrée ne s'exécute qu'une fois, or un médecin disponible sur plusieurs
-    // créneaux le même jour pouvait sinon dépasser son plafond hebdomadaire.
-    if (compterGardesParSemaine(medecinId, dateString, planning) >= maxGardesParSemaine) {
-      break;
-    }
-
-    if (!planning[dateString][creneau.id]) {
-      continue;
-    }
-
-    const preference = preferencesJour[creneau.id];
-
-    // Seulement le type de préférence demandé
-    if (preference !== preferenceType) {
-      continue;
-    }
-
-    // Vérifier les chevauchements
-    if (aCreneauxChevauchants(medecinId, dateString, creneau.id, planning)) {
-      continue;
-    }
-
-    // Chercher une place libre dans ce créneau
-    const indexLibre = planning[dateString][creneau.id].findIndex(m => m === null);
-    if (indexLibre !== -1) {
-      planning[dateString][creneau.id][indexLibre] = medecinId;
-      compteur[mois] = (compteur[mois] || 0) + 1;
-    }
-  }
-};
-
-const remplirCreneauxVidesAvecDisponibles = (dateString, ordrePriorite, mapMedecinNomVersId, desiderata, planning, gardesAttribuees) => {
-  const mois = dateString.slice(0, 7);
-  const quotaEffectif = (id) => desiderata[id].nombreGardesSouhaitees || DEFAUT_GARDES_MENSUEL;
-  const gardesDuMois = (id) => (gardesAttribuees[id]?.[mois] || 0);
-
-  // Parcourir tous les créneaux pour trouver les places vides
-  for (const creneau of creneaux) {
-    if (!planning[dateString][creneau.id]) {
-      continue;
-    }
-
-    const placesVides = planning[dateString][creneau.id]
-      .map((medecin, index) => medecin === null ? index : -1)
-      .filter(index => index !== -1);
-
-    for (const indexVide of placesVides) {
-      // Rassembler tous les médecins ÉLIGIBLES (dispo Oui/Possible + toutes les
-      // contraintes dures respectées + quota mensuel NON dépassé). L'ordre de
-      // priorité sert de départage (collecte dans cet ordre → tri stable).
-      const candidats = [];
-      for (const nomMedecin of ordrePriorite) {
-        const medecinId = mapMedecinNomVersId[nomMedecin];
-        if (!medecinId || !desiderata[medecinId]) {
-          continue;
-        }
-
-        const preference = desiderata[medecinId].preferences[dateString]?.[creneau.id];
-        // SEULEMENT "Oui" ou "Possible" - jamais "Non".
-        if (preference !== 'Oui' && preference !== 'Possible') {
-          continue;
-        }
-
-        // Quota mensuel : ne JAMAIS sur-servir au-delà du nombre EXPLICITEMENT
-        // souhaité. Les médecins n'ayant pas renseigné de quota (champ vide) ne
-        // sont PAS bloqués ici : ils servent à combler les créneaux vacants
-        // (seules les limites hebdo / consécutives / chevauchement s'appliquent).
-        const quotaSouhaite = desiderata[medecinId].nombreGardesSouhaitees;
-        if (quotaSouhaite && gardesDuMois(medecinId) >= quotaSouhaite) {
-          continue;
-        }
-
-        const maxGardesParSemaine = desiderata[medecinId].nombreGardesMaxParSemaine || 7;
-        if (compterGardesParSemaine(medecinId, dateString, planning) >= maxGardesParSemaine) {
-          continue;
-        }
-        if (aCreneauxChevauchants(medecinId, dateString, creneau.id, planning)) {
-          continue;
-        }
-        // Pas plus de 2 jours de garde consécutifs.
-        if (creeraitTroisJoursConsecutifs(medecinId, dateString, planning)) {
-          continue;
-        }
-        // Un seul créneau par médecin et par jour via le fallback.
-        const dejaAssigneAujourdhui = Object.values(planning[dateString]).some(medecins =>
-          medecins.includes(medecinId)
-        );
-        if (dejaAssigneAujourdhui) {
-          continue;
-        }
-
-        candidats.push(medecinId);
-      }
-
-      if (candidats.length === 0) {
-        // Personne de disponible sous son quota → créneau laissé vacant plutôt
-        // que de surcharger quelqu'un contre son nombre de gardes souhaité.
-        continue;
-      }
-
-      // Équité : servir en priorité le médecin le plus « en manque » (plus grand
-      // écart entre quota souhaité et gardes déjà attribuées ce mois-ci).
-      candidats.sort((a, b) =>
-        (quotaEffectif(b) - gardesDuMois(b)) - (quotaEffectif(a) - gardesDuMois(a))
-      );
-      const choisi = candidats[0];
-
-      planning[dateString][creneau.id][indexVide] = choisi;
+    for (const cid of wanting) {
+      const cands = candidatsPour(cid); // recalcul : l'état a changé pendant ce round
+      if (cands.length === 0) { continue; }
+      const choisi = cands[0].id;
+      jour[cid][jour[cid].indexOf(null)] = choisi;
       gardesAttribuees[choisi] = gardesAttribuees[choisi] || {};
-      gardesAttribuees[choisi][mois] = gardesDuMois(choisi) + 1;
-      logger.info(`Fallback: ${choisi} assigné à ${creneau.id} le ${dateString} (écart quota: ${quotaEffectif(choisi) - gardesDuMois(choisi)})`);
+      gardesAttribuees[choisi][mois] = gardesMois(choisi) + 1;
     }
   }
 };
@@ -526,106 +436,14 @@ const genererPlanningPourPeriode = (debut, fin, ordrePriorite, mapMedecinNomVers
       }
     });
 
-    // Attribution séquentielle complète par ordre de priorité
-    for (const nomMedecin of ordrePriorite) {
-      const medecinId = mapMedecinNomVersId[nomMedecin];
-      if (!medecinId || !desiderata[medecinId]) {
-        continue;
-      }
-
-      const nombreGardesSouhaitees = desiderata[medecinId].nombreGardesSouhaitees || DEFAUT_GARDES_MENSUEL;
-      const maxGardesParSemaine = desiderata[medecinId].nombreGardesMaxParSemaine || 7;
-
-      // Attribuer toutes les gardes possibles à ce médecin avant de passer au suivant
-      // Phase 1: D'abord tous les créneaux "Oui"
-      attribuerCreneauxParPreference(
-        medecinId, dateString, 'Oui', nombreGardesSouhaitees, maxGardesParSemaine,
-        desiderata, planning, gardesAttribuees
-      );
-
-      // Phase 2: Puis tous les créneaux "Possible" si pas encore au quota
-      attribuerCreneauxParPreference(
-        medecinId, dateString, 'Possible', nombreGardesSouhaitees, maxGardesParSemaine,
-        desiderata, planning, gardesAttribuees
-      );
-    }
-
-    // Phase 3: FALLBACK - Remplir les créneaux vides avec les médecins disponibles (Oui/Possible)
-    remplirCreneauxVidesAvecDisponibles(dateString, ordrePriorite, mapMedecinNomVersId, desiderata, planning, gardesAttribuees);
+    // Remplissage « COUVERTURE D'ABORD » : 1 médecin par créneau (créneaux rares en
+    // premier) avant d'en remplir un 2e, quota strict + contraintes dures respectés.
+    remplirJourEnCouverture(dateString, ordrePriorite, mapMedecinNomVersId, desiderata, planning, gardesAttribuees);
 
     currentDate.setUTCDate(currentDate.getUTCDate() + 1);
   }
 
   return planning;
-};
-
-// Passe « LARGEUR » : après les deux tours, combler les places encore vides
-// (y compris dans les créneaux PARTIELLEMENT remplis) SANS JAMAIS dépasser le quota
-// mensuel donné par le médecin (mêmes règles que remplirCreneauxVidesAvecDisponibles).
-// Les médecins sans souhait explicite (0) ne sont pas bloqués — ils comblent les
-// vacances. On sert d'abord le plus « en manque » (tri par déficit décroissant). Un
-// créneau pour lequel il ne reste que des médecins à leur quota est laissé VIDE
-// (l'admin le complète à la main) plutôt que de sur-charger quelqu'un contre son gré.
-const comblerCreneauxVidesEnLargeur = (planning, ordrePriorite, mapMedecinNomVersId, desiderata, gardesAttribuees) => {
-  const gardesDuMoisPlanning = (id, mois) => {
-    let n = 0;
-    for (const [d, cs] of Object.entries(planning)) {
-      if (d.slice(0, 7) !== mois) { continue; }
-      for (const arr of Object.values(cs)) { if (arr.includes(id)) { n++; } }
-    }
-    return n;
-  };
-  const quotaEffectif = (id) => desiderata[id].nombreGardesSouhaitees || DEFAUT_GARDES_MENSUEL;
-
-  for (const dateString of Object.keys(planning).sort()) {
-    const mois = dateString.slice(0, 7);
-    for (const creneau of creneaux) {
-      const arr = planning[dateString][creneau.id];
-      if (!arr) { continue; }
-
-      // Combler CHAQUE place vide (y compris les créneaux partiellement remplis).
-      for (let indexVide = 0; indexVide < arr.length; indexVide++) {
-        if (arr[indexVide] !== null) { continue; }
-
-        // Recalculé à chaque place : un médecin placé plus tôt ce jour est exclu.
-        const assignesJour = new Set();
-        Object.values(planning[dateString]).forEach((slots) =>
-          slots.forEach((m) => { if (m) { assignesJour.add(m); } }));
-
-        const candidats = [];
-        for (const nomMedecin of ordrePriorite) {
-          const id = mapMedecinNomVersId[nomMedecin];
-          if (!id || !desiderata[id] || assignesJour.has(id)) { continue; }
-          const pref = desiderata[id].preferences[dateString]?.[creneau.id];
-          if (pref !== 'Oui' && pref !== 'Possible') { continue; }
-          const maxSem = desiderata[id].nombreGardesMaxParSemaine || 7;
-          if (compterGardesParSemaine(id, dateString, planning) >= maxSem) { continue; }
-          if (aCreneauxChevauchants(id, dateString, creneau.id, planning)) { continue; }
-          if (creeraitTroisJoursConsecutifs(id, dateString, planning)) { continue; }
-          candidats.push(id);
-        }
-        if (candidats.length === 0) { continue; }
-
-        // Deux niveaux : d'abord les médecins ENCORE sous leur quota mensuel (tri par
-        // déficit décroissant) ; sinon, dépassement en dernier recours (moins chargé).
-        // Respect STRICT du quota donné par le médecin : ne JAMAIS dépasser le souhait
-        // mensuel explicite. Les médecins sans souhait explicite (0) ne sont pas bloqués.
-        const eligibles = candidats.filter((id) => {
-          const souhait = desiderata[id].nombreGardesSouhaitees;
-          return !(souhait && gardesDuMoisPlanning(id, mois) >= souhait);
-        });
-        if (eligibles.length === 0) { continue; } // que des médecins à leur quota → laisser vide
-        // Servir en priorité le plus « en manque » (aligné sur le fallback).
-        eligibles.sort((a, b) =>
-          (quotaEffectif(b) - gardesDuMoisPlanning(b, mois)) - (quotaEffectif(a) - gardesDuMoisPlanning(a, mois)));
-        const choisi = eligibles[0];
-
-        arr[indexVide] = choisi;
-        gardesAttribuees[choisi] = gardesAttribuees[choisi] || {};
-        gardesAttribuees[choisi][mois] = (gardesAttribuees[choisi][mois] || 0) + 1;
-      }
-    }
-  }
 };
 
 // Entrée pure « priorité » : division en deux tours puis attribution séquentielle.
@@ -659,10 +477,6 @@ export const computePriorite = (debut, fin, desiderata, mapMedecinNomVersId, lis
     gardesAttribuees,
     planning
   );
-
-  // Passe LARGEUR : combler les places encore vides (y compris partiellement remplies).
-  const ordreComplet = [...new Set([...listePriorite.premierTour, ...listePriorite.deuxiemeTour])];
-  comblerCreneauxVidesEnLargeur(planning, ordreComplet, mapMedecinNomVersId, desiderata, gardesAttribuees);
 
   // Filet de sécurité : le planning généré DOIT satisfaire les contraintes dures
   // (max hebdo, pas 3 jours consécutifs, pas de chevauchement). Tripwire de non-
