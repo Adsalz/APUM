@@ -29,9 +29,9 @@ describe('effectifPour', () => {
     expect(effectifPour('QUART_3', '2026-07-04')).toBe(4); // samedi
   });
 
-  it('4ème quart est réduit le samedi', () => {
+  it('4ème quart : 3 quel que soit le type de jour (samedi soir aligné sur le staffing réel)', () => {
     expect(effectifPour('QUART_4', '2026-07-01')).toBe(3); // semaine
-    expect(effectifPour('QUART_4', '2026-07-04')).toBe(2); // samedi
+    expect(effectifPour('QUART_4', '2026-07-04')).toBe(3); // samedi (corrigé 2->3)
     expect(effectifPour('QUART_4', '2026-07-05')).toBe(3); // dimanche
   });
 
@@ -68,11 +68,11 @@ describe('génération — tailles des créneaux selon le type de jour', () => {
     expect(jour.RENFORT_1).toBeUndefined();
   });
 
-  it('samedi (04/07) : renfort 10h/13h, 3ème quart à 4, 4ème réduit à 2', () => {
+  it('samedi (04/07) : renfort 10h/13h, 3ème quart à 4, 4ème à 3', () => {
     const jour = planning['2026-07-04'];
     expect(jour.RENFORT_1).toHaveLength(1);
     expect(jour.QUART_3).toHaveLength(4);
-    expect(jour.QUART_4).toHaveLength(2);
+    expect(jour.QUART_4).toHaveLength(3);
   });
 
   it('dimanche (05/07) : 2ème et 3ème quart à 4, pas de renfort 10h/13h', () => {

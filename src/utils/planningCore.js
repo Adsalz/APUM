@@ -38,6 +38,11 @@ const MAX_CRENEAUX_PAR_JOUR = 2;
 // règle de type de jour → ne PAS l'encoder ici. Il émerge naturellement des
 // desiderata (médecins indisponibles en août laissant des créneaux non pourvus).
 // Pour ajuster le nombre de médecins par garde, modifier UNIQUEMENT ce tableau.
+// Validé (2026-07) sur 7 mois NORMAUX (oct 2025→avr 2026), remplis à 98-99 % dans
+// les feuilles de référence : les effectifs collent au staffing réel. Seule
+// correction issue de cette validation : QUART_4 le SAMEDI passé de 2 à 3 (la
+// réalité staffe constamment 3 régulateurs le samedi soir). Le déficit d'ASO26
+// (854 staffés / 1145 ouverts) est bien l'effet saisonnier d'AOÛT, pas une table trop haute.
 const EFFECTIFS_PAR_TYPE_JOUR = {
   //             semaine     samedi      dimanche (= férié)
   QUART_1:   { semaine: 2, samedi: 2, dimanche: 2 },
@@ -45,7 +50,7 @@ const EFFECTIFS_PAR_TYPE_JOUR = {
   RENFORT_1: { semaine: 0, samedi: 1, dimanche: 0 },
   QUART_3:   { semaine: 3, samedi: 4, dimanche: 4 },
   RENFORT_2: { semaine: 1, samedi: 1, dimanche: 1 },
-  QUART_4:   { semaine: 3, samedi: 2, dimanche: 3 },
+  QUART_4:   { semaine: 3, samedi: 3, dimanche: 3 },
 };
 
 // Type de jour pour les effectifs : 'samedi' | 'dimanche' | 'semaine'.
