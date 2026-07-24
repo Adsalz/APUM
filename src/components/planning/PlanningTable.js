@@ -1,14 +1,11 @@
 // src/components/planning/PlanningTable.js
 import React, { useMemo } from 'react';
 import {
-  sortMedecinsByPreference,
-  getPreferenceStyle,
   getMedecinPreference,
-  getNombreGardesSouhaitees,
   compterGardesMoisParMedecin
 } from '../../utils/planningUtils';
 import { effectifPour } from '../../utils/planningCore';
-import { Select } from '../ui';
+import MedecinSlotSelect from './components/MedecinSlotSelect';
 
 // Classes de pastille sémantiques dérivées de la préférence (présentation)
 const preferencePill = (preference) => {
@@ -36,75 +33,6 @@ const preferenceCellBg = (preference) => {
   default:
     return '';
   }
-};
-
-// Jauge « gardes attribuées ce mois / souhaitées (mensuel) » pour un médecin.
-// gardesMois = { medecinId: nombre } pour le mois du jour édité.
-const jaugeMedecin = (medecinId, desiderata, gardesMois) => {
-  const attribuees = gardesMois?.[medecinId] || 0;
-  const souhait = getNombreGardesSouhaitees(desiderata, medecinId);
-  if (!souhait) { return { texte: ` · ${attribuees}`, statut: 'inconnu' }; }
-  const statut = attribuees > souhait ? 'depasse' : attribuees === souhait ? 'plein' : 'ok';
-  return { texte: ` · ${attribuees}/${souhait}${statut === 'depasse' ? ' ⚠' : ''}`, statut };
-};
-
-// Composant pour le sélecteur de médecin
-const MedecinSelect = ({
-  date,
-  creneauId,
-  index,
-  currentValue,
-  medecins,
-  desiderata,
-  selectedMedecin, // On garde ce paramètre pour l'affichage des infos mais pas pour le filtrage
-  onChange,
-  dateLabel,
-  creneauLabel,
-  gardesMois // { medecinId: nombre } pour le mois de `date`
-}) => {
-  // Trier les médecins selon leurs préférences
-  const sortedMedecins = sortMedecinsByPreference(medecins, desiderata, date, creneauId);
-
-  // Code couleur FIABLE sur la case (le médecin assigné y est affiché) selon son quota.
-  const statutAssigne = currentValue ? jaugeMedecin(currentValue, desiderata, gardesMois).statut : null;
-  const boxClass = statutAssigne === 'depasse'
-    ? 'border-danger-400 text-danger-700'
-    : statutAssigne === 'plein'
-      ? 'border-warning-400 text-warning-700'
-      : '';
-
-  return (
-    <Select
-      value={currentValue || ''}
-      onChange={(e) => onChange(date, creneauId, index, e.target.value)}
-      aria-label={`Médecin — ${dateLabel} ${creneauLabel} place ${index + 1}`}
-      className={boxClass}
-    >
-      <option value="">Non assigné</option>
-      {sortedMedecins.all.map(medecin => {
-        const preference = getMedecinPreference(desiderata, medecin.id, date, creneauId);
-        const style = getPreferenceStyle(preference);
-        const isSelected = medecin.id === selectedMedecin;
-        const jauge = jaugeMedecin(medecin.id, desiderata, gardesMois);
-
-        return (
-          <option
-            key={medecin.id}
-            value={medecin.id}
-            style={{
-              ...style,
-              fontWeight: isSelected ? 'bold' : 'normal'
-            }}
-          >
-              Dr. {medecin.prenom} {medecin.nom}
-            {preference ? ` (${preference})` : ''}
-            {jauge.texte}
-            {isSelected ? ' ★' : ''}
-          </option>
-        );
-      })}
-    </Select>
-  );
 };
 
 // Composant pour l'affichage des préférences
@@ -239,7 +167,7 @@ const PlanningTable = ({
                               {Array.from({ length: nbSlots }).map((_, index) => (
                                 <div key={index}>
                                   {editMode ? (
-                                    <MedecinSelect
+                                    <MedecinSlotSelect
                                       date={date}
                                       creneauId={creneau.id}
                                       index={index}
