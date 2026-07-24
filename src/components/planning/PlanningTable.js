@@ -1,9 +1,11 @@
 // src/components/planning/PlanningTable.js
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   sortMedecinsByPreference,
   getPreferenceStyle,
-  getMedecinPreference
+  getMedecinPreference,
+  getNombreGardesSouhaitees,
+  compterGardesMoisParMedecin
 } from '../../utils/planningUtils';
 import { effectifPour } from '../../utils/planningCore';
 import { Select } from '../ui';
@@ -36,6 +38,16 @@ const preferenceCellBg = (preference) => {
   }
 };
 
+// Jauge « gardes attribuées ce mois / souhaitées (mensuel) » pour un médecin.
+// gardesMois = { medecinId: nombre } pour le mois du jour édité.
+const jaugeMedecin = (medecinId, desiderata, gardesMois) => {
+  const attribuees = gardesMois?.[medecinId] || 0;
+  const souhait = getNombreGardesSouhaitees(desiderata, medecinId);
+  if (!souhait) { return { texte: ` · ${attribuees}`, statut: 'inconnu' }; }
+  const statut = attribuees > souhait ? 'depasse' : attribuees === souhait ? 'plein' : 'ok';
+  return { texte: ` · ${attribuees}/${souhait}${statut === 'depasse' ? ' ⚠' : ''}`, statut };
+};
+
 // Composant pour le sélecteur de médecin
 const MedecinSelect = ({
   date,
@@ -47,22 +59,33 @@ const MedecinSelect = ({
   selectedMedecin, // On garde ce paramètre pour l'affichage des infos mais pas pour le filtrage
   onChange,
   dateLabel,
-  creneauLabel
+  creneauLabel,
+  gardesMois // { medecinId: nombre } pour le mois de `date`
 }) => {
   // Trier les médecins selon leurs préférences
   const sortedMedecins = sortMedecinsByPreference(medecins, desiderata, date, creneauId);
+
+  // Code couleur FIABLE sur la case (le médecin assigné y est affiché) selon son quota.
+  const statutAssigne = currentValue ? jaugeMedecin(currentValue, desiderata, gardesMois).statut : null;
+  const boxClass = statutAssigne === 'depasse'
+    ? 'border-danger-400 text-danger-700'
+    : statutAssigne === 'plein'
+      ? 'border-warning-400 text-warning-700'
+      : '';
 
   return (
     <Select
       value={currentValue || ''}
       onChange={(e) => onChange(date, creneauId, index, e.target.value)}
       aria-label={`Médecin — ${dateLabel} ${creneauLabel} place ${index + 1}`}
+      className={boxClass}
     >
       <option value="">Non assigné</option>
       {sortedMedecins.all.map(medecin => {
         const preference = getMedecinPreference(desiderata, medecin.id, date, creneauId);
         const style = getPreferenceStyle(preference);
         const isSelected = medecin.id === selectedMedecin;
+        const jauge = jaugeMedecin(medecin.id, desiderata, gardesMois);
 
         return (
           <option
@@ -75,6 +98,7 @@ const MedecinSelect = ({
           >
               Dr. {medecin.prenom} {medecin.nom}
             {preference ? ` (${preference})` : ''}
+            {jauge.texte}
             {isSelected ? ' ★' : ''}
           </option>
         );
@@ -106,6 +130,10 @@ const PlanningTable = ({
   dateFilter,
   creneauFilter
 }) => {
+  // Gardes attribuées par mois et par médecin (jauge d'édition). Recalculé à chaque
+  // changement du planning → la jauge se met à jour en direct pendant l'édition.
+  const gardesMoisMap = useMemo(() => compterGardesMoisParMedecin(planning), [planning]);
+
   // Fonction pour formatter la date
   const formatDate = (dateString) => {
     const date = new Date(dateString);
@@ -222,6 +250,7 @@ const PlanningTable = ({
                                       onChange={onMedecinChange}
                                       dateLabel={formatDate(date)}
                                       creneauLabel={creneau.label}
+                                      gardesMois={gardesMoisMap[date.slice(0, 7)]}
                                     />
                                   ) : (
                                     planning.planning[date]?.[creneau.id]?.[index] ? (

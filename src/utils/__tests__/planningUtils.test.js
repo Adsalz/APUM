@@ -3,6 +3,7 @@ import {
   sortMedecinsByPreference,
   getPreferenceStyle,
   compterGardesParMedecin,
+  compterGardesMoisParMedecin,
   getMedecinPreference,
   getNombreGardesSouhaitees
 } from '../planningUtils';
@@ -86,6 +87,33 @@ describe('planningUtils — compterGardesParMedecin', () => {
     expect(compterGardesParMedecin(null, 'm1')).toBe(0);
     expect(compterGardesParMedecin({}, 'm1')).toBe(0);
     expect(compterGardesParMedecin({ planning: {} }, 'm1')).toBe(0);
+  });
+});
+
+describe('planningUtils — compterGardesMoisParMedecin', () => {
+  const planning = {
+    planning: {
+      '2025-01-01': { QUART_1: ['m1', 'm2'], QUART_2: ['m1'] },
+      '2025-01-15': { QUART_1: ['m1'], QUART_2: [null] },
+      '2025-02-03': { QUART_1: ['m1', 'm2'], QUART_2: ['m3'] }
+    }
+  };
+  const parMois = compterGardesMoisParMedecin(planning);
+
+  it('compte les gardes par mois et par médecin', () => {
+    expect(parMois['2025-01']).toEqual({ m1: 3, m2: 1 });
+    expect(parMois['2025-02']).toEqual({ m1: 1, m2: 1, m3: 1 });
+  });
+
+  it('ignore les places vides (null) et n\'agrège pas deux mois', () => {
+    expect(parMois['2025-01'].m3).toBeUndefined();
+    expect(parMois['2025-02'].m1).toBe(1); // pas 4 : janvier non agrégé
+  });
+
+  it('renvoie un objet vide pour un planning nul ou incomplet', () => {
+    expect(compterGardesMoisParMedecin(null)).toEqual({});
+    expect(compterGardesMoisParMedecin({})).toEqual({});
+    expect(compterGardesMoisParMedecin({ planning: {} })).toEqual({});
   });
 });
 

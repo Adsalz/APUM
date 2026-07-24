@@ -66,6 +66,28 @@ export const compterGardesParMedecin = (planning, medecinId) => {
   return count;
 };
   
+// Nombre de gardes attribuées PAR MOIS et PAR MÉDECIN dans le planning courant.
+// Renvoie { 'YYYY-MM': { medecinId: nombre } }. Sert la jauge d'édition (le souhait
+// « gardes souhaitées » étant mensuel, on compare au compte du mois du jour édité).
+export const compterGardesMoisParMedecin = (planning) => {
+  const parMois = {};
+  if (!planning || !planning.planning) { return parMois; }
+
+  Object.entries(planning.planning).forEach(([date, joursCreneaux]) => {
+    const mois = date.slice(0, 7);
+    if (!parMois[mois]) { parMois[mois] = {}; }
+    Object.values(joursCreneaux).forEach(medecins => {
+      medecins.forEach(medecinId => {
+        if (medecinId) {
+          parMois[mois][medecinId] = (parMois[mois][medecinId] || 0) + 1;
+        }
+      });
+    });
+  });
+
+  return parMois;
+};
+
 export const getMedecinPreference = (desiderata, medecinId, date, creneauId) => {
   return desiderata
     .find(d => d.userId === medecinId)?.desiderata[date]?.[creneauId] || '';
