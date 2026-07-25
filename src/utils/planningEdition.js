@@ -115,6 +115,10 @@ const PROBLEMES = {
   maxSemaine: { niveau: NIVEAUX.DUR, libelle: 'Max/semaine dépassé' },
   indisponible: { niveau: NIVEAUX.FORT, libelle: 'A répondu « Non »' },
   nonRenseigne: { niveau: NIVEAUX.INFO, libelle: 'Pas de réponse' },
+  // « atteint » (il est pile à son quota) et « dépassé » (il est au-delà) sont
+  // deux situations distinctes : les confondre ferait lire « dépassé » à l'admin
+  // pour un médecin qui respecte exactement son souhait.
+  quotaAtteint: { niveau: NIVEAUX.FORT, libelle: 'Quota mensuel atteint' },
   quota: { niveau: NIVEAUX.FORT, libelle: 'Quota mensuel dépassé' },
   deuxCreneaux: { niveau: NIVEAUX.INFO, libelle: 'Déjà 2 créneaux ce jour' }
 };
@@ -190,8 +194,11 @@ export const problemesCandidat = (medecinId, date, creneauId, planningJours, idx
 
   const souhait = souhaitMensuelDe(idxDesiderata, medecinId);
   const dejaCeMois = gardesDuMois(idxPlanning, date, medecinId);
-  if (souhait && dejaCeMois + 1 > souhait) {
-    out.push(probleme('quota', `${dejaCeMois}/${souhait}`));
+  if (souhait && dejaCeMois >= souhait) {
+    out.push(probleme(
+      dejaCeMois > souhait ? 'quota' : 'quotaAtteint',
+      `${dejaCeMois}/${souhait}`
+    ));
   }
 
   const creneauxCeJour = idxPlanning?.parJour?.[date]?.[medecinId] || 0;

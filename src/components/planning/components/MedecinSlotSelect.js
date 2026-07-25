@@ -37,9 +37,25 @@ const prefPillClass = (pref) => {
   }
 };
 
-// Rang de préférence pour le tri (le plus volontaire d'abord).
+// Rang de préférence : c'est la clé de tri PRINCIPALE — le premier critère de
+// choix reste « ce médecin s'est-il proposé pour ce créneau ? ».
 const rangPreference = (pref) => ({ Oui: 0, Possible: 1, Non: 3 }[pref] ?? 2);
-const rangNiveau = (niveau) => ({ '': 0, info: 1, fort: 2, dur: 3 }[niveau] ?? 0);
+
+// Groupes du menu, du plus au moins recommandable.
+// NB : « quota mensuel atteint » ne déclasse PAS. Les places restent vides
+// justement parce que le générateur ne dépasse jamais le quota déclaré : si le
+// dépassement rétrogradait, l'écran enterrerait précisément les médecins que
+// l'admin doit solliciter. Le quota reste affiché (jauge) et départage à
+// préférence égale — celui qui a le plus de marge d'abord.
+const GROUPES = [
+  { cle: 'disponibles', titre: null },
+  { cle: 'horsDesiderata', titre: 'Hors desiderata' },
+  { cle: 'contrainte', titre: 'Contrainte non respectée' }
+];
+const rangGroupe = (candidat) => {
+  if (candidat.niveau === NIVEAUX.DUR) { return 2; }
+  return (candidat.pref === 'Oui' || candidat.pref === 'Possible') ? 0 : 1;
+};
 
 // Toutes les props sont des PRIMITIVES, sauf `ctx` qui est une ref stable vers les
 // données lourdes (index, planning). C'est ce qui rend `React.memo` efficace : les
@@ -126,7 +142,7 @@ const MedecinSlotSelect = ({
         const pref = preferencePour(idxDesiderata, m.id, date, creneauId);
         const souhait = souhaitMensuelDe(idxDesiderata, m.id);
         const attribuees = gardesDuMois(idxPlanning, date, m.id);
-        return {
+        const candidat = {
           medecin: m,
           pref,
           souhait,
@@ -135,9 +151,13 @@ const MedecinSlotSelect = ({
           niveau: pireNiveau(bloquants),
           marge: souhait ? souhait - attribuees : 99
         };
+        return { ...candidat, groupe: rangGroupe(candidat) };
       })
+      // 1. groupe (disponibles / hors desiderata / contrainte dure)
+      // 2. PRÉFÉRENCE du jour — « Oui » avant « Possible »
+      // 3. marge de quota restante, la plus grande d'abord
       .sort((a, b) =>
-        (rangNiveau(a.niveau) - rangNiveau(b.niveau))
+        (a.groupe - b.groupe)
         || (rangPreference(a.pref) - rangPreference(b.pref))
         || (b.marge - a.marge)
         || a.medecin.nom.localeCompare(b.medecin.nom, 'fr'));
@@ -145,7 +165,6 @@ const MedecinSlotSelect = ({
 
   // Index 0 = « Retirer / Non assigné », les candidats suivent.
   const nbOptions = candidats.length + 1;
-  const premierDeconseille = candidats.findIndex((c) => c.niveau !== '');
 
   const fermer = useCallback(() => {
     setIsOpen(false);
@@ -354,16 +373,22 @@ const MedecinSlotSelect = ({
           {currentValue ? 'Retirer ce médecin' : 'Laisser vide'}
         </button>
 
-        {candidats.map((c, i) => (
-          <React.Fragment key={c.medecin.id}>
-            {i === premierDeconseille && premierDeconseille > 0 && (
-              <div className="mb-1 mt-2 border-t border-ink-100 px-2.5 pt-2 text-[0.7rem] font-semibold uppercase tracking-wide text-ink-400">
-                Déconseillés
-              </div>
-            )}
-            {ligneCandidat(c, i + 1)}
-          </React.Fragment>
-        ))}
+        {candidats.map((c, i) => {
+          // Intertitre au changement de groupe (jamais avant le premier).
+          const titre = (i > 0 && c.groupe !== candidats[i - 1].groupe)
+            ? GROUPES[c.groupe]?.titre
+            : null;
+          return (
+            <React.Fragment key={c.medecin.id}>
+              {titre && (
+                <div className="mb-1 mt-2 border-t border-ink-100 px-2.5 pt-2 text-[0.7rem] font-semibold uppercase tracking-wide text-ink-400">
+                  {titre}
+                </div>
+              )}
+              {ligneCandidat(c, i + 1)}
+            </React.Fragment>
+          );
+        })}
 
         {candidats.length === 0 && (
           <div className="px-3 py-4 text-center text-sm text-ink-500">Aucun médecin trouvé</div>

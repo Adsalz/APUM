@@ -145,14 +145,33 @@ describe('planningEdition — détection des problèmes', () => {
     expect(pbsM2.map((p) => p.code)).not.toContain('quota');
   });
 
-  it('problemesCandidat anticipe le dépassement AVANT affectation', () => {
+  it('problemesCandidat anticipe le quota AVANT affectation', () => {
     const jours = { [D1]: { QUART_1: ['m1'], QUART_2: ['m1'], QUART_3: [null] } };
     const idxP = indexerPlanning({ planning: jours });
-    // m1 est déjà à 2/2 ce mois : l'ajouter dépasserait le quota
+    // m1 est pile à 2/2 ce mois : « atteint », pas encore « dépassé »
     const pbs = problemesCandidat('m1', D1, 'QUART_3', jours, idxP, idx);
-    expect(pbs.find((p) => p.code === 'quota').detail).toBe('2/2');
+    const quota = pbs.find((p) => p.code === 'quotaAtteint');
+    expect(quota.detail).toBe('2/2');
+    expect(quota.libelle).toBe('Quota mensuel atteint');
+    expect(pbs.map((p) => p.code)).not.toContain('quota');
     // ... et il a déjà 2 créneaux ce jour-là
     expect(pbs.map((p) => p.code)).toContain('deuxCreneaux');
+  });
+
+  it('problemesCandidat distingue « atteint » de « dépassé »', () => {
+    const jours = { [D1]: { QUART_1: ['m1'], QUART_2: ['m1'], QUART_3: ['m1', null] } };
+    const idxP = indexerPlanning({ planning: jours });
+    const pbs = problemesCandidat('m1', D2, 'QUART_1', jours, idxP, idx);
+    expect(pbs.find((p) => p.code === 'quota').detail).toBe('3/2');
+    expect(pbs.map((p) => p.code)).not.toContain('quotaAtteint');
+  });
+
+  it('un souhait à 0 (non renseigné) ne déclenche jamais d\'alerte de quota', () => {
+    const jours = { [D1]: { QUART_2: ['m2', 'm2', null] } };
+    const idxP = indexerPlanning({ planning: jours });
+    const codes = problemesCandidat('m2', D2, 'QUART_1', jours, idxP, idx).map((p) => p.code);
+    expect(codes).not.toContain('quota');
+    expect(codes).not.toContain('quotaAtteint');
   });
 
   it('pireNiveau hiérarchise dur > fort > info', () => {
