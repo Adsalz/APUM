@@ -101,18 +101,12 @@ function GestionPlanning() {
 
         if (latestPlan) {
           dispatch({ type: 'charger', planning: latestPlan });
-        }
-
-        // Le filtre « Période » se cale sur la PÉRIODE ACTIVE de saisie (la période
-        // travaillée), et non sur les dates du dernier planning généré — qui peut
-        // concerner une période antérieure (ex. démo passée). Repli sur le planning
-        // si aucune période de saisie n'est définie.
-        const periodeFiltre = periode
-          || (latestPlan && { startDate: latestPlan.startDate, endDate: latestPlan.endDate });
-        if (periodeFiltre) {
+          // Le filtre « Période » SUIT le planning affiché (la période générée) : il
+          // se cale sur ses dates au chargement, et est remis à jour à chaque nouvelle
+          // génération (voir handleGeneratePlanning) → filtre et planning toujours alignés.
           setDateFilter({
-            start: periodeFiltre.startDate.split('T')[0],
-            end: periodeFiltre.endDate.split('T')[0]
+            start: latestPlan.startDate.split('T')[0],
+            end: latestPlan.endDate.split('T')[0]
           });
         }
 
@@ -170,32 +164,31 @@ function GestionPlanning() {
       if (!periodeSaisie) { throw new Error('Période de saisie non définie'); }
       if (!listePriorite) { throw new Error("Liste d'ordre de choix manquante"); }
 
-      const newPlanningData = await genererPlanningPriorite(
-        periodeSaisie.startDate,
-        periodeSaisie.endDate,
-        listePriorite
-      );
+      const { startDate, endDate } = periodeSaisie;
+      const newPlanningData = await genererPlanningPriorite(startDate, endDate, listePriorite);
       logger.info('Planning généré par ordre de priorité', { listePriorite });
 
       let nouveau;
       if (planning && planning.id) {
-        nouveau = { ...planning, planning: newPlanningData };
+        // La génération porte TOUJOURS sur la période de saisie active : on recale
+        // aussi les bornes du document, sinon un planning issu d'une période
+        // antérieure garderait des dates qui ne décrivent plus son contenu.
+        nouveau = { ...planning, planning: newPlanningData, startDate, endDate };
         await updatePlanning(planning.id, nouveau);
       } else {
         const savedPlanningId = await savePlanning({
           planning: newPlanningData,
-          startDate: periodeSaisie.startDate,
-          endDate: periodeSaisie.endDate
+          startDate,
+          endDate
         });
-        nouveau = {
-          id: savedPlanningId,
-          planning: newPlanningData,
-          startDate: periodeSaisie.startDate,
-          endDate: periodeSaisie.endDate
-        };
+        nouveau = { id: savedPlanningId, planning: newPlanningData, startDate, endDate };
       }
       dispatch({ type: 'remplacer', planning: nouveau });
       dernierVideRef.current = null;
+      // Le filtre « Période » suit le planning affiché (cf. chargement initial) : sans
+      // ce recalage, un filtre hérité d'une période antérieure masquerait le planning
+      // qu'on vient de générer.
+      setDateFilter({ start: startDate.split('T')[0], end: endDate.split('T')[0] });
 
       showNotification('Planning généré avec succès par ordre de priorité');
       setShowGenerateConfirm(false);
