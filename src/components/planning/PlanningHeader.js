@@ -9,13 +9,16 @@ import {
   Edit2,
   X,
   Download,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Undo2
 } from 'lucide-react';
 import { Button } from '../ui';
 
 const PlanningHeader = ({
   editMode,
   modified,
+  nombreModifications = 0,
+  onUndo,
   onEditToggle,
   onGenerateClick,
   onPublishClick,
@@ -93,6 +96,25 @@ const PlanningHeader = ({
             </>
           ) : (
             <>
+              <span
+                className={`hidden text-sm sm:inline ${modified ? 'font-semibold text-warning-700' : 'text-ink-400'}`}
+                aria-live="polite"
+              >
+                {modified
+                  ? `${nombreModifications} modification${nombreModifications > 1 ? 's' : ''} non sauvegardée${nombreModifications > 1 ? 's' : ''}`
+                  : 'Aucune modification'}
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={<Undo2 size={16} aria-hidden="true" />}
+                onClick={onUndo}
+                disabled={!modified}
+                title="Annuler la dernière affectation (Ctrl+Z)"
+                aria-label="Annuler la dernière affectation"
+              >
+                <span className="hidden sm:inline">Annuler l&apos;action</span>
+              </Button>
               <Button
                 variant="primary"
                 size="sm"

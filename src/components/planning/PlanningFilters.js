@@ -1,8 +1,8 @@
 // src/components/planning/PlanningFilters.js
 import React from 'react';
-import { Filter, ChevronDown, ChevronUp, List, Grid } from 'lucide-react';
+import { Filter, ChevronDown, ChevronUp } from 'lucide-react';
 import MedecinSearchSelect from './components/MedecinSearchSelect';
-import { Card, Select, SegmentedControl } from '../ui';
+import { Card, Select } from '../ui';
 
 const inputClass =
   'w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm text-ink-800 shadow-sm ' +
@@ -17,8 +17,6 @@ const PlanningFilters = ({
   onCreneauFilterChange,
   selectedMedecin,
   onMedecinFilterChange,
-  viewMode,
-  onViewModeChange,
   medecins,
   creneaux
 }) => {
@@ -40,7 +38,7 @@ const PlanningFilters = ({
 
       {showFilters && (
         <div className="border-t border-ink-100 px-6 py-5">
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {/* Filtre par période */}
             <div>
               <label className="mb-2 block text-sm font-semibold text-ink-700">
@@ -92,21 +90,6 @@ const PlanningFilters = ({
                 value={selectedMedecin}
                 onChange={onMedecinFilterChange}
                 placeholder="Rechercher un médecin..."
-              />
-            </div>
-
-            {/* Sélecteur de vue */}
-            <div>
-              <label className="mb-2 block text-sm font-semibold text-ink-700">
-                Mode d&apos;affichage
-              </label>
-              <SegmentedControl
-                value={viewMode}
-                onChange={onViewModeChange}
-                options={[
-                  { value: 'list', label: 'Liste', icon: <List size={16} aria-hidden="true" /> },
-                  { value: 'grid', label: 'Grille', icon: <Grid size={16} aria-hidden="true" /> },
-                ]}
               />
             </div>
           </div>

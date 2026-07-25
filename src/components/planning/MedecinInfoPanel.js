@@ -1,24 +1,42 @@
 // src/components/planning/MedecinInfoPanel.js
+// Panneau d'information du médecin filtré.
+//
+// Correctif d'audit : le compteur « gardes attribuées » cumulait TOUTE la période
+// (3 mois) et le comparait au souhait, qui est MENSUEL — le panneau affichait donc
+// un dépassement quasi permanent. La charge est désormais détaillée MOIS PAR MOIS,
+// seule comparaison qui ait un sens.
 import React from 'react';
 import { User } from 'lucide-react';
-import { compterGardesParMedecin, getNombreGardesSouhaitees } from '../../utils/planningUtils';
+import { souhaitMensuelDe, maxParSemaineDe } from '../../utils/planningEdition';
 import { Card } from '../ui';
 
-const MedecinInfoPanel = ({ medecin, planning, desiderata }) => {
-  if (!medecin) {return null;}
+const MOIS_LONGS = [
+  'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
+  'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'
+];
 
-  const gardesAttribuees = compterGardesParMedecin(planning, medecin.id);
-  const gardesSouhaitees = getNombreGardesSouhaitees(desiderata, medecin.id);
+const libelleMois = (cle) => {
+  const [annee, mois] = cle.split('-');
+  return `${MOIS_LONGS[Number(mois) - 1]} ${annee}`;
+};
 
-  // Rechercher les desiderata les plus récents pour ce médecin
-  const medecinDesiderata = desiderata
-    .filter(d => d.userId === medecin.id)
-    .sort((a, b) => new Date(b.startDate) - new Date(a.startDate))[0];
+const Stat = ({ label, children }) => (
+  <div className="rounded-xl bg-ink-50 p-4">
+    <div className="mb-1 text-sm text-ink-500">{label}</div>
+    {children}
+  </div>
+);
 
-  // Si aucun desiderata n'est trouvé, on affiche "Non défini"
-  const gardesMaxParSemaine = medecinDesiderata?.nombreGardesMaxParSemaine !== undefined
-    ? medecinDesiderata.nombreGardesMaxParSemaine
-    : 'Non défini';
+const MedecinInfoPanel = ({ medecin, idxDesiderata, analyse }) => {
+  if (!medecin) { return null; }
+
+  const souhaitees = souhaitMensuelDe(idxDesiderata, medecin.id);
+  const maxSemaine = maxParSemaineDe(idxDesiderata, medecin.id);
+
+  const parMois = Object.entries(analyse?.parMois || {})
+    .map(([cle, compte]) => ({ cle, total: compte[medecin.id] || 0 }))
+    .sort((a, b) => a.cle.localeCompare(b.cle));
+  const totalPeriode = parMois.reduce((n, m) => n + m.total, 0);
 
   return (
     <Card className="mb-6">
@@ -27,37 +45,49 @@ const MedecinInfoPanel = ({ medecin, planning, desiderata }) => {
           <User size={24} aria-hidden="true" />
         </div>
         <h3 className="text-xl font-bold text-ink-900">
-          Dr. {medecin.prenom} {medecin.nom}
+          {medecin.nom} <span className="font-medium text-ink-500">{medecin.prenom}</span>
         </h3>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <div className="rounded-xl bg-ink-50 p-4">
-          <div className="mb-1 text-sm text-ink-500">
-            Gardes souhaitées / mois
-          </div>
+        <Stat label="Gardes souhaitées / mois">
           <div className="text-2xl font-extrabold text-primary-600">
-            {gardesSouhaitees || 'Non défini'}
+            {souhaitees || 'Non défini'}
           </div>
-        </div>
+        </Stat>
 
-        <div className="rounded-xl bg-ink-50 p-4">
-          <div className="mb-1 text-sm text-ink-500">
-            Gardes max. / semaine
-          </div>
-          <div className="text-2xl font-extrabold text-success-600">
-            {typeof gardesMaxParSemaine === 'number' ? gardesMaxParSemaine : 'Non défini'}
-          </div>
-        </div>
+        <Stat label="Gardes max. / semaine">
+          <div className="text-2xl font-extrabold text-ink-800">{maxSemaine}</div>
+        </Stat>
 
-        <div className="rounded-xl bg-ink-50 p-4">
-          <div className="mb-1 text-sm text-ink-500">
-            Gardes attribuées
-          </div>
-          <div className={`text-2xl font-extrabold ${gardesAttribuees > gardesSouhaitees ? 'text-danger-600' : 'text-success-600'}`}>
-            {gardesAttribuees}
-          </div>
-        </div>
+        <Stat label={`Attribuées sur la période (${totalPeriode})`}>
+          {parMois.length === 0 ? (
+            <div className="text-2xl font-extrabold text-ink-400">0</div>
+          ) : (
+            <ul className="flex flex-wrap gap-1.5">
+              {parMois.map(({ cle, total }) => {
+                const depasse = Boolean(souhaitees) && total > souhaitees;
+                const plein = Boolean(souhaitees) && total === souhaitees;
+                return (
+                  <li
+                    key={cle}
+                    className={`rounded-lg px-2 py-1 text-sm font-semibold tabular-nums ring-1 ring-inset ${
+                      depasse
+                        ? 'bg-danger-50 text-danger-700 ring-danger-200'
+                        : plein
+                          ? 'bg-ink-100 text-ink-700 ring-ink-200'
+                          : 'bg-success-50 text-success-700 ring-success-200'
+                    }`}
+                    title={`${libelleMois(cle)} : ${total} garde${total > 1 ? 's' : ''}${souhaitees ? ` pour ${souhaitees} souhaitée${souhaitees > 1 ? 's' : ''}` : ''}`}
+                  >
+                    <span className="font-normal capitalize">{MOIS_LONGS[Number(cle.split('-')[1]) - 1].slice(0, 4)}.</span>{' '}
+                    {souhaitees ? `${total}/${souhaitees}` : total}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </Stat>
       </div>
     </Card>
   );

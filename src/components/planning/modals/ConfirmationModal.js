@@ -18,7 +18,9 @@ const ConfirmationModal = ({
   confirmLabel = 'Confirmer',
   cancelLabel = 'Annuler',
   icon: Icon = AlertTriangle,
-  tone = 'danger'
+  tone = 'danger',
+  confirmDisabled = false,
+  children = null
 }) => {
   const t = tones[tone] || tones.danger;
 
@@ -32,17 +34,20 @@ const ConfirmationModal = ({
           <Button variant="secondary" onClick={onClose}>
             {cancelLabel}
           </Button>
-          <Button variant={t.variant} onClick={onConfirm}>
+          <Button variant={t.variant} onClick={onConfirm} disabled={confirmDisabled}>
             {confirmLabel}
           </Button>
         </>
       }
     >
-      <div className="flex items-start gap-4">
-        <div className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl ${t.circle}`}>
-          <Icon size={22} aria-hidden="true" />
+      <div className="space-y-4">
+        <div className="flex items-start gap-4">
+          <div className={`flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl ${t.circle}`}>
+            <Icon size={22} aria-hidden="true" />
+          </div>
+          <p className="pt-1 text-sm text-ink-700">{message}</p>
         </div>
-        <p className="pt-1 text-sm text-ink-700">{message}</p>
+        {children}
       </div>
     </Modal>
   );

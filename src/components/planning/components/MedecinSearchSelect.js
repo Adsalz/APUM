@@ -49,7 +49,7 @@ const MedecinSearchSelect = ({
   // Options navigables au clavier : « Tous les médecins » puis les médecins filtrés
   const options = [
     { id: 'all', label: 'Tous les médecins' },
-    ...filteredMedecins.map(m => ({ id: m.id, label: `Dr. ${m.prenom} ${m.nom}` }))
+    ...filteredMedecins.map(m => ({ id: m.id, label: `${m.nom} ${m.prenom}` }))
   ];
 
   const commitSelection = (id) => {
@@ -188,7 +188,8 @@ const MedecinSearchSelect = ({
                 onMouseEnter={() => setActiveIndex(optionIndex)}
                 className={optionClass(value === medecin.id || activeIndex === optionIndex)}
               >
-                Dr. {medecin.prenom} {medecin.nom}
+                <span className="font-semibold">{medecin.nom}</span>{' '}
+                <span className="text-ink-500">{medecin.prenom}</span>
               </button>
             );
           })}
@@ -205,7 +206,7 @@ const MedecinSearchSelect = ({
       {/* Affichage du médecin sélectionné sous l'input */}
       {value !== 'all' && selectedMedecin && !isOpen && (
         <div className="mt-1 text-xs font-medium text-primary-600">
-          Médecin sélectionné : Dr. {selectedMedecin.prenom} {selectedMedecin.nom}
+          Médecin sélectionné : {selectedMedecin.nom} {selectedMedecin.prenom}
         </div>
       )}
     </div>
