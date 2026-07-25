@@ -25,6 +25,13 @@ const GestionPeriodeSaisie = lazy(() => import('./components/GestionPeriodeSaisi
 const PlanningVisualisation = lazy(() => import('./components/PlanningVisualisation'));
 const GestionDesiderata = lazy(() => import('./components/GestionDesiderata'));
 
+// Harnais de développement (jamais monté en production) : rejoue l'écran
+// d'édition du planning sur des données fictives, sans Firebase ni auth.
+const isDev = process.env.NODE_ENV === 'development';
+const PlanningEditPreview = isDev
+  ? lazy(() => import('./devtools/PlanningEditPreview'))
+  : null;
+
 function NotFound() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-ink-100 p-6 text-center">
@@ -75,6 +82,10 @@ const router = createBrowserRouter(
         <Route path="/gestion-periode-saisie" element={<GestionPeriodeSaisie />} />
         <Route path="/gestion-desiderata" element={<GestionDesiderata />} />
       </Route>
+
+      {isDev && (
+        <Route path="/__dev/planning-edit" element={<PlanningEditPreview />} />
+      )}
 
       <Route path="*" element={<NotFound />} />
     </Route>
