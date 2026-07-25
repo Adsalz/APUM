@@ -101,9 +101,18 @@ function GestionPlanning() {
 
         if (latestPlan) {
           dispatch({ type: 'charger', planning: latestPlan });
+        }
+
+        // Le filtre « Période » se cale sur la PÉRIODE ACTIVE de saisie (la période
+        // travaillée), et non sur les dates du dernier planning généré — qui peut
+        // concerner une période antérieure (ex. démo passée). Repli sur le planning
+        // si aucune période de saisie n'est définie.
+        const periodeFiltre = periode
+          || (latestPlan && { startDate: latestPlan.startDate, endDate: latestPlan.endDate });
+        if (periodeFiltre) {
           setDateFilter({
-            start: latestPlan.startDate.split('T')[0],
-            end: latestPlan.endDate.split('T')[0]
+            start: periodeFiltre.startDate.split('T')[0],
+            end: periodeFiltre.endDate.split('T')[0]
           });
         }
 
