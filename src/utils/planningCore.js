@@ -22,7 +22,7 @@ export const creneaux = [
 // Sans ce plafond, la passe principale produisait des enchaînements de 3 créneaux =
 // jusqu'à 18h continues (ex. QUART_2+QUART_3+QUART_4 = 7h→1h). Les passes fallback et
 // largeur imposent déjà « 1/jour » ; ce plafond rend la passe principale cohérente.
-const MAX_CRENEAUX_PAR_JOUR = 2;
+export const MAX_CRENEAUX_PAR_JOUR = 2;
 
 // Effectifs cibles par TYPE DE JOUR, déduits de la feuille de garde de référence
 // APUM (« TABLEAUX MOIS PAR MOIS »). Un JOUR FÉRIÉ compte comme un DIMANCHE
@@ -95,12 +95,24 @@ export const getWeekNumber = (date) => {
   return Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
 };
 
+// Clé de semaine NON AMBIGUË : numéro ISO préfixé de l'année ISO (le lundi de la
+// semaine). `getWeekNumber` seul recollerait la semaine 1 de deux années
+// différentes — sans effet sur une période de 3 mois, mais faux dès qu'un
+// planning couvre plus d'un an. Utilisée par le comptage hebdomadaire et par
+// l'écran d'édition, pour que l'UI et le moteur comptent à l'identique.
+export const cleSemaineISO = (dateString) => {
+  const d = new Date(dateString);
+  d.setUTCHours(0, 0, 0, 0);
+  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7)); // jeudi de la semaine ISO
+  return `${d.getUTCFullYear()}-S${getWeekNumber(dateString)}`;
+};
+
 export const compterGardesParSemaine = (medecinId, date, planning) => {
-  const weekNumber = getWeekNumber(date);
+  const semaine = cleSemaineISO(date);
   let count = 0;
 
   Object.entries(planning).forEach(([planningDate, creneauxDuJour]) => {
-    if (getWeekNumber(planningDate) === weekNumber) {
+    if (cleSemaineISO(planningDate) === semaine) {
       Object.values(creneauxDuJour).forEach(medecins => {
         if (medecins && medecins.includes(medecinId)) {
           count++;
@@ -179,7 +191,7 @@ export const evaluerPlanning = (planning, desiderata) => {
         if (medecinId === null) { continue; }
 
         // Compter les gardes par semaine
-        const semaine = getWeekNumber(date);
+        const semaine = cleSemaineISO(date);
         if (!gardesParMedecinParSemaine[medecinId]) {
           gardesParMedecinParSemaine[medecinId] = {};
         }
@@ -243,7 +255,7 @@ export const verifierContraintes = (planning, desiderata = {}) => {
 
   for (let i = 0; i < dates.length; i++) {
     const date = dates[i];
-    const semaine = getWeekNumber(date);
+    const semaine = cleSemaineISO(date);
     const medecinsDuJour = new Set();
 
     // Chevauchements + comptage des gardes (occurrences de créneaux) par semaine
@@ -314,7 +326,7 @@ export const verifierContraintes = (planning, desiderata = {}) => {
 // (J-1 & J-2) était insuffisant pour la passe LARGEUR, qui s'exécute après coup
 // sur des dates déjà remplies et pouvait donc créer un triplet vers l'avant
 // (ex. placer J alors que J+1 et J+2 sont déjà des gardes). Dates en UTC.
-const creeraitTroisJoursConsecutifs = (medecinId, dateString, planning) => {
+export const creeraitTroisJoursConsecutifs = (medecinId, dateString, planning) => {
   const jour = new Date(dateString);
   const gardeDecalee = (offset) => {
     const d = new Date(jour); d.setUTCDate(d.getUTCDate() + offset);
