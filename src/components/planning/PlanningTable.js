@@ -26,6 +26,19 @@ import useMediaQuery from '../../hooks/useMediaQuery';
 const JOURS = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
 const MOIS = ['jan', 'fév', 'mar', 'avr', 'mai', 'juin', 'juil', 'août', 'sep', 'oct', 'nov', 'déc'];
 
+// Teintes de fond par créneau, reprises du code couleur des tableaux Excel
+// (bleu 1er quart, jaune 2ème, rose renforts, vert 3ème, gris 4ème) —
+// volontairement pâles pour ne pas concurrencer les couleurs d'alerte des
+// places. Le week-end garde son repère : même teinte, un cran plus soutenue.
+const TEINTES_CRENEAU = {
+  QUART_1: { th: 'bg-blue-100', td: 'bg-blue-50/70', we: 'bg-blue-100/70' },
+  QUART_2: { th: 'bg-amber-100', td: 'bg-amber-50/70', we: 'bg-amber-100/70' },
+  RENFORT_1: { th: 'bg-fuchsia-100', td: 'bg-fuchsia-50/70', we: 'bg-fuchsia-100/70' },
+  QUART_3: { th: 'bg-green-100', td: 'bg-green-50/70', we: 'bg-green-100/70' },
+  QUART_4: { th: 'bg-neutral-200', td: 'bg-neutral-100/70', we: 'bg-neutral-200/70' },
+  RENFORT_2: { th: 'bg-fuchsia-100', td: 'bg-fuchsia-50/70', we: 'bg-fuchsia-100/70' },
+};
+
 export const formatDate = (dateString) => {
   const date = new Date(dateString);
   return `${JOURS[date.getUTCDay()]} ${date.getUTCDate()} ${MOIS[date.getUTCMonth()]}`;
@@ -260,8 +273,11 @@ const PlanningTable = ({
                   <span className="text-xs font-bold uppercase tracking-wide text-ink-500">Date</span>
                 </th>
                 {creneauxAffiches.map((creneau) => (
-                  <th key={creneau.id} className="min-w-[190px] border-b border-ink-100 bg-ink-50 px-3 py-3 text-left align-top">
-                    <div className="text-xs font-bold uppercase tracking-wide text-ink-500">
+                  <th
+                    key={creneau.id}
+                    className={`min-w-[190px] border-b border-ink-100 px-3 py-3 text-left align-top ${TEINTES_CRENEAU[creneau.id]?.th || 'bg-ink-50'}`}
+                  >
+                    <div className="text-xs font-bold uppercase tracking-wide text-ink-600">
                       {creneau.label.replace(/\s*\(.*\)$/, '')}
                     </div>
                     <div className="mt-0.5 text-[0.7rem] font-normal text-ink-500">{creneau.hours || ''}</div>
@@ -291,10 +307,16 @@ const PlanningTable = ({
                       const pref = selectedMedecin !== 'all'
                         ? preferencePour(idxDesiderata, selectedMedecin, date, creneau.id)
                         : '';
+                      // Créneau fermé ce jour (ex. renfort hors samedi) : pas de
+                      // teinte, comme la colonne blanche du fichier Excel.
+                      const teinte = nbSlots > 0 ? TEINTES_CRENEAU[creneau.id] : null;
+                      const fondCellule = teinte
+                        ? (weekend ? teinte.we : teinte.td)
+                        : (weekend ? 'bg-primary-50/40' : '');
                       return (
                         <td
                           key={creneau.id}
-                          className={`border-b border-ink-100 px-3 py-3 align-top ${weekend ? 'bg-primary-50/40' : ''}`}
+                          className={`border-b border-ink-100 px-3 py-3 align-top ${fondCellule}`}
                         >
                           {nbSlots > 0 && (
                             <>
@@ -347,9 +369,12 @@ const PlanningTable = ({
                   const nbSlots = occupants?.length ?? effectifPour(creneau.id, date);
                   if (nbSlots === 0) { return null; }
                   return (
-                    <div key={creneau.id}>
+                    <div
+                      key={creneau.id}
+                      className={`rounded-xl px-3 py-2.5 ${TEINTES_CRENEAU[creneau.id]?.td || ''}`}
+                    >
                       <div className="mb-1.5 flex items-baseline gap-2">
-                        <span className="text-xs font-bold uppercase tracking-wide text-ink-500">
+                        <span className="text-xs font-bold uppercase tracking-wide text-ink-600">
                           {creneau.label.replace(/\s*\(.*\)$/, '')}
                         </span>
                         <span className="text-[0.7rem] text-ink-400">{creneau.hours || ''}</span>

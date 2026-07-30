@@ -24,6 +24,7 @@ const GestionPlanning = lazy(() => import('./components/planning/GestionPlanning
 const GestionPeriodeSaisie = lazy(() => import('./components/GestionPeriodeSaisie'));
 const PlanningVisualisation = lazy(() => import('./components/PlanningVisualisation'));
 const GestionDesiderata = lazy(() => import('./components/GestionDesiderata'));
+const DesiderataIndividuels = lazy(() => import('./components/DesiderataIndividuels'));
 
 // Harnais de développement (jamais monté en production) : rejoue l'écran
 // d'édition du planning sur des données fictives, sans Firebase ni auth.
@@ -81,6 +82,7 @@ const router = createBrowserRouter(
         <Route path="/gestion-planning-admin" element={<GestionPlanning />} />
         <Route path="/gestion-periode-saisie" element={<GestionPeriodeSaisie />} />
         <Route path="/gestion-desiderata" element={<GestionDesiderata />} />
+        <Route path="/desiderata-individuels" element={<DesiderataIndividuels />} />
       </Route>
 
       {isDev && (
