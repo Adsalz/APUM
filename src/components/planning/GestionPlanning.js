@@ -101,9 +101,18 @@ function GestionPlanning() {
 
         if (latestPlan) {
           dispatch({ type: 'charger', planning: latestPlan });
-          // Le filtre « Période » SUIT le planning affiché (la période générée) : il
-          // se cale sur ses dates au chargement, et est remis à jour à chaque nouvelle
-          // génération (voir handleGeneratePlanning) → filtre et planning toujours alignés.
+        }
+
+        // Le filtre « Période » démarre TOUJOURS sur la PÉRIODE DE SAISIE
+        // (demande admin) : c'est la période de travail de référence. Il reste
+        // modifiable à la main (ex. n'afficher qu'un seul mois). Sans période
+        // définie, repli sur les dates du planning chargé.
+        if (periode) {
+          setDateFilter({
+            start: periode.startDate.split('T')[0],
+            end: periode.endDate.split('T')[0]
+          });
+        } else if (latestPlan) {
           setDateFilter({
             start: latestPlan.startDate.split('T')[0],
             end: latestPlan.endDate.split('T')[0]
@@ -185,9 +194,9 @@ function GestionPlanning() {
       }
       dispatch({ type: 'remplacer', planning: nouveau });
       dernierVideRef.current = null;
-      // Le filtre « Période » suit le planning affiché (cf. chargement initial) : sans
-      // ce recalage, un filtre hérité d'une période antérieure masquerait le planning
-      // qu'on vient de générer.
+      // Le filtre « Période » revient sur la période de saisie (= la période
+      // générée) : un filtre resserré à la main (ex. un seul mois) masquerait
+      // une partie du planning qu'on vient de générer.
       setDateFilter({ start: startDate.split('T')[0], end: endDate.split('T')[0] });
 
       showNotification('Planning généré avec succès par ordre de priorité');
