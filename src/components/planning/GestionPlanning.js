@@ -423,7 +423,6 @@ function GestionPlanning() {
         medecins={medecins}
         desiderata={desiderata}
         periodeSaisie={periodeSaisie}
-        creneaux={creneaux}
       />
 
       <ExportPlanningModal

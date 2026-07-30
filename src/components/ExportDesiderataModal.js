@@ -1,19 +1,26 @@
 import React, { useState } from 'react';
 import { X, Download, Search } from 'lucide-react';
-import { Modal, Button, Checkbox } from './ui';
+import { Modal, Button, Checkbox, useToast } from './ui';
+import { exportDesiderataToExcel } from '../services/excelExportService';
+import { getPeriodeSaisie } from '../services/planningService';
 import { trierMedecinsParNom } from '../utils/medecins';
+import logger from '../utils/logger';
 
+// Exporte les desiderata des médecins SÉLECTIONNÉS au format Excel de la fiche
+// de référence « DESIDERATA ASO26 » (une feuille par médecin) — le même
+// classeur que l'export de l'écran « Suivi des desiderata ».
 function ExportDesiderataModal({
   isOpen,
   onClose,
   medecins,
   desiderata,
-  _periodeSaisie,
-  _creneaux
+  periodeSaisie
 }) {
   const [selectedMedecins, setSelectedMedecins] = useState({});
   const [selectAll, setSelectAll] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isExporting, setIsExporting] = useState(false);
+  const toast = useToast();
 
   const filteredMedecins = trierMedecinsParNom(medecins.filter(medecin =>
     medecin.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -37,158 +44,29 @@ function ExportDesiderataModal({
     }));
   };
 
-  const formatDate = (dateStr) => {
-    const date = new Date(dateStr);
-    const days = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
-    return `${days[date.getDay()]} ${date.getDate().toString().padStart(2, '0')}/${(date.getMonth() + 1).toString().padStart(2, '0')}`;
-  };
+  const nbSelectionnes = Object.values(selectedMedecins).filter(Boolean).length;
 
-  const getPreferenceSymbol = (preference) => {
-    switch(preference) {
-    case 'Oui': return 'O';
-    case 'Possible': return 'P';
-    case 'Non': return 'N';
-    default: return '-';
+  const exporterExcel = async () => {
+    const selection = trierMedecinsParNom(medecins.filter((m) => selectedMedecins[m.id]));
+    if (selection.length === 0) { return; }
+
+    setIsExporting(true);
+    try {
+      // Filet : l'écran parent peut ne pas avoir encore chargé la période.
+      const periode = periodeSaisie || await getPeriodeSaisie();
+      if (!periode) {
+        toast.error('Aucune période de saisie définie');
+        return;
+      }
+      const result = await exportDesiderataToExcel(selection, desiderata || [], periode);
+      toast.success(result.message);
+      onClose();
+    } catch (error) {
+      logger.error('Erreur lors de l\'export Excel des desiderata:', error);
+      toast.error('Erreur lors de l\'export Excel');
+    } finally {
+      setIsExporting(false);
     }
-  };
-
-  const generatePDF = async () => {
-    // jspdf (~lourd) chargé à la demande pour alléger le bundle initial.
-    const { jsPDF } = await import('jspdf');
-    const doc = new jsPDF();
-    const selectedMedecinsList = medecins.filter(m => selectedMedecins[m.id]);
-    // Ordre canonique (fiche desiderata) : renfort du soir APRÈS le 4ème quart.
-    const creneauxSimplifies = [
-      { id: 'QUART_1', label: 'Q1' },
-      { id: 'QUART_2', label: 'Q2' },
-      { id: 'RENFORT_1', label: 'RM' },
-      { id: 'QUART_3', label: 'Q3' },
-      { id: 'QUART_4', label: 'Q4' },
-      { id: 'RENFORT_2', label: 'RS' }
-    ];
-
-    let currentPage = 1;
-    selectedMedecinsList.forEach((medecin, index) => {
-      if (index > 0) {
-        doc.addPage();
-        currentPage++;
-      }
-
-      const medecinDesiderata = desiderata.find(d => d.userId === medecin.id);
-      const startY = 20;
-
-      // En-tête du médecin
-      doc.setFontSize(14);
-      doc.setFont('helvetica', 'bold');
-      doc.text(`Dr. ${medecin.prenom} ${medecin.nom}`, 20, startY);
-
-      // Informations générales
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      const infoY = startY + 10;
-      doc.text(`Gardes/mois: ${medecinDesiderata?.nombreGardesSouhaitees || '-'}`, 20, infoY);
-      doc.text(`Max/semaine: ${medecinDesiderata?.nombreGardesMaxParSemaine || '-'}`, 90, infoY);
-      doc.text(`Gardes groupées: ${medecinDesiderata?.gardesGroupees ? 'Oui' : 'Non'}`, 20, infoY + 7);
-      doc.text(`Renforts associés: ${medecinDesiderata?.renfortsAssocies ? 'Oui' : 'Non'}`, 90, infoY + 7);
-
-      // Tableau des desiderata
-      const tableStartY = infoY + 15;
-      const cellWidth = 20;
-      const dateWidth = 40;
-      const rowHeight = 7;
-      let currentY = tableStartY;
-
-      // En-têtes des créneaux
-      doc.setFont('helvetica', 'bold');
-      doc.text('Date', 20, currentY);
-      creneauxSimplifies.forEach((creneau, index) => {
-        doc.text(creneau.label, dateWidth + (index * cellWidth) + 7, currentY);
-      });
-      currentY += 5;
-
-      // Ligne de séparation
-      doc.setLineWidth(0.1);
-      doc.line(20, currentY, dateWidth + (creneauxSimplifies.length * cellWidth), currentY);
-      currentY += 5;
-
-      // Données du tableau
-      doc.setFont('helvetica', 'normal');
-      const dates = Object.keys(medecinDesiderata?.desiderata || {}).sort();
-      
-      dates.forEach(date => {
-        // Vérifier s'il faut ajouter une nouvelle page
-        if (currentY > 270) {
-          doc.addPage();
-          currentPage++;
-          currentY = 20;
-          
-          // Répéter les en-têtes sur la nouvelle page
-          doc.setFont('helvetica', 'bold');
-          doc.text('Date', 20, currentY);
-          creneauxSimplifies.forEach((creneau, index) => {
-            doc.text(creneau.label, dateWidth + (index * cellWidth) + 7, currentY);
-          });
-          currentY += 5;
-          doc.line(20, currentY, dateWidth + (creneauxSimplifies.length * cellWidth), currentY);
-          currentY += 5;
-          doc.setFont('helvetica', 'normal');
-        }
-
-        // Date
-        doc.text(formatDate(date), 20, currentY);
-
-        // Préférences
-        creneauxSimplifies.forEach((creneau, index) => {
-          const preference = medecinDesiderata?.desiderata[date]?.[creneau.id];
-          const symbol = getPreferenceSymbol(preference);
-          
-          // Ajouter un rectangle coloré selon la préférence
-          if (symbol !== '-') {
-            doc.setFillColor(
-              symbol === 'O' ? '#BBF7D0' :
-                symbol === 'P' ? '#FEF08A' :
-                  '#FECACA'
-            );
-            doc.rect(dateWidth + (index * cellWidth), currentY - 4, cellWidth, rowHeight, 'F');
-          }
-          
-          doc.text(symbol, dateWidth + (index * cellWidth) + 7, currentY);
-        });
-
-        currentY += rowHeight;
-      });
-
-      // Légende
-      currentY += 10;
-      if (currentY > 270) {
-        doc.addPage();
-        currentPage++;
-        currentY = 20;
-      }
-
-      doc.setFontSize(8);
-      doc.setFillColor('#BBF7D0');
-      doc.rect(20, currentY, 5, 5, 'F');
-      doc.text('O: Oui', 30, currentY + 4);
-
-      doc.setFillColor('#FEF08A');
-      doc.rect(50, currentY, 5, 5, 'F');
-      doc.text('P: Possible', 60, currentY + 4);
-
-      doc.setFillColor('#FECACA');
-      doc.rect(90, currentY, 5, 5, 'F');
-      doc.text('N: Non', 100, currentY + 4);
-
-      doc.setFillColor('#F3F4F6');
-      doc.rect(130, currentY, 5, 5, 'F');
-      doc.text('-: Non spécifié', 140, currentY + 4);
-
-      // Numéro de page
-      doc.setFontSize(8);
-      doc.text(`Page ${currentPage}`, 180, 290);
-    });
-
-    doc.save('desiderata.pdf');
   };
 
   if (!isOpen) {return null;}
@@ -205,11 +83,12 @@ function ExportDesiderataModal({
             Annuler
           </Button>
           <Button
-            onClick={generatePDF}
-            disabled={Object.values(selectedMedecins).filter(Boolean).length === 0}
+            onClick={exporterExcel}
+            loading={isExporting}
+            disabled={nbSelectionnes === 0 || isExporting}
             icon={<Download size={18} />}
           >
-            Exporter en PDF
+            Exporter en Excel
           </Button>
         </>
       }
