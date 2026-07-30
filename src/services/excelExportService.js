@@ -1,5 +1,6 @@
 import logger from '../utils/logger';
 import { estJourFerie } from '../utils/joursFeries';
+import { typeDeJour } from '../utils/planningCore';
 
 // exceljs (~lourd) est chargé à la demande (import dynamique) pour ne pas
 // alourdir le bundle initial : il n'est utile qu'au moment d'un export.
@@ -192,10 +193,17 @@ const createMedecinWorksheet = async (worksheet, medecin, desiderata, datesList)
     }
   });
 
-  // LIGNES 11+ — une ligne par date de la période
+  // LIGNES 11+ — une ligne par date de la période. Au changement de mois, la
+  // bordure haute passe en trait épais sur toute la largeur du tableau
+  // (séparation visuelle entre les mois, demande admin).
   let currentRow = 11;
+  let moisPrecedent = null;
   datesList.forEach((date) => {
     worksheet.getRow(currentRow).height = 32.1;
+
+    const nouveauMois = moisPrecedent !== null && date.getMonth() !== moisPrecedent;
+    moisPrecedent = date.getMonth();
+    const bordure = nouveauMois ? { ...THIN, top: { style: 'medium' } } : THIN;
 
     // Colonne A — date réelle, rouge gras, format long français
     const dateCell = worksheet.getCell(currentRow, 1);
@@ -203,7 +211,7 @@ const createMedecinWorksheet = async (worksheet, medecin, desiderata, datesList)
     dateCell.numFmt = '[$-F800]dddd, mmmm dd, yyyy';
     dateCell.font = { name: 'Calibri', bold: true, size: 18, color: { argb: DESID_RED } };
     dateCell.alignment = { horizontal: 'center' };
-    dateCell.border = THIN;
+    dateCell.border = bordure;
 
     const dateKey = date.toISOString().split('T')[0];
     const dayData = desiderata?.desiderata?.[dateKey];
@@ -211,7 +219,7 @@ const createMedecinWorksheet = async (worksheet, medecin, desiderata, datesList)
     // Colonnes B→G — préférence par créneau (liste déroulante + couleur légende)
     DESID_COLONNES.forEach(({ col, creneauId }) => {
       const cell = worksheet.getCell(currentRow, col);
-      cell.border = THIN;
+      cell.border = bordure;
       cell.alignment = { horizontal: 'center', vertical: 'middle' };
       cell.dataValidation = {
         type: 'list',
@@ -392,17 +400,60 @@ const MOIS_COURTS = ['jan', 'fév', 'mar', 'avr', 'mai', 'juin', 'juil', 'août'
 // Rose des colonnes RENFORT (ARGB repris à l'identique du fichier de référence).
 const RENFORT_PINK = 'FFFF99FF';
 
-// Largeurs des colonnes A→Q (reprises telles quelles du fichier de référence).
+// Couleurs de fond des quarts, reprises du fichier de référence « TABLEAUX MOIS
+// PAR MOIS » (thème Office standard, converti en ARGB) : teinte pleine pour les
+// places toujours staffées, teinte claire pour la place « en plus » du type de
+// jour, gris argent pour les en-têtes DATES / 4ème QUART.
+const PLANNING_FILLS = {
+  bleu: 'FFB4C6E7',        // 1er QUART  (accent1 +60 %)
+  jaune: 'FFFFE699',       // 2ème QUART (accent4 +60 %)
+  jauneClair: 'FFFFF2CC',  //   … place « en plus » (accent4 +80 %)
+  vert: 'FFC6E0B4',        // 3ème QUART (accent6 +60 %)
+  vertClair: 'FFE2EFDA',   //   … place « en plus » (accent6 +80 %)
+  gris: 'FFD9D9D9',        // 4ème QUART (fond −15 %)
+  grisClair: 'FFF2F2F2',   //   … 3ème place (fond −5 %)
+  argent: 'FFC0C0C0',      // en-têtes DATES et 4ème QUART
+};
+
+// Nuance de chaque place selon le TYPE DE JOUR (semaine / samedi / dimanche-férié),
+// relevée sur la feuille de référence : les places au-delà de l'effectif du jour
+// restent blanches (annotations manuelles), la dernière place ouverte est claire.
+const SLOT_FILLS = {
+  QUART_1: {
+    semaine: [PLANNING_FILLS.bleu, PLANNING_FILLS.bleu],
+    samedi: [PLANNING_FILLS.bleu, PLANNING_FILLS.bleu],
+    dimanche: [PLANNING_FILLS.bleu, PLANNING_FILLS.bleu],
+  },
+  QUART_2: {
+    semaine: [PLANNING_FILLS.jaune, PLANNING_FILLS.jaune, PLANNING_FILLS.jauneClair, null],
+    samedi: [PLANNING_FILLS.jaune, PLANNING_FILLS.jaune, PLANNING_FILLS.jaune, null],
+    dimanche: [PLANNING_FILLS.jaune, PLANNING_FILLS.jaune, PLANNING_FILLS.jaune, PLANNING_FILLS.jauneClair],
+  },
+  QUART_3: {
+    semaine: [PLANNING_FILLS.vert, PLANNING_FILLS.vert, PLANNING_FILLS.vertClair, null],
+    samedi: [PLANNING_FILLS.vert, PLANNING_FILLS.vert, PLANNING_FILLS.vert, PLANNING_FILLS.vertClair],
+    dimanche: [PLANNING_FILLS.vert, PLANNING_FILLS.vert, PLANNING_FILLS.vert, PLANNING_FILLS.vertClair],
+  },
+  QUART_4: {
+    semaine: [PLANNING_FILLS.gris, PLANNING_FILLS.gris, PLANNING_FILLS.grisClair],
+    samedi: [PLANNING_FILLS.gris, PLANNING_FILLS.gris, PLANNING_FILLS.grisClair],
+    dimanche: [PLANNING_FILLS.gris, PLANNING_FILLS.gris, PLANNING_FILLS.grisClair],
+  },
+};
+
+// Largeurs des colonnes A→Q (reprises du fichier de référence, renfort du soir
+// déplacé en colonne P avec sa largeur d'origine).
 const PLANNING_COL_WIDTHS = [
   33.3, 32.3, 34.4, 31.6, 31.3, 31.3, 31.6, 32.0, 33.4,
-  34.6, 34.6, 30.9, 35.3, 30.9, 30.9, 30.9, 39.4
+  34.6, 34.6, 30.9, 30.9, 30.9, 30.9, 35.3, 39.4
 ];
 
-// Modèle de colonnes de la feuille de garde, calqué EXACTEMENT sur la feuille
-// papier APUM. Chaque quart occupe un nombre fixe de colonnes ; l'algo remplit
-// autant de places qu'il a de médecins, les colonnes en trop restent vides
-// (annotations manuelles possibles, comme dans le fichier de référence) :
-//   A=DATES | B,C=1er | D,E,F,G=2ème | H=RENFORT | I,J,K,L=3ème | M=RENFORT | N,O,P=4ème | Q=DATES
+// Modèle de colonnes de la feuille de garde, calqué sur la feuille papier APUM
+// avec l'ORDRE CANONIQUE demandé par l'admin (renfort 20h/00h APRÈS le 4ème
+// quart, comme sur la fiche desiderata). Chaque quart occupe un nombre fixe de
+// colonnes ; l'algo remplit autant de places qu'il a de médecins, les colonnes
+// en trop restent vides (annotations manuelles possibles) :
+//   A=DATES | B,C=1er | D,E,F,G=2ème | H=RENFORT | I,J,K,L=3ème | M,N,O=4ème | P=RENFORT | Q=DATES
 const PLANNING_COLUMNS = [
   { type: 'date' },
   { type: 'slot', creneauId: 'QUART_1', slot: 0 },
@@ -416,25 +467,27 @@ const PLANNING_COLUMNS = [
   { type: 'slot', creneauId: 'QUART_3', slot: 1 },
   { type: 'slot', creneauId: 'QUART_3', slot: 2 },
   { type: 'slot', creneauId: 'QUART_3', slot: 3 },
-  { type: 'slot', creneauId: 'RENFORT_2', slot: 0 },
   { type: 'slot', creneauId: 'QUART_4', slot: 0 },
   { type: 'slot', creneauId: 'QUART_4', slot: 1 },
   { type: 'slot', creneauId: 'QUART_4', slot: 2 },
+  { type: 'slot', creneauId: 'RENFORT_2', slot: 0 },
   { type: 'date' },
 ];
 
 // En-têtes (ligne 2). Libellés et espacements repris à l'identique du fichier de
-// référence. startCol/endCol en base 1 (A=1) ; endCol > startCol → fusion.
+// référence ; couleurs de fond idem (quarts teintés, renforts roses, DATES et
+// 4ème QUART gris argent). startCol/endCol en base 1 (A=1) ; endCol > startCol
+// → fusion.
 const HEADER_GROUPS = [
-  { text: 'DATES', startCol: 1, endCol: 1 },
-  { text: '1er QUART      (1h- 7h)', startCol: 2, endCol: 2 },
-  { text: '1er QUART      (1h- 7h)', startCol: 3, endCol: 3 },
-  { text: '2ème QUART (7h - 13h)', startCol: 4, endCol: 7 },
-  { text: 'RENFORT        10h / 13h', startCol: 8, endCol: 8, pink: true },
-  { text: '3ème QUART  (13h - 19h)', startCol: 9, endCol: 12 },
-  { text: 'RENFORT      20H / 00H', startCol: 13, endCol: 13, pink: true },
-  { text: '4ème QUART (19h - 1h)', startCol: 14, endCol: 16 },
-  { text: 'DATES', startCol: 17, endCol: 17 },
+  { text: 'DATES', startCol: 1, endCol: 1, fill: PLANNING_FILLS.argent },
+  { text: '1er QUART      (1h- 7h)', startCol: 2, endCol: 2, fill: PLANNING_FILLS.bleu },
+  { text: '1er QUART      (1h- 7h)', startCol: 3, endCol: 3, fill: PLANNING_FILLS.bleu },
+  { text: '2ème QUART (7h - 13h)', startCol: 4, endCol: 7, fill: PLANNING_FILLS.jaune },
+  { text: 'RENFORT        10h / 13h', startCol: 8, endCol: 8, fill: RENFORT_PINK },
+  { text: '3ème QUART  (13h - 19h)', startCol: 9, endCol: 12, fill: PLANNING_FILLS.vert },
+  { text: '4ème QUART (19h - 1h)', startCol: 13, endCol: 15, fill: PLANNING_FILLS.argent },
+  { text: 'RENFORT      20H / 00H', startCol: 16, endCol: 16, fill: RENFORT_PINK },
+  { text: 'DATES', startCol: 17, endCol: 17, fill: PLANNING_FILLS.argent },
 ];
 
 const THIN_BORDER = {
@@ -444,10 +497,13 @@ const THIN_BORDER = {
   right: { style: 'thin' },
 };
 
-// Parse une clé 'YYYY-MM-DD' en Date locale sans ambiguïté de fuseau horaire.
+// Parse une clé 'YYYY-MM-DD' en Date à MINUIT UTC. ExcelJS sérialise les dates
+// sur l'époque UTC : un minuit LOCAL (UTC+2 en été) s'écrirait « veille 22h00 »
+// dans la cellule, décalant toutes les dates d'un jour à l'affichage Excel
+// (« mar. 30 juin » au lieu de « mer. 01 juil »).
 const parseDateKey = (dateKey) => {
   const [y, m, d] = dateKey.split('-').map(Number);
-  return new Date(y, m - 1, d);
+  return new Date(Date.UTC(y, m - 1, d));
 };
 
 /**
@@ -508,8 +564,9 @@ const makeDisplayName = (medecins) => {
 };
 
 // Remplit une feuille pour un mois donné, au format EXACT de la feuille papier
-// APUM (17 colonnes A→Q, titre « MOIS … », en-têtes, renforts roses, dates en
-// rouge pour les fériés, paysage A4 ajusté à la page).
+// APUM (17 colonnes A→Q, titre « MOIS … », en-têtes, quarts colorés comme les
+// tableaux de référence, renforts roses, dates en rouge pour les fériés,
+// paysage A4 ajusté à la page).
 const buildMonthWorksheet = (worksheet, monthKey, dates, planningData, medecins) => {
   const [year, month] = monthKey.split('-').map(Number);
   const medecinsById = new Map((medecins || []).map((m) => [m.id, m]));
@@ -526,15 +583,15 @@ const buildMonthWorksheet = (worksheet, monthKey, dates, planningData, medecins)
   titleCell.alignment = { horizontal: 'left', vertical: 'middle' };
   worksheet.getRow(1).height = 70.5;
 
-  // Ligne 2 : en-têtes (quarts fusionnés, renforts roses)
+  // Ligne 2 : en-têtes (quarts fusionnés et teintés, renforts roses)
   HEADER_GROUPS.forEach((g) => {
     if (g.endCol > g.startCol) {
       worksheet.mergeCells(2, g.startCol, 2, g.endCol);
     }
     const cell = worksheet.getCell(2, g.startCol);
     cell.value = g.text;
-    if (g.pink) {
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: RENFORT_PINK } };
+    if (g.fill) {
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: g.fill } };
     }
   });
   for (let c = 1; c <= lastCol; c++) {
@@ -549,8 +606,9 @@ const buildMonthWorksheet = (worksheet, monthKey, dates, planningData, medecins)
   let rowIdx = 3;
   dates.forEach((dateKey) => {
     const dateObj = parseDateKey(dateKey);
-    const samedi = dateObj.getDay() === 6;
+    const samedi = dateObj.getUTCDay() === 6; // minuit UTC → jour en UTC
     const ferie = estJourFerie(dateKey);
+    const typeJour = typeDeJour(dateKey);
     const dayData = planningData[dateKey] || {};
 
     PLANNING_COLUMNS.forEach((colDef, i) => {
@@ -572,11 +630,16 @@ const buildMonthWorksheet = (worksheet, monthKey, dates, planningData, medecins)
       cell.font = { name: 'Calibri', bold: true, size: 24 };
       cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
 
-      // Rose des renforts : 20H/00H tous les jours, 10h/13h les samedis.
+      // Couleurs des places, comme la feuille de référence : rose des renforts
+      // (20H/00H tous les jours, 10h/13h les samedis, fériés compris), teinte du
+      // quart selon le type de jour pour les autres.
       const pink = colDef.creneauId === 'RENFORT_2'
         || (colDef.creneauId === 'RENFORT_1' && samedi);
-      if (pink) {
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: RENFORT_PINK } };
+      const fillArgb = pink
+        ? RENFORT_PINK
+        : SLOT_FILLS[colDef.creneauId]?.[typeJour]?.[colDef.slot] || null;
+      if (fillArgb) {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fillArgb } };
       }
 
       const assigned = dayData[colDef.creneauId];
