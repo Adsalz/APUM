@@ -141,5 +141,24 @@ describe('export Excel des desiderata', () => {
       expect(feuille.getCell(`${col}13`).border?.top?.style).toBe('medium');
     });
     expect(feuille.getCell('A14').border?.top?.style).toBe('thin');
+
+    // Toute la ligne d'en-tête est orange, comme le modèle (DATES comprise)
+    ['A', 'B', 'C', 'D', 'E', 'F', 'G'].forEach((col) => {
+      expect(argbDe(feuille.getCell(`${col}10`))).toBe('FFED7D31');
+    });
+
+    // Fonds du modèle : période jeu 30/07 (l.11) → dim 02/08 (l.14).
+    // Renfort samedi : NOIR (condamné) hors samedi, orange foncé le samedi.
+    expect(argbDe(feuille.getCell('D11'))).toBe('FF000000');
+    expect(argbDe(feuille.getCell('D13'))).toBe('FFC55A11');
+    expect(argbDe(feuille.getCell('D14'))).toBe('FF000000');
+    // Week-end grisé (B→G hors renfort), semaine sans fond.
+    expect(argbDe(feuille.getCell('B11'))).toBeNull();
+    expect(argbDe(feuille.getCell('B13'))).toBe('FFD0CECE');
+    expect(argbDe(feuille.getCell('G13'))).toBe('FFD0CECE');
+    expect(argbDe(feuille.getCell('B14'))).toBe('FFD0CECE');
+    // Les cases condamnées n'offrent pas la liste déroulante, les autres si.
+    expect(feuille.getCell('B11').dataValidation).toBeTruthy();
+    expect(feuille.getCell('D11').dataValidation).toBeFalsy();
   });
 });

@@ -80,18 +80,20 @@ export const exportDesiderataToExcel = async (medecins, desiderataList, periode)
  */
 // Couleurs et constantes reprises à l'identique du fichier de référence
 // « DESIDERATA ASO26 ».
-const DESID_YELLOW = 'FFFFFF00';   // bloc « À COMPLÉTER »
-const DESID_ORANGE = 'FFED7D31';   // en-tête RENFORT SAMEDI + 3ème QUART
-const DESID_RED = 'FFFF0000';      // dates, questions
-const DESID_GREEN = 'FF00B050';    // légende « Oui »
-const DESID_AMBER = 'FFFFC000';    // légende « Possible »
+const DESID_YELLOW = 'FFFFFF00';        // bloc « À COMPLÉTER »
+const DESID_ORANGE = 'FFED7D31';        // ligne d'en-tête du tableau (entière)
+const DESID_RED = 'FFFF0000';           // dates, questions
+const DESID_GREEN = 'FF00B050';         // légende « Oui »
+const DESID_AMBER = 'FFFFC000';         // légende « Possible »
+const DESID_GRIS_WEEKEND = 'FFD0CECE';  // lignes samedi / dimanche / férié
+const DESID_NOIR = 'FF000000';          // renfort samedi condamné hors samedi
+const DESID_ORANGE_FONCE = 'FFC55A11';  // renfort samedi le samedi (accent2 −25 %)
 
 // Colonnes B→G du tableau (ordre exact du modèle) : créneau + libellé d'en-tête.
-// Les créneaux « RENFORT SAMEDI » (D) et « 3ème QUART » (E) ont un en-tête orange.
 const DESID_COLONNES = [
   { col: 2, creneauId: 'QUART_1', header: '1er QUART                      (1h- 7h)' },
   { col: 3, creneauId: 'QUART_2', header: '2ème QUART                                                             (7h - 13h)' },
-  { col: 4, creneauId: 'RENFORT_1', orange: true, header: {
+  { col: 4, creneauId: 'RENFORT_1', header: {
     richText: [
       { font: { bold: true, underline: true, size: 14, name: 'Comic Sans MS', family: 4 }, text: 'RENFORT' },
       { font: { bold: true, size: 14, name: 'Comic Sans MS', family: 4 }, text: ' ' },
@@ -99,7 +101,7 @@ const DESID_COLONNES = [
       { font: { bold: true, size: 14, name: 'Comic Sans MS', family: 4 }, text: ' 10H/13H                                        ' },
     ],
   } },
-  { col: 5, creneauId: 'QUART_3', orange: true, header: '3ème QUART                                             (13h - 19h)' },
+  { col: 5, creneauId: 'QUART_3', header: '3ème QUART                                             (13h - 19h)' },
   { col: 6, creneauId: 'QUART_4', header: '4ème QUART                                                         (19h - 1h)' },
   { col: 7, creneauId: 'RENFORT_2', header: 'RENFORT 20H / 00H' },
 ];
@@ -174,23 +176,24 @@ const createMedecinWorksheet = async (worksheet, medecin, desiderata, datesList)
   kPoss.value = 'Possible';
   kPoss.font = { name: 'Calibri', bold: true, size: 18, color: { argb: DESID_AMBER } };
 
-  // LIGNE 10 — en-tête du tableau (Comic Sans MS)
+  // LIGNE 10 — en-tête du tableau (Comic Sans MS, entièrement orange comme le
+  // modèle : DATES comprise)
   worksheet.getRow(10).height = 108.75;
   const headerFont = { name: 'Comic Sans MS', bold: true, size: 14 };
+  const orangeFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: DESID_ORANGE } };
   const hDate = worksheet.getCell('A10');
   hDate.value = 'DATES';
   hDate.font = headerFont;
   hDate.alignment = { horizontal: 'center' };
   hDate.border = THIN;
-  DESID_COLONNES.forEach(({ col, header, orange }) => {
+  hDate.fill = orangeFill;
+  DESID_COLONNES.forEach(({ col, header }) => {
     const cell = worksheet.getCell(10, col);
     cell.value = header;
     cell.font = headerFont;
     cell.alignment = { horizontal: 'center', wrapText: true };
     cell.border = THIN;
-    if (orange) {
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: DESID_ORANGE } };
-    }
+    cell.fill = orangeFill;
   });
 
   // LIGNES 11+ — une ligne par date de la période. Au changement de mois, la
@@ -215,12 +218,29 @@ const createMedecinWorksheet = async (worksheet, medecin, desiderata, datesList)
 
     const dateKey = date.toISOString().split('T')[0];
     const dayData = desiderata?.desiderata?.[dateKey];
+    // Dates générées à MIDI local → getDay() rend le jour local correct.
+    const samedi = date.getDay() === 6;
+    const weekendOuFerie = date.getDay() === 0 || samedi || estJourFerie(dateKey);
 
-    // Colonnes B→G — préférence par créneau (liste déroulante + couleur légende)
+    // Colonnes B→G — préférence par créneau (liste déroulante + couleur légende).
+    // Fonds repris du modèle : lignes week-end/férié grisées, colonne RENFORT
+    // SAMEDI orange foncé le samedi et NOIRE (condamnée, sans liste déroulante)
+    // les autres jours.
     DESID_COLONNES.forEach(({ col, creneauId }) => {
       const cell = worksheet.getCell(currentRow, col);
       cell.border = bordure;
       cell.alignment = { horizontal: 'center', vertical: 'middle' };
+
+      if (creneauId === 'RENFORT_1' && !samedi) {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: DESID_NOIR } };
+        return;
+      }
+      if (creneauId === 'RENFORT_1') {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: DESID_ORANGE_FONCE } };
+      } else if (weekendOuFerie) {
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: DESID_GRIS_WEEKEND } };
+      }
+
       cell.dataValidation = {
         type: 'list',
         allowBlank: true,
