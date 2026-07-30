@@ -108,6 +108,7 @@ function DesiderataIndividuels() {
 
   const dates = useMemo(() => (periode ? generateDatesList(periode) : []), [periode]);
   const ficheMedecin = desiderataDocs.find((d) => d.userId === selectedId);
+  const medecinSelectionne = medecins.find((m) => m.id === selectedId);
   const planningJours = useMemo(() => planning?.planning || {}, [planning]);
 
   // Gardes attribuées au médecin sélectionné, comptées par mois.
@@ -199,19 +200,29 @@ function DesiderataIndividuels() {
 
         {periode && selectedId && (
           <>
-            {/* Gardes attribuées par mois vs souhait mensuel */}
+            {/* Gardes attribuées par mois vs souhait mensuel : le mois passe en
+                vert quand le souhait est atteint. */}
             <div className="mb-4 flex flex-wrap items-center gap-2">
-              {moisPeriode.map((mois) => (
-                <span
-                  key={mois}
-                  className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1 text-xs font-semibold text-ink-700 ring-1 ring-inset ring-ink-200"
-                >
-                  {libelleMoisAnnee(mois)} :
-                  <span className="font-extrabold text-success-700">{gardesParMois[mois] || 0}</span>
-                  garde{(gardesParMois[mois] || 0) > 1 ? 's' : ''} attribuée{(gardesParMois[mois] || 0) > 1 ? 's' : ''}
-                  {souhaitMensuel ? ` / ${souhaitMensuel} souhaitée${souhaitMensuel > 1 ? 's' : ''}` : ''}
-                </span>
-              ))}
+              {moisPeriode.map((mois) => {
+                const attribuees = gardesParMois[mois] || 0;
+                const objectifAtteint = souhaitMensuel && attribuees >= souhaitMensuel;
+                return (
+                  <span
+                    key={mois}
+                    className={`inline-flex items-baseline gap-1.5 rounded-full px-3.5 py-1.5 text-xs ring-1 ring-inset ${
+                      objectifAtteint
+                        ? 'bg-success-50 text-success-800 ring-success-300'
+                        : 'bg-white text-ink-700 ring-ink-200'
+                    }`}
+                  >
+                    <span className="font-bold uppercase tracking-wide opacity-70">{libelleMoisAnnee(mois)}</span>
+                    <span className="text-sm font-extrabold">{attribuees}</span>
+                    <span className="font-semibold">
+                      garde{attribuees > 1 ? 's' : ''}{souhaitMensuel ? ` / ${souhaitMensuel} souhaitée${souhaitMensuel > 1 ? 's' : ''}` : ' attribuée' + (attribuees > 1 ? 's' : '')}
+                    </span>
+                  </span>
+                );
+              })}
             </div>
 
             {!ficheMedecin && (
@@ -220,17 +231,35 @@ function DesiderataIndividuels() {
               </Card>
             )}
 
-            {/* Bloc jaune « À COMPLÉTER » de la fiche */}
+            {/* En-tête de la fiche : nom du médecin + bloc jaune « À COMPLÉTER »
+                recomposé en trois réponses lisibles (jaune et rouge de la fiche
+                conservés, appliqués avec plus de retenue). */}
             <Card className="mb-4 overflow-hidden p-0">
-              <div className="bg-[#FFFF00] px-5 py-4">
-                <p className="text-sm font-extrabold uppercase tracking-wide text-ink-900">
-                  A compléter obligatoirement
+              <div className="flex flex-wrap items-baseline gap-x-2 border-b border-ink-100 px-5 py-3">
+                <span className="text-xs font-bold uppercase tracking-wide text-ink-400">Nom et prénom</span>
+                <span className="text-base font-extrabold text-ink-900">
+                  Dr {medecinSelectionne?.prenom} {(medecinSelectionne?.nom || '').toUpperCase()}
+                </span>
+              </div>
+              <div className="relative bg-[#FFFF00]/20 px-5 py-4 pl-6">
+                <span aria-hidden="true" className="absolute inset-y-0 left-0 w-1.5 bg-[#FFE699]" />
+                <p className="text-[0.7rem] font-extrabold uppercase tracking-widest text-ink-500">
+                  À compléter obligatoirement
                 </p>
-                <div className="mt-2 space-y-1 text-sm font-bold text-[#FF0000]">
-                  <p>1 - Nombre de gardes par mois souhaité : {souhaitMensuel ?? '—'} /mois</p>
-                  <p>2 - Gardes groupées dans un même week-end : {ouiNon(ficheMedecin?.gardesGroupees)}</p>
-                  <p>3 - Les renforts associés à une garde : {ouiNon(ficheMedecin?.renfortsAssocies)}</p>
-                </div>
+                <dl className="mt-2.5 grid gap-x-8 gap-y-2 sm:grid-cols-3">
+                  <div>
+                    <dt className="text-xs font-semibold text-ink-600">Gardes souhaitées par mois</dt>
+                    <dd className="mt-0.5 text-lg font-extrabold leading-tight text-[#FF0000]">{souhaitMensuel ?? '—'}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-semibold text-ink-600">Gardes groupées le même week-end</dt>
+                    <dd className="mt-0.5 text-lg font-extrabold leading-tight text-[#FF0000]">{ouiNon(ficheMedecin?.gardesGroupees)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-semibold text-ink-600">Renforts associés à une garde</dt>
+                    <dd className="mt-0.5 text-lg font-extrabold leading-tight text-[#FF0000]">{ouiNon(ficheMedecin?.renfortsAssocies)}</dd>
+                  </div>
+                </dl>
               </div>
             </Card>
 
@@ -240,16 +269,16 @@ function DesiderataIndividuels() {
                 <table className="w-full border-collapse text-sm">
                   <thead>
                     <tr>
-                      <th className="sticky left-0 top-0 z-30 border-b border-ink-300 bg-[#ED7D31] px-4 py-3 text-left text-xs font-extrabold uppercase text-ink-900">
+                      <th className="sticky left-0 top-0 z-30 border-b-2 border-b-[#C55A11] bg-[#ED7D31] px-4 py-3 text-left text-xs font-extrabold uppercase tracking-wide text-ink-900">
                         Dates
                       </th>
                       {FICHE_COLONNES.map((col) => (
                         <th
                           key={col.id}
-                          className="sticky top-0 z-20 min-w-[110px] border-b border-l border-ink-300 bg-[#ED7D31] px-3 py-3 text-left"
+                          className="sticky top-0 z-20 min-w-[110px] border-b-2 border-b-[#C55A11] border-l border-l-white/40 bg-[#ED7D31] px-3 py-3 text-left"
                         >
-                          <div className="text-xs font-extrabold uppercase text-ink-900">{col.label}</div>
-                          <div className="text-[0.7rem] font-semibold text-ink-800">{col.hours}</div>
+                          <div className="text-xs font-extrabold uppercase tracking-wide text-ink-900">{col.label}</div>
+                          <div className="text-[0.7rem] font-semibold text-ink-900/60">{col.hours}</div>
                         </th>
                       ))}
                     </tr>
@@ -263,7 +292,7 @@ function DesiderataIndividuels() {
                       const nouveauMois = index > 0 &&
                         dateKey.slice(0, 7) !== dates[index - 1].toISOString().slice(0, 7);
                       // Séparation entre les mois : bordure haute épaisse, comme l'export.
-                      const bordMois = nouveauMois ? 'border-t-[3px] border-t-ink-900' : '';
+                      const bordMois = nouveauMois ? 'border-t-[3px] border-t-ink-800' : '';
                       const reponses = ficheMedecin?.desiderata?.[dateKey];
                       return (
                         <tr key={dateKey}>
@@ -293,13 +322,15 @@ function DesiderataIndividuels() {
                               >
                                 {!condamnee && (
                                   <span className="flex items-center gap-1.5">
-                                    <span className={`font-bold ${COULEUR_PREF[pref] || 'text-ink-400'}`}>
+                                    {/* Sur le fond orange foncé du renfort samedi, le
+                                        texte passe en blanc pour rester lisible. */}
+                                    <span className={`font-bold ${col.id === 'RENFORT_1' ? 'text-white' : (COULEUR_PREF[pref] || 'text-ink-400')}`}>
                                       {pref || ''}
                                     </span>
                                     {attribuee && (
                                       <span
                                         title="Garde attribuée dans le planning en cours"
-                                        className="inline-flex shrink-0 items-center justify-center rounded-full bg-success-600 p-0.5 text-white"
+                                        className="inline-flex shrink-0 items-center justify-center rounded-full bg-success-600 p-0.5 text-white shadow-sm ring-2 ring-white/70"
                                       >
                                         <Check size={11} strokeWidth={3.5} aria-label="Garde attribuée" />
                                       </span>

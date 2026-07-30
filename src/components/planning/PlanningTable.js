@@ -26,17 +26,18 @@ import useMediaQuery from '../../hooks/useMediaQuery';
 const JOURS = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
 const MOIS = ['jan', 'fév', 'mar', 'avr', 'mai', 'juin', 'juil', 'août', 'sep', 'oct', 'nov', 'déc'];
 
-// Fonds par créneau : les couleurs EXACTES des exports Excel (bleu B4C6E7,
-// jaune FFE699, rose FF99FF, vert C6E0B4, gris D9D9D9), appliquées telles
-// quelles aux en-têtes et aux cellules — le repère week-end reste porté par
-// la colonne des dates, comme dans le fichier Excel.
+// Fonds par créneau : le pigment EXACT des exports Excel (bleu B4C6E7, jaune
+// FFE699, rose FF99FF, vert C6E0B4, gris D9D9D9). Couleur PLEINE sur les
+// en-têtes et les week-ends (le repère week-end reste lisible dans la grille),
+// voile du même pigment les jours de semaine pour laisser respirer les
+// pastilles d'alerte. `accent` : liseré des cartes mobiles.
 const TEINTES_CRENEAU = {
-  QUART_1: { th: 'bg-[#B4C6E7]', td: 'bg-[#B4C6E7]', we: 'bg-[#B4C6E7]' },
-  QUART_2: { th: 'bg-[#FFE699]', td: 'bg-[#FFE699]', we: 'bg-[#FFE699]' },
-  RENFORT_1: { th: 'bg-[#FF99FF]', td: 'bg-[#FF99FF]', we: 'bg-[#FF99FF]' },
-  QUART_3: { th: 'bg-[#C6E0B4]', td: 'bg-[#C6E0B4]', we: 'bg-[#C6E0B4]' },
-  QUART_4: { th: 'bg-[#D9D9D9]', td: 'bg-[#D9D9D9]', we: 'bg-[#D9D9D9]' },
-  RENFORT_2: { th: 'bg-[#FF99FF]', td: 'bg-[#FF99FF]', we: 'bg-[#FF99FF]' },
+  QUART_1: { th: 'bg-[#B4C6E7]', td: 'bg-[#B4C6E7]/60', we: 'bg-[#B4C6E7]', accent: 'border-l-[#B4C6E7]' },
+  QUART_2: { th: 'bg-[#FFE699]', td: 'bg-[#FFE699]/60', we: 'bg-[#FFE699]', accent: 'border-l-[#FFE699]' },
+  RENFORT_1: { th: 'bg-[#FF99FF]', td: 'bg-[#FF99FF]/50', we: 'bg-[#FF99FF]/80', accent: 'border-l-[#FF99FF]' },
+  QUART_3: { th: 'bg-[#C6E0B4]', td: 'bg-[#C6E0B4]/60', we: 'bg-[#C6E0B4]', accent: 'border-l-[#C6E0B4]' },
+  QUART_4: { th: 'bg-[#D9D9D9]', td: 'bg-[#D9D9D9]/60', we: 'bg-[#D9D9D9]', accent: 'border-l-[#D9D9D9]' },
+  RENFORT_2: { th: 'bg-[#FF99FF]', td: 'bg-[#FF99FF]/50', we: 'bg-[#FF99FF]/80', accent: 'border-l-[#FF99FF]' },
 };
 
 export const formatDate = (dateString) => {
@@ -269,18 +270,18 @@ const PlanningTable = ({
             </colgroup>
             <thead>
               <tr>
-                <th className="sticky left-0 z-10 border-b border-ink-100 bg-ink-50 px-3 py-3 text-left align-top">
-                  <span className="text-xs font-bold uppercase tracking-wide text-ink-500">Date</span>
+                <th className="sticky left-0 z-10 bg-ink-50 px-3 py-3 text-left align-top shadow-[inset_0_-2px_0_rgba(15,23,42,0.10)]">
+                  <span className="text-xs font-extrabold uppercase tracking-wide text-ink-500">Date</span>
                 </th>
                 {creneauxAffiches.map((creneau) => (
                   <th
                     key={creneau.id}
-                    className={`min-w-[190px] border-b border-ink-100 px-3 py-3 text-left align-top ${TEINTES_CRENEAU[creneau.id]?.th || 'bg-ink-50'}`}
+                    className={`min-w-[190px] border-l border-l-white/70 px-3 py-3 text-left align-top shadow-[inset_0_-2px_0_rgba(15,23,42,0.10)] ${TEINTES_CRENEAU[creneau.id]?.th || 'bg-ink-50'}`}
                   >
-                    <div className="text-xs font-bold uppercase tracking-wide text-ink-600">
+                    <div className="text-xs font-extrabold uppercase tracking-wide text-ink-800">
                       {creneau.label.replace(/\s*\(.*\)$/, '')}
                     </div>
-                    <div className="mt-0.5 text-[0.7rem] font-normal text-ink-500">{creneau.hours || ''}</div>
+                    <div className="mt-0.5 text-[0.7rem] font-semibold text-ink-700/70">{creneau.hours || ''}</div>
                   </th>
                 ))}
               </tr>
@@ -316,7 +317,7 @@ const PlanningTable = ({
                       return (
                         <td
                           key={creneau.id}
-                          className={`border-b border-ink-100 px-3 py-3 align-top ${fondCellule}`}
+                          className={`border-b border-ink-100 border-l border-l-white/70 px-3 py-3 align-top ${fondCellule}`}
                         >
                           {nbSlots > 0 && (
                             <>
@@ -368,10 +369,11 @@ const PlanningTable = ({
                   const occupants = planningJours[date]?.[creneau.id];
                   const nbSlots = occupants?.length ?? effectifPour(creneau.id, date);
                   if (nbSlots === 0) { return null; }
+                  const teinte = TEINTES_CRENEAU[creneau.id];
                   return (
                     <div
                       key={creneau.id}
-                      className={`rounded-xl px-3 py-2.5 ${TEINTES_CRENEAU[creneau.id]?.td || ''}`}
+                      className={`rounded-xl border-l-4 px-3 py-2.5 ${teinte?.td || ''} ${teinte?.accent || 'border-l-transparent'}`}
                     >
                       <div className="mb-1.5 flex items-baseline gap-2">
                         <span className="text-xs font-bold uppercase tracking-wide text-ink-600">
