@@ -26,17 +26,17 @@ import useMediaQuery from '../../hooks/useMediaQuery';
 const JOURS = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
 const MOIS = ['jan', 'fév', 'mar', 'avr', 'mai', 'juin', 'juil', 'août', 'sep', 'oct', 'nov', 'déc'];
 
-// Teintes de fond par créneau, reprises du code couleur des tableaux Excel
-// (bleu 1er quart, jaune 2ème, rose renforts, vert 3ème, gris 4ème) —
-// volontairement pâles pour ne pas concurrencer les couleurs d'alerte des
-// places. Le week-end garde son repère : même teinte, un cran plus soutenue.
+// Fonds par créneau : les couleurs EXACTES des exports Excel (bleu B4C6E7,
+// jaune FFE699, rose FF99FF, vert C6E0B4, gris D9D9D9), appliquées telles
+// quelles aux en-têtes et aux cellules — le repère week-end reste porté par
+// la colonne des dates, comme dans le fichier Excel.
 const TEINTES_CRENEAU = {
-  QUART_1: { th: 'bg-blue-100', td: 'bg-blue-50/70', we: 'bg-blue-100/70' },
-  QUART_2: { th: 'bg-amber-100', td: 'bg-amber-50/70', we: 'bg-amber-100/70' },
-  RENFORT_1: { th: 'bg-fuchsia-100', td: 'bg-fuchsia-50/70', we: 'bg-fuchsia-100/70' },
-  QUART_3: { th: 'bg-green-100', td: 'bg-green-50/70', we: 'bg-green-100/70' },
-  QUART_4: { th: 'bg-neutral-200', td: 'bg-neutral-100/70', we: 'bg-neutral-200/70' },
-  RENFORT_2: { th: 'bg-fuchsia-100', td: 'bg-fuchsia-50/70', we: 'bg-fuchsia-100/70' },
+  QUART_1: { th: 'bg-[#B4C6E7]', td: 'bg-[#B4C6E7]', we: 'bg-[#B4C6E7]' },
+  QUART_2: { th: 'bg-[#FFE699]', td: 'bg-[#FFE699]', we: 'bg-[#FFE699]' },
+  RENFORT_1: { th: 'bg-[#FF99FF]', td: 'bg-[#FF99FF]', we: 'bg-[#FF99FF]' },
+  QUART_3: { th: 'bg-[#C6E0B4]', td: 'bg-[#C6E0B4]', we: 'bg-[#C6E0B4]' },
+  QUART_4: { th: 'bg-[#D9D9D9]', td: 'bg-[#D9D9D9]', we: 'bg-[#D9D9D9]' },
+  RENFORT_2: { th: 'bg-[#FF99FF]', td: 'bg-[#FF99FF]', we: 'bg-[#FF99FF]' },
 };
 
 export const formatDate = (dateString) => {

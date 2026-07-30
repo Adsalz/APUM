@@ -10,7 +10,8 @@ import {
   X,
   Download,
   FileSpreadsheet,
-  Undo2
+  Undo2,
+  ExternalLink
 } from 'lucide-react';
 import { Button } from '../ui';
 
@@ -26,6 +27,7 @@ const PlanningHeader = ({
   onBackClick,
   onExportClick,
   onExportPlanningClick,
+  onOpenDesiderataClick,
   planning
 }) => {
   return (
@@ -49,6 +51,15 @@ const PlanningHeader = ({
         <div className="flex flex-wrap items-center gap-2">
           {!editMode ? (
             <>
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={<ExternalLink size={16} aria-hidden="true" />}
+                onClick={onOpenDesiderataClick}
+                title="Ouvrir la fiche desiderata d'un médecin dans une fenêtre séparée"
+              >
+                Voir desiderata
+              </Button>
               <Button
                 variant="secondary"
                 size="sm"

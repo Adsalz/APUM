@@ -1,6 +1,6 @@
 // src/components/planning/PlanningFilters.js
 import React from 'react';
-import { Filter, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
+import { Filter, ChevronDown, ChevronUp } from 'lucide-react';
 import MedecinSearchSelect from './components/MedecinSearchSelect';
 import { Card, Select } from '../ui';
 
@@ -91,19 +91,6 @@ const PlanningFilters = ({
                 onChange={onMedecinFilterChange}
                 placeholder="Rechercher un médecin..."
               />
-              {/* Fiche desiderata au format Excel, dans un onglet séparé : permet
-                  de garder le planning et la fiche côte à côte. */}
-              <a
-                href={selectedMedecin !== 'all'
-                  ? `/desiderata-individuels?medecin=${selectedMedecin}`
-                  : '/desiderata-individuels'}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-primary-600 transition-colors hover:text-primary-700 hover:underline"
-              >
-                <ExternalLink size={13} aria-hidden="true" />
-                Voir la fiche desiderata (nouvel onglet)
-              </a>
             </div>
           </div>
         </div>

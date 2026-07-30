@@ -328,6 +328,15 @@ function GestionPlanning() {
         onBackClick={handleBack}
         onExportClick={() => setShowExportModal(true)}
         onExportPlanningClick={() => setShowExportPlanningModal(true)}
+        onOpenDesiderataClick={() => {
+          // Fiche desiderata dans une FENÊTRE séparée (pas un onglet) : l'admin
+          // garde le planning et la fiche côte à côte. Fenêtre nommée → un
+          // nouveau clic re-navigue la même fenêtre (ex. autre médecin filtré).
+          const url = selectedMedecin !== 'all'
+            ? `/desiderata-individuels?medecin=${selectedMedecin}`
+            : '/desiderata-individuels';
+          window.open(url, 'apum-desiderata-individuels', 'width=1080,height=950');
+        }}
         planning={planning}
       />
 
