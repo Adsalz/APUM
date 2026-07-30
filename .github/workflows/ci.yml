@@ -28,10 +28,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20
+      # Node 24 LTS = npm 11, comme le poste qui maintient package-lock.json.
+      # npm 11 n'installe plus les peer-dependencies OPTIONNELLES (ex. yaml
+      # pour tailwind) : un lock npm 11 fait échouer `npm ci` sous npm 10
+      # (« Missing: yaml@x.y.z from lock file »), d'où les échecs CI sous Node 20.
+      - name: Setup Node.js 24
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - name: Install dependencies
