@@ -7,6 +7,7 @@ import { twMerge } from 'tailwind-merge';
 import { Sparkles, ChevronDown } from 'lucide-react';
 import { Card } from '../ui';
 import { estJourFerie } from '../../utils/joursFeries';
+import { libelleMoisAnnee } from '../../utils/mois';
 import { CHOIX_DISPONIBILITE } from '../../constants/creneaux';
 
 // Habillage coloré du sélecteur de choix selon la valeur.
@@ -36,6 +37,11 @@ function formatDate(date) {
 }
 
 function DesiderataTable({ dates, creneaux, desiderata, onChange }) {
+  // Bandeaux de séparation entre les mois, uniquement si la période de saisie
+  // en couvre plusieurs (demande admin).
+  const moisKeys = dates.map((date) => date.toISOString().slice(0, 7));
+  const multiMois = new Set(moisKeys).size > 1;
+
   return (
     <Card className="overflow-hidden p-0">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-ink-100 px-5 py-4">
@@ -84,13 +90,28 @@ function DesiderataTable({ dates, creneaux, desiderata, onChange }) {
             </tr>
           </thead>
           <tbody>
-            {dates.map((date) => {
+            {dates.map((date, index) => {
               const isHighlighted = isWeekendOrHoliday(date);
               const dateString = date.toISOString().split('T')[0];
               const rowBg = isHighlighted ? 'bg-primary-50/40' : 'bg-white';
               const d = formatDate(date);
+              const nouveauMois = multiMois &&
+                (index === 0 || moisKeys[index] !== moisKeys[index - 1]);
               return (
-                <tr key={dateString} className={twMerge('group', rowBg)}>
+                <React.Fragment key={dateString}>
+                {nouveauMois && (
+                  <tr>
+                    <td
+                      colSpan={creneaux.length + 1}
+                      className="border-y-2 border-ink-200 bg-ink-100 px-4 py-1.5"
+                    >
+                      <span className="sticky left-0 inline-block text-xs font-extrabold uppercase tracking-wider text-ink-600">
+                        {libelleMoisAnnee(dateString)}
+                      </span>
+                    </td>
+                  </tr>
+                )}
+                <tr className={twMerge('group', rowBg)}>
                   <td
                     className={twMerge(
                       'border-b border-ink-100 px-4 py-2.5 font-semibold',
@@ -153,6 +174,7 @@ function DesiderataTable({ dates, creneaux, desiderata, onChange }) {
                     );
                   })}
                 </tr>
+                </React.Fragment>
               );
             })}
           </tbody>

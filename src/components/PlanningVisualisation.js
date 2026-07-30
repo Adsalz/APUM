@@ -18,6 +18,7 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import logger from '../utils/logger';
 import { estJourFerie } from '../utils/joursFeries';
+import { libelleMoisAnnee } from '../utils/mois';
 // Créneaux (avec teinte `chip`) : source unique partagée avec les formulaires.
 import { CRENEAUX as creneaux } from '../constants/creneaux';
 
@@ -172,6 +173,10 @@ function PlanningVisualisation() {
       ? allDates.filter(date => creneaux.some(c => cellIds(date, c.id).length > 0))
       : allDates;
 
+  // Bandeaux de séparation entre les mois, uniquement si la période en couvre
+  // plusieurs (demande admin : « ligne de séparation entre les mois »).
+  const multiMois = new Set(filteredDates.map(date => date.slice(0, 7))).size > 1;
+
   return (
     <div className="min-h-screen bg-ink-100">
       <AppHeader
@@ -273,12 +278,27 @@ function PlanningVisualisation() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredDates.map(date => {
+                  {filteredDates.map((date, index) => {
                     const we = isWeekend(date);
                     const rowBg = we ? 'bg-primary-50/40' : 'bg-white';
                     const d = formatDate(date);
+                    const nouveauMois = multiMois &&
+                      (index === 0 || date.slice(0, 7) !== filteredDates[index - 1].slice(0, 7));
                     return (
-                      <tr key={date} className={rowBg}>
+                      <React.Fragment key={date}>
+                      {nouveauMois && (
+                        <tr>
+                          <td
+                            colSpan={creneaux.length + 1}
+                            className="border-y-2 border-ink-200 bg-ink-100 px-4 py-1.5"
+                          >
+                            <span className="sticky left-0 inline-block text-xs font-extrabold uppercase tracking-wider text-ink-600">
+                              {libelleMoisAnnee(date)}
+                            </span>
+                          </td>
+                        </tr>
+                      )}
+                      <tr className={rowBg}>
                         <td className={twMerge('sticky left-0 z-10 border-b border-ink-100 px-4 py-2.5 font-semibold', rowBg)}>
                           <span className="flex items-baseline gap-1.5">
                             <span className={twMerge('text-xs font-bold uppercase', we ? 'text-primary-600' : 'text-ink-500')}>{d.day}</span>
@@ -319,6 +339,7 @@ function PlanningVisualisation() {
                           );
                         })}
                       </tr>
+                      </React.Fragment>
                     );
                   })}
                 </tbody>

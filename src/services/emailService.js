@@ -1,6 +1,7 @@
 import { db } from '../firebase';
 import { collection, addDoc, Timestamp, getDocs, query, where, orderBy, limit } from 'firebase/firestore';
 import logger from '../utils/logger';
+import { trierMedecinsParNom } from '../utils/medecins';
 
 // Collection pour stocker les demandes d'emails à envoyer
 const EMAIL_QUEUE_COLLECTION = 'email_queue';
@@ -97,14 +98,16 @@ export const envoyerRelancesEnMasse = async (medecins, subject, message) => {
  * @param {Array} desiderataStatus - Statut des desiderata
  */
 export const getMedecinsSansDesiderata = (medecins, desiderataStatus) => {
-  return medecins.filter(medecin => {
+  const sansDesiderata = medecins.filter(medecin => {
     const medecinDesiderata = desiderataStatus?.find(d => d.userId === medecin.id);
-    
+
     // Médecin n'a pas saisi du tout ou a une saisie incomplète
-    return !medecinDesiderata || 
-           !medecinDesiderata.desiderata || 
+    return !medecinDesiderata ||
+           !medecinDesiderata.desiderata ||
            Object.keys(medecinDesiderata.desiderata || {}).length === 0;
   });
+  // Ordre alphabétique (demande admin) — l'ordre Firestore est arbitraire.
+  return trierMedecinsParNom(sansDesiderata);
 };
 
 /**

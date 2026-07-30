@@ -11,6 +11,7 @@
 import React, { useMemo, useRef } from 'react';
 import { AlertTriangle, CalendarX2 } from 'lucide-react';
 import { effectifPour } from '../../utils/planningCore';
+import { libelleMoisAnnee } from '../../utils/mois';
 import {
   cleSlot,
   preferencePour,
@@ -217,6 +218,13 @@ const PlanningTable = ({
 
   const largeurColonne = `${100 / Math.max(1, creneauxAffiches.length)}%`;
 
+  // Bandeaux de séparation entre les mois, uniquement si la période affichée
+  // en couvre plusieurs (demande admin).
+  const multiMois = new Set(dates.map((d) => d.slice(0, 7))).size > 1;
+  const debutDeMois = (index) => multiMois &&
+    (index === 0 || dates[index].slice(0, 7) !== dates[index - 1].slice(0, 7));
+  const bandeauMois = 'border-y-2 border-ink-200 bg-ink-100 px-4 py-1.5 text-xs font-extrabold uppercase tracking-wider text-ink-600';
+
   if (dates.length === 0) {
     return (
       <div className="rounded-2xl border border-ink-100 bg-white p-10 text-center shadow-card">
@@ -262,10 +270,18 @@ const PlanningTable = ({
               </tr>
             </thead>
             <tbody>
-              {dates.map((date) => {
+              {dates.map((date, index) => {
                 const weekend = estWeekEnd(date);
                 return (
-                  <tr key={date} className={weekend ? 'bg-primary-50/40' : 'bg-white'}>
+                  <React.Fragment key={date}>
+                  {debutDeMois(index) && (
+                    <tr>
+                      <td colSpan={creneauxAffiches.length + 1} className={bandeauMois}>
+                        <span className="sticky left-0 inline-block">{libelleMoisAnnee(date)}</span>
+                      </td>
+                    </tr>
+                  )}
+                  <tr className={weekend ? 'bg-primary-50/40' : 'bg-white'}>
                     <td className={`sticky left-0 z-10 border-b border-ink-100 px-3 py-3 align-top text-sm font-semibold text-ink-800 ${weekend ? 'bg-primary-50' : 'bg-white'}`}>
                       {formatDate(date)}
                     </td>
@@ -303,6 +319,7 @@ const PlanningTable = ({
                       );
                     })}
                   </tr>
+                  </React.Fragment>
                 );
               })}
             </tbody>
@@ -313,10 +330,14 @@ const PlanningTable = ({
       {/* ---------- Cartes par jour (< lg) ---------- */}
       {!grandEcran && (
         <div className="divide-y divide-ink-100">
-        {dates.map((date) => {
+        {dates.map((date, index) => {
           const weekend = estWeekEnd(date);
           return (
-            <section key={date} className={weekend ? 'bg-primary-50/40' : ''}>
+            <React.Fragment key={date}>
+            {debutDeMois(index) && (
+              <div className={bandeauMois}>{libelleMoisAnnee(date)}</div>
+            )}
+            <section className={weekend ? 'bg-primary-50/40' : ''}>
               <h3 className="sticky top-16 z-10 border-b border-ink-100 bg-ink-50/95 px-4 py-2 text-sm font-bold text-ink-800 backdrop-blur">
                 {formatDate(date)}
               </h3>
@@ -346,6 +367,7 @@ const PlanningTable = ({
                 })}
               </div>
             </section>
+            </React.Fragment>
           );
         })}
         </div>

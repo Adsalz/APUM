@@ -6,6 +6,7 @@ import DesiderataStatus from './DesiderataStatus';
 import RelanceEmailModal from './RelanceEmailModal';
 import { getMedecinsSansDesiderata } from '../services/emailService';
 import { exportDesiderataToExcel } from '../services/excelExportService';
+import { trierMedecinsParNom } from '../utils/medecins';
 import {
   AppHeader,
   LoadingScreen,
@@ -33,7 +34,9 @@ function GestionDesiderata() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const medecinsList = await getMedecins();
+        // Tri alphabétique (demande admin) : liste de suivi, relances et
+        // classeur Excel exporté suivent tous cet ordre.
+        const medecinsList = trierMedecinsParNom(await getMedecins());
         setMedecins(medecinsList);
 
         const statusData = await getDesiderataStatus();

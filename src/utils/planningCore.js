@@ -7,13 +7,17 @@
 import logger from './logger';
 import { estJourFerie } from './joursFeries';
 
+// ORDRE CANONIQUE (demande admin, aligné sur la fiche desiderata papier) : le
+// RENFORT 20h/00h vient APRÈS le 4ème quart. Cet ordre pilote l'affichage
+// (écran d'édition) et sert de départage stable dans la passe de remplissage —
+// aucune logique métier ne dépend de la position d'un créneau.
 export const creneaux = [
   { id: 'QUART_1', label: '1er QUART (1h - 7h)', medecins: 2 },
   { id: 'QUART_2', label: '2ème QUART (7h - 13h)', medecins: 3 },
   { id: 'RENFORT_1', label: 'RENFORT 10h / 13h', medecins: 1, samediOnly: true },
   { id: 'QUART_3', label: '3ème QUART (13h - 19h)', medecins: 3 },
-  { id: 'RENFORT_2', label: 'RENFORT 20H / 00H', medecins: 1 },
-  { id: 'QUART_4', label: '4ème QUART (19h - 1h)', medecins: 3 }
+  { id: 'QUART_4', label: '4ème QUART (19h - 1h)', medecins: 3 },
+  { id: 'RENFORT_2', label: 'RENFORT 20H / 00H', medecins: 1 }
 ];
 
 // Plafond de créneaux (gardes) qu'un même médecin peut cumuler le MÊME jour.
@@ -44,8 +48,8 @@ const EFFECTIFS_PAR_TYPE_JOUR = {
   QUART_2:   { semaine: 3, samedi: 3, dimanche: 4 },
   RENFORT_1: { semaine: 0, samedi: 1, dimanche: 0 },
   QUART_3:   { semaine: 3, samedi: 4, dimanche: 4 },
-  RENFORT_2: { semaine: 1, samedi: 1, dimanche: 1 },
   QUART_4:   { semaine: 3, samedi: 3, dimanche: 3 },
+  RENFORT_2: { semaine: 1, samedi: 1, dimanche: 1 },
 };
 
 // Type de jour pour les effectifs : 'samedi' | 'dimanche' | 'semaine'.

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, Download, Search } from 'lucide-react';
 import { Modal, Button, Checkbox } from './ui';
+import { trierMedecinsParNom } from '../utils/medecins';
 
 function ExportDesiderataModal({
   isOpen,
@@ -14,10 +15,10 @@ function ExportDesiderataModal({
   const [selectAll, setSelectAll] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const filteredMedecins = medecins.filter(medecin => 
+  const filteredMedecins = trierMedecinsParNom(medecins.filter(medecin =>
     medecin.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
     medecin.prenom.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  ));
 
   const toggleSelectAll = () => {
     const newState = !selectAll;
@@ -56,13 +57,14 @@ function ExportDesiderataModal({
     const { jsPDF } = await import('jspdf');
     const doc = new jsPDF();
     const selectedMedecinsList = medecins.filter(m => selectedMedecins[m.id]);
+    // Ordre canonique (fiche desiderata) : renfort du soir APRÈS le 4ème quart.
     const creneauxSimplifies = [
       { id: 'QUART_1', label: 'Q1' },
       { id: 'QUART_2', label: 'Q2' },
       { id: 'RENFORT_1', label: 'RM' },
       { id: 'QUART_3', label: 'Q3' },
-      { id: 'RENFORT_2', label: 'RS' },
-      { id: 'QUART_4', label: 'Q4' }
+      { id: 'QUART_4', label: 'Q4' },
+      { id: 'RENFORT_2', label: 'RS' }
     ];
 
     let currentPage = 1;
