@@ -68,11 +68,14 @@ export const idSlot = (date, creneauId, index) => `slot-${date}-${creneauId}-${i
 const SlotLecture = React.memo(function SlotLecture({
   id, nom, prenom, niveau, detailProblemes, estFiltre
 }) {
+  // Place vide : c'est CE que l'admin cherche → blanc PLEIN sur le fond coloré
+  // de la colonne, bord pointillé appuyé. Une place pourvue sans problème est
+  // au contraire translucide et se fond dans la couleur du créneau.
   if (!nom && !prenom) {
     return (
       <span
         id={id}
-        className="inline-flex items-center gap-1 rounded-lg border border-dashed border-warning-400 bg-warning-50/50 px-2 py-1 text-xs font-semibold text-warning-800"
+        className="inline-flex items-center gap-1 rounded-lg border-2 border-dashed border-warning-500 bg-white px-2 py-1 text-xs font-bold text-warning-800 shadow-sm"
       >
         <CalendarX2 size={12} aria-hidden="true" />
         Non pourvu
@@ -84,7 +87,7 @@ const SlotLecture = React.memo(function SlotLecture({
     ? 'bg-danger-50 text-danger-800 ring-danger-300'
     : niveau === NIVEAUX.FORT
       ? 'bg-warning-50 text-warning-800 ring-warning-300'
-      : 'bg-ink-50 text-ink-800 ring-ink-200';
+      : 'bg-white/40 text-ink-900 ring-ink-900/10';
 
   return (
     <span
@@ -166,7 +169,7 @@ const Legende = () => (
   <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 border-b border-ink-100 bg-ink-50/60 px-4 py-2 text-[0.7rem] text-ink-600">
     <span className="font-semibold uppercase tracking-wide text-ink-400">Légende</span>
     <span className="inline-flex items-center gap-1.5">
-      <span className="h-3 w-3 rounded border border-dashed border-warning-400 bg-warning-50" />
+      <span className="h-3 w-3 rounded border-2 border-dashed border-warning-500 bg-white" />
       Place non pourvue
     </span>
     <span className="inline-flex items-center gap-1.5">

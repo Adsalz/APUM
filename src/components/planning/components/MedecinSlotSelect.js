@@ -228,6 +228,9 @@ const MedecinSlotSelect = ({
   const initiale = prenom ? `${prenom.charAt(0).toUpperCase()}.` : '';
 
   // Case fermée : neutre par défaut, colorée UNIQUEMENT si quelque chose cloche.
+  // Sur les colonnes teintées, une place pourvue sans problème est translucide
+  // (elle se fond dans la couleur du créneau) ; une place VIDE — ce que l'admin
+  // cherche — est en blanc PLEIN avec un bord pointillé appuyé.
   const classeCase = [
     'flex w-full items-center gap-1.5 rounded-lg border py-1.5 pl-2.5 pr-1.5 text-left text-sm shadow-sm',
     'transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500/30',
@@ -236,9 +239,8 @@ const MedecinSlotSelect = ({
         ? 'border-danger-300 bg-danger-50/60 hover:border-danger-400'
         : niveauProbleme === NIVEAUX.FORT
           ? 'border-warning-300 bg-warning-50/50 hover:border-warning-400'
-          : 'border-ink-200 bg-white hover:border-ink-300')
-      // Place vide : c'est CE que l'admin cherche → traitement visible et actionnable.
-      : 'border-dashed border-warning-400 bg-warning-50/40 hover:border-warning-500 hover:bg-warning-50'
+          : 'border-ink-900/10 bg-white/40 hover:border-ink-900/25 hover:bg-white/60')
+      : 'border-2 border-dashed border-warning-500 bg-white hover:border-warning-600 hover:bg-warning-50'
   ].join(' ');
 
   const ligneCandidat = (c, optionIndex) => {
