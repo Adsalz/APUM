@@ -145,6 +145,28 @@ describe('planningEdition — détection des problèmes', () => {
     expect(pbsM2.map((p) => p.code)).not.toContain('quota');
   });
 
+  // L'écran d'édition doit signaler la MÊME contrainte que le moteur : deux nuits
+  // (1h-7h) d'affilée sont interdites, y compris posées à la main.
+  it('signale deux nuits consécutives, en avant comme en arrière', () => {
+    const jours = { [D1]: { QUART_1: ['m1'] }, [D2]: { QUART_1: [null] } };
+    const idxP = indexerPlanning({ planning: jours });
+    const codes = problemesCandidat('m1', D2, 'QUART_1', jours, idxP, idx).map((p) => p.code);
+    expect(codes).toContain('nuitsConsecutives');
+
+    // Contrôle symétrique : la veille encore libre, le LENDEMAIN déjà pris.
+    const joursApres = { [D1]: { QUART_1: [null] }, [D2]: { QUART_1: ['m1'] } };
+    const codesAvant = problemesCandidat('m1', D1, 'QUART_1', joursApres,
+      indexerPlanning({ planning: joursApres }), idx).map((p) => p.code);
+    expect(codesAvant).toContain('nuitsConsecutives');
+  });
+
+  it('ne signale rien pour deux jours d\'affilée sur un AUTRE créneau', () => {
+    const jours = { [D1]: { QUART_3: ['m1'] }, [D2]: { QUART_3: [null] } };
+    const codes = problemesCandidat('m1', D2, 'QUART_3', jours,
+      indexerPlanning({ planning: jours }), idx).map((p) => p.code);
+    expect(codes).not.toContain('nuitsConsecutives');
+  });
+
   it('problemesCandidat anticipe le quota AVANT affectation', () => {
     const jours = { [D1]: { QUART_1: ['m1'], QUART_2: ['m1'], QUART_3: [null] } };
     const idxP = indexerPlanning({ planning: jours });
