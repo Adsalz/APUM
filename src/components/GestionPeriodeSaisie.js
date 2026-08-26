@@ -39,7 +39,7 @@ function GestionPeriodeSaisie() {
     setIsSaving(true);
     try {
       await setPeriodeSaisie(startDate, endDate);
-      toast.success('Période de saisie mise à jour avec succès ! Les desiderata obsolètes ont été supprimés.');
+      toast.success('Période de saisie mise à jour avec succès !');
     } catch (error) {
       logger.error('Erreur lors de la mise à jour de la période de saisie:', error);
       toast.error('Une erreur est survenue lors de la mise à jour de la période de saisie');
@@ -79,7 +79,8 @@ function GestionPeriodeSaisie() {
           </h1>
           <p className="mt-1 text-sm text-ink-500">
             Configurez la période pendant laquelle les médecins pourront saisir leurs desiderata.
-            Les desiderata en dehors de cette période seront automatiquement supprimés.
+            Les desiderata des périodes précédentes sont conservés : ils restent consultables
+            en revenant sur leurs dates.
           </p>
         </div>
 
@@ -123,9 +124,9 @@ function GestionPeriodeSaisie() {
             </div>
 
             {/* Message d'information persistant */}
-            <Alert kind="warning" className="mt-5">
-              Attention : la modification de la période de saisie entraînera la suppression des
-              desiderata obsolètes.
+            <Alert kind="info" className="mt-5">
+              Les médecins verront le formulaire de cette période dès validation. Aucun desiderata
+              n'est supprimé : ceux des autres périodes restent en base.
             </Alert>
           </form>
         </Card>

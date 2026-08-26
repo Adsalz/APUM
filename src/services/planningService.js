@@ -63,48 +63,24 @@ export const setPeriodeSaisie = async (startDate, endDate) => {
       endDate: convertToTimestamp(endDate)
     });
 
-    await deleteObsoleteDesiderata(startDate, endDate);
-
-    logger.debug('Période de saisie mise à jour et desiderata obsolètes supprimés');
+    logger.debug('Période de saisie mise à jour');
   } catch (error) {
     logger.error('Erreur lors de la mise à jour de la période de saisie:', error);
     throw error;
   }
 };
 
-const deleteObsoleteDesiderata = async (newStartDate, newEndDate) => {
-  try {
-    const desiderataRef = collection(db, DESIDERATA_COLLECTION);
-    const q = query(desiderataRef);
-    const querySnapshot = await getDocs(q);
-
-    // Firestore limite un batch à 500 opérations : on découpe par lots de 450
-    const toDelete = querySnapshot.docs.filter((d) =>
-      isDesiderataObsolete(d.data(), newStartDate, newEndDate)
-    );
-
-    const BATCH_LIMIT = 450;
-    for (let i = 0; i < toDelete.length; i += BATCH_LIMIT) {
-      const batch = writeBatch(db);
-      toDelete.slice(i, i + BATCH_LIMIT).forEach((d) => batch.delete(d.ref));
-      await batch.commit();
-    }
-
-    logger.debug(`Desiderata obsolètes supprimés: ${toDelete.length}`);
-  } catch (error) {
-    logger.error('Erreur lors de la suppression des desiderata obsolètes:', error);
-    throw error;
-  }
-};
-
-const isDesiderataObsolete = (desiderata, newStartDate, newEndDate) => {
-  const desiderataStart = desiderata.startDate.toDate();
-  const desiderataEnd = desiderata.endDate.toDate();
-  const newStart = new Date(newStartDate);
-  const newEnd = new Date(newEndDate);
-
-  return desiderataEnd < newStart || desiderataStart > newEnd;
-};
+// NOTE — pourquoi il n'y a PAS de suppression en cascade ici.
+// Jusqu'en août 2026, définir la période effaçait tout desiderata entièrement
+// hors de la nouvelle période. Conséquence : impossible de revenir consulter un
+// trimestre passé sans détruire celui en cours, et toute période refermée était
+// perdue. Décision (août 2026) : on CONSERVE les anciennes périodes — le coût est
+// négligeable (≈ 130 à 170 Kio par fiche, mesuré ; ≈ 10 Mio par trimestre, contre
+// 1 Gio offerts, soit ~25 ans de conservation) et l'historique sert à calibrer le
+// générateur. Les requêtes filtrent par dates sur index : les anciennes périodes
+// ne sont ni lues ni facturées.
+// Faire le ménage est désormais un geste EXPLICITE, hors application :
+// scripts/supprimer-desiderata-periode.js (sauvegarde + confirmation).
 
 export const getPeriodeSaisie = async () => {
   try {
