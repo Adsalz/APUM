@@ -4,6 +4,7 @@ import {
   verifierContraintes,
   evaluerPlanning,
   computePriorite,
+  creeraitCreneauxConsecutifs,
 } from '../planningCore';
 
 // Dates déterministes quel que soit le fuseau de la machine.
@@ -249,5 +250,69 @@ describe('planningCore — correctifs d’audit (B1 consécutifs, B3 plafond/jou
     const totalA = Object.values(planning).reduce((n, jour) =>
       n + Object.values(jour).filter((s) => s.includes('a')).length, 0);
     expect(totalA).toBeGreaterThan(8); // dépasse le DEFAUT_GARDES_MENSUEL (comble les vacances)
+  });
+});
+
+
+// Règles de répartition du 1er quart (1h-7h), déduites de la feuille de référence
+// APUM ASO26 et validées avec la coordinatrice.
+describe('planningCore — 1er quart : équité mensuelle et pas deux nuits d\'affilée', () => {
+  const noms = { A: 'a', B: 'b', C: 'c' };
+  const listePriorite = { premierTour: ['A', 'B', 'C'], deuxiemeTour: ['C', 'B', 'A'] };
+
+  const nuitsDe = (planning, id) =>
+    Object.values(planning).filter((jour) => (jour.QUART_1 || []).includes(id)).length;
+
+  it('sert la 1re nuit de chacun avant d\'en donner une 2e — malgré l\'ordre de choix', () => {
+    // Trois médecins également disponibles : sans équité, « A » (1er de l'ordre)
+    // raflerait les nuits jusqu'à épuisement de son quota.
+    const desiderata = desiderataUniforme(['a', 'b', 'c'], '2026-06-01', '2026-06-30', 'Oui');
+    const planning = computePriorite('2026-06-01', '2026-06-30', desiderata, noms, listePriorite);
+    const nuits = ['a', 'b', 'c'].map((id) => nuitsDe(planning, id));
+    // Écart maximal d'une nuit entre le plus et le moins servi.
+    expect(Math.max(...nuits) - Math.min(...nuits)).toBeLessThanOrEqual(1);
+  });
+
+  it('ne place JAMAIS deux nuits consécutives, quitte à laisser la place vide', () => {
+    const desiderata = desiderataUniforme(['a', 'b', 'c'], '2026-06-01', '2026-06-30', 'Oui');
+    const planning = computePriorite('2026-06-01', '2026-06-30', desiderata, noms, listePriorite);
+    const dates = Object.keys(planning).sort();
+    for (let i = 1; i < dates.length; i += 1) {
+      const veille = (planning[dates[i - 1]].QUART_1 || []).filter(Boolean);
+      const jour = (planning[dates[i]].QUART_1 || []).filter(Boolean);
+      jour.forEach((m) => expect(veille).not.toContain(m));
+    }
+  });
+
+  it('laisse la nuit NON POURVUE plutôt que de doubler le seul médecin disponible', () => {
+    // « a » est le seul à pouvoir faire les nuits des 1er et 2 juin.
+    const desiderata = {
+      a: {
+        nombreGardesSouhaitees: 10,
+        nombreGardesMaxParSemaine: 7,
+        preferences: {
+          '2026-06-01': { QUART_1: 'Oui' },
+          '2026-06-02': { QUART_1: 'Oui' },
+        },
+      },
+    };
+    const planning = computePriorite('2026-06-01', '2026-06-02', desiderata, { A: 'a' },
+      { premierTour: ['A'], deuxiemeTour: ['A'] });
+    const nuits1 = planning['2026-06-01'].QUART_1.filter(Boolean);
+    const nuits2 = planning['2026-06-02'].QUART_1.filter(Boolean);
+    expect(nuits1).toContain('a');
+    expect(nuits2).toEqual([]); // vide : « a » a déjà fait la veille
+  });
+
+  it('creeraitCreneauxConsecutifs ne s\'applique qu\'au 1er quart', () => {
+    const planning = { '2026-06-01': { QUART_1: ['a'], QUART_3: ['a'] } };
+    expect(creeraitCreneauxConsecutifs('a', '2026-06-02', 'QUART_1', planning)).toBe(true);
+    expect(creeraitCreneauxConsecutifs('a', '2026-06-02', 'QUART_3', planning)).toBe(false);
+    expect(creeraitCreneauxConsecutifs('b', '2026-06-02', 'QUART_1', planning)).toBe(false);
+  });
+
+  it('contrôle SYMÉTRIQUE : le lendemain déjà rempli bloque aussi', () => {
+    const planning = { '2026-06-03': { QUART_1: ['a'] } };
+    expect(creeraitCreneauxConsecutifs('a', '2026-06-02', 'QUART_1', planning)).toBe(true);
   });
 });

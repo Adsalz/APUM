@@ -28,6 +28,25 @@ export const creneaux = [
 // largeur imposent déjà « 1/jour » ; ce plafond rend la passe principale cohérente.
 export const MAX_CRENEAUX_PAR_JOUR = 2;
 
+// Créneaux dont la charge est RÉPARTIE ÉQUITABLEMENT entre les médecins avant
+// d'être doublée : on sert la 1re du mois à chacun avant d'en donner une 2e à
+// quiconque. Déduit de la feuille de référence APUM ASO26, où le 1er quart
+// (1h-7h) suit une règle d'équité que l'ordre de choix ne produit pas seul :
+// 25 médecins sur 36 y ont EXACTEMENT 3 nuits sur le trimestre (= 1 par mois),
+// les 11 autres — des volontaires — absorbant le surplus (jusqu'à 11 nuits).
+// Sans cette règle, la répartition dérivait de la seule disponibilité déclarée
+// (un médecin à 12 nuits, un autre à 1) — écart signalé par la coordinatrice.
+// Ce n'est PAS un quota imposé : qui n'a déclaré aucune disponibilité de nuit
+// n'en reçoit aucune, et le surplus va à ceux qui peuvent le prendre.
+export const CRENEAUX_REPARTITION_EQUITABLE = ['QUART_1'];
+
+// Créneaux qu'un même médecin ne peut PAS prendre deux jours d'affilée. Règle
+// observée sur la feuille de référence APUM ASO26 : le 2 août, la coordinatrice
+// a laissé une place de nuit VIDE plutôt que de redonner un 1h-7h au seul médecin
+// encore disponible, qui en avait déjà fait un la veille. La couverture cède donc
+// devant cette contrainte — c'est un arbitrage assumé, pas un effet de bord.
+export const CRENEAUX_SANS_JOURS_CONSECUTIFS = ['QUART_1'];
+
 // Effectifs cibles par TYPE DE JOUR, déduits de la feuille de garde de référence
 // APUM (« TABLEAUX MOIS PAR MOIS »). Un JOUR FÉRIÉ compte comme un DIMANCHE
 // (vérifié sur la référence : le 15/08, pourtant un samedi, n'a pas de renfort
@@ -72,6 +91,14 @@ export const effectifPour = (creneauId, dateString) => {
   return parType ? (parType[typeDeJour(dateString)] || 0) : 0;
 };
 
+// Créneaux qui se recouvrent DANS LA MÊME JOURNÉE — un médecin ne peut pas tenir
+// les deux à la fois.
+//
+// DÉLIBÉRÉMENT ABSENT : l'enchaînement 4ème quart (19h-1h) puis 1er quart (1h-7h)
+// LE LENDEMAIN, soit 19h→7h d'affilée. Ce n'est pas un oubli — arbitrage de la
+// coordinatrice (août 2026) : un médecin qui répond « Oui » à la soirée ET « Oui »
+// à la nuit qui suit a le droit de faire les deux. La feuille de référence ASO26
+// en contient 25 occurrences. Ne pas « corriger » sans revalider avec elle.
 const creneauxChevauchants = {
   'QUART_2': ['RENFORT_1'],
   'RENFORT_1': ['QUART_2'],
@@ -351,7 +378,23 @@ export const creeraitTroisJoursConsecutifs = (medecinId, dateString, planning) =
 // le quota mensuel (souhait). Ordre de choix respecté : à créneau donné, priorité au médecin
 // le mieux placé dans l'ordre, préférences « Oui » avant « Possible ». Les médecins sans
 // souhait explicite (0) restent flexibles (bornés par le max hebdo), ils comblent les vacances.
-const remplirJourEnCouverture = (dateString, ordrePriorite, mapMedecinNomVersId, desiderata, planning, gardesAttribuees) => {
+// Renvoie true si affecter ce médecin à ce créneau créerait deux jours consécutifs
+// sur un créneau à repos obligatoire (1h-7h). Contrôle SYMÉTRIQUE (veille ET
+// lendemain) : la passe de remplissage progresse jour par jour, mais les deux
+// tours de l'ordre de choix se partagent le même planning, et un jour ultérieur
+// peut déjà être rempli. Dates en UTC, comme creeraitTroisJoursConsecutifs.
+export const creeraitCreneauxConsecutifs = (medecinId, dateString, creneauId, planning) => {
+  if (!CRENEAUX_SANS_JOURS_CONSECUTIFS.includes(creneauId)) { return false; }
+  const jour = new Date(dateString);
+  const aLeCreneau = (offset) => {
+    const d = new Date(jour); d.setUTCDate(d.getUTCDate() + offset);
+    const cle = d.toISOString().split('T')[0];
+    return Boolean(planning[cle]?.[creneauId]?.includes(medecinId));
+  };
+  return aLeCreneau(-1) || aLeCreneau(1);
+};
+
+const remplirJourEnCouverture = (dateString, ordrePriorite, mapMedecinNomVersId, desiderata, planning, gardesAttribuees, gardesParCreneau = {}) => {
   const mois = dateString.slice(0, 7);
   const jour = planning[dateString];
   const cids = creneaux.map((c) => c.id).filter((id) => jour[id]); // créneaux ouverts ce jour, ordre canonique
@@ -364,6 +407,8 @@ const remplirJourEnCouverture = (dateString, ordrePriorite, mapMedecinNomVersId,
   }
 
   const gardesMois = (id) => (gardesAttribuees[id]?.[mois] || 0);
+  // Nombre de fois que ce médecin a déjà pris CE créneau CE mois-ci (répartition équitable).
+  const gardesCreneauMois = (id, cid) => (gardesParCreneau[id]?.[mois]?.[cid] || 0);
   const gardesJour = (id) => Object.values(jour).reduce((n, arr) => n + (arr.includes(id) ? 1 : 0), 0);
 
   // Préférence ('Oui'/'Possible') si le médecin est éligible pour ce créneau ; sinon null.
@@ -378,18 +423,30 @@ const remplirJourEnCouverture = (dateString, ordrePriorite, mapMedecinNomVersId,
     if (compterGardesParSemaine(id, dateString, planning) >= maxSem) { return null; }
     if (gardesJour(id) >= MAX_CRENEAUX_PAR_JOUR) { return null; }
     if (aCreneauxChevauchants(id, dateString, cid, planning)) { return null; }
+    if (creeraitCreneauxConsecutifs(id, dateString, cid, planning)) { return null; }
     if (creeraitTroisJoursConsecutifs(id, dateString, planning)) { return null; }
     return pref;
   };
 
   // Candidats éligibles pour un créneau, triés : Oui avant Possible, puis ordre de choix.
+  // Pour les créneaux à répartition équitable (1h-7h), le nombre de fois que le
+  // médecin a DÉJÀ pris ce créneau dans le mois passe AVANT tout le reste : chacun
+  // reçoit sa 1re nuit avant que quiconque en reçoive une 2e. À égalité de charge,
+  // on retombe sur les critères habituels (Oui avant Possible, puis ordre de choix).
   const candidatsPour = (cid) => {
+    const equitableCid = CRENEAUX_REPARTITION_EQUITABLE.includes(cid);
     const out = [];
     for (const id of ids) {
       const pref = prefEligible(id, cid);
-      if (pref) { out.push({ id, possible: pref === 'Possible' ? 1 : 0 }); }
+      if (pref) {
+        out.push({
+          id,
+          possible: pref === 'Possible' ? 1 : 0,
+          deja: equitableCid ? gardesCreneauMois(id, cid) : 0,
+        });
+      }
     }
-    out.sort((a, b) => (a.possible - b.possible) || (rank[a.id] - rank[b.id]));
+    out.sort((a, b) => (a.deja - b.deja) || (a.possible - b.possible) || (rank[a.id] - rank[b.id]));
     return out;
   };
 
@@ -409,6 +466,9 @@ const remplirJourEnCouverture = (dateString, ordrePriorite, mapMedecinNomVersId,
       jour[cid][jour[cid].indexOf(null)] = choisi;
       gardesAttribuees[choisi] = gardesAttribuees[choisi] || {};
       gardesAttribuees[choisi][mois] = gardesMois(choisi) + 1;
+      gardesParCreneau[choisi] = gardesParCreneau[choisi] || {};
+      gardesParCreneau[choisi][mois] = gardesParCreneau[choisi][mois] || {};
+      gardesParCreneau[choisi][mois][cid] = gardesCreneauMois(choisi, cid) + 1;
     }
   }
 };
@@ -434,7 +494,7 @@ export const diviserPeriode = (debut, fin) => {
   };
 };
 
-const genererPlanningPourPeriode = (debut, fin, ordrePriorite, mapMedecinNomVersId, desiderata, gardesAttribuees, planning) => {
+const genererPlanningPourPeriode = (debut, fin, ordrePriorite, mapMedecinNomVersId, desiderata, gardesAttribuees, planning, gardesParCreneau = {}) => {
   const currentDate = new Date(debut);
   const endDate = new Date(fin);
 
@@ -454,7 +514,7 @@ const genererPlanningPourPeriode = (debut, fin, ordrePriorite, mapMedecinNomVers
 
     // Remplissage « COUVERTURE D'ABORD » : 1 médecin par créneau (créneaux rares en
     // premier) avant d'en remplir un 2e, quota strict + contraintes dures respectés.
-    remplirJourEnCouverture(dateString, ordrePriorite, mapMedecinNomVersId, desiderata, planning, gardesAttribuees);
+    remplirJourEnCouverture(dateString, ordrePriorite, mapMedecinNomVersId, desiderata, planning, gardesAttribuees, gardesParCreneau);
 
     currentDate.setUTCDate(currentDate.getUTCDate() + 1);
   }
@@ -473,6 +533,9 @@ export const computePriorite = (debut, fin, desiderata, mapMedecinNomVersId, lis
   // hebdomadaire et règle des jours consécutifs au passage d'un tour à l'autre).
   const gardesAttribuees = {};
   const planning = {};
+  // Charge par créneau et par mois, PARTAGÉE entre les deux tours : la répartition
+  // équitable du 1er quart doit se raisonner sur le mois entier, pas par tour.
+  const gardesParCreneau = {};
 
   genererPlanningPourPeriode(
     periodes.premierTour.debut,
@@ -481,7 +544,8 @@ export const computePriorite = (debut, fin, desiderata, mapMedecinNomVersId, lis
     mapMedecinNomVersId,
     desiderata,
     gardesAttribuees,
-    planning
+    planning,
+    gardesParCreneau
   );
 
   genererPlanningPourPeriode(
@@ -491,7 +555,8 @@ export const computePriorite = (debut, fin, desiderata, mapMedecinNomVersId, lis
     mapMedecinNomVersId,
     desiderata,
     gardesAttribuees,
-    planning
+    planning,
+    gardesParCreneau
   );
 
   // Filet de sécurité : le planning généré DOIT satisfaire les contraintes dures
