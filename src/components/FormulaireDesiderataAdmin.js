@@ -12,6 +12,7 @@ import {
   updateDesiderata,
 } from '../services/planningService';
 import { importDesiderataFromExcel } from '../services/excelImportService';
+import { nomFicheCorrespond } from '../utils/medecins';
 import logger from '../utils/logger';
 import { Calendar, Save, Upload, CalendarRange, Users } from 'lucide-react';
 import QuickFill from './QuickFill';
@@ -176,10 +177,13 @@ function FormulaireDesiderataAdmin() {
 
     // Une préférence absente de la fiche garde sa valeur par défaut.
     return {
-      desiderata: lu.desiderata,
-      nombreGardesSouhaitees: lu.nombreGardesSouhaitees ?? 0,
-      gardesGroupees: lu.gardesGroupees ?? false,
-      renfortsAssocies: lu.renfortsAssocies ?? false,
+      nomLu: lu.nomLu,
+      donnees: {
+        desiderata: lu.desiderata,
+        nombreGardesSouhaitees: lu.nombreGardesSouhaitees ?? 0,
+        gardesGroupees: lu.gardesGroupees ?? false,
+        renfortsAssocies: lu.renfortsAssocies ?? false,
+      },
     };
   };
 
@@ -188,7 +192,8 @@ function FormulaireDesiderataAdmin() {
     if (!importedData.desiderata || typeof importedData.desiderata !== 'object') {
       throw new Error('Structure JSON invalide : le champ « desiderata » est manquant.');
     }
-    return importedData;
+    // Un export JSON ne porte pas de nom : rien à confronter au médecin choisi.
+    return { nomLu: '', donnees: importedData };
   };
 
   const handleFileImport = async (event) => {
@@ -210,16 +215,23 @@ function FormulaireDesiderataAdmin() {
     }
 
     try {
-      const importedData = estExcel
+      const { nomLu, donnees } = estExcel
         ? await lireFichierExcel(file)
         : await lireFichierJson(file);
       event.target.value = '';
-      // Si des desiderata existent déjà, confirmer avant de remplacer.
-      if (existingDesiderataId) {
-        setPendingImport(importedData);
+
+      // Deux raisons de demander confirmation : la fiche semble être celle d'un
+      // autre médecin, ou celui-ci a déjà des desiderata qu'on écraserait.
+      const medecin = medecins.find((m) => m.id === selectedMedecinId);
+      const motifs = [];
+      if (!nomFicheCorrespond(nomLu, medecin)) { motifs.push('nom'); }
+      if (existingDesiderataId) { motifs.push('remplacement'); }
+
+      if (motifs.length > 0) {
+        setPendingImport({ donnees, motifs, nomLu, medecin });
         return;
       }
-      applyImportedData(importedData);
+      applyImportedData(donnees);
     } catch (err) {
       logger.error('Erreur lors de l\'import du fichier:', err);
       toast.error(err.message || 'Erreur lors de la lecture du fichier');
@@ -228,7 +240,7 @@ function FormulaireDesiderataAdmin() {
   };
 
   const handleConfirmImport = () => {
-    if (pendingImport) { applyImportedData(pendingImport); }
+    if (pendingImport) { applyImportedData(pendingImport.donnees); }
     setPendingImport(null);
   };
   const handleCancelImport = () => setPendingImport(null);
@@ -330,22 +342,43 @@ function FormulaireDesiderataAdmin() {
       <Modal
         open={!!pendingImport}
         onClose={handleCancelImport}
-        title="Remplacer les desiderata ?"
+        title={
+          pendingImport?.motifs.includes('nom')
+            ? 'Est-ce bien la fiche de ce médecin ?'
+            : 'Remplacer les desiderata ?'
+        }
         size="sm"
         footer={
           <>
             <Button variant="secondary" onClick={handleCancelImport}>
               Annuler
             </Button>
-            <Button variant="primary" onClick={handleConfirmImport}>
-              Confirmer
+            <Button
+              variant={pendingImport?.motifs.includes('nom') ? 'danger' : 'primary'}
+              onClick={handleConfirmImport}
+            >
+              Importer quand même
             </Button>
           </>
         }
       >
-        <p className="text-sm text-ink-600">
-          Ce médecin a déjà des desiderata saisis. Voulez-vous les remplacer par les données importées ?
-        </p>
+        {pendingImport?.motifs.includes('nom') && (
+          <p className="mb-3 text-sm text-ink-600">
+            La fiche est au nom de{' '}
+            <strong className="text-danger-600">« {pendingImport.nomLu} »</strong>, alors que le
+            médecin sélectionné est{' '}
+            <strong>
+              Dr. {pendingImport.medecin?.prenom} {pendingImport.medecin?.nom}
+            </strong>
+            . Vérifiez que vous n'importez pas la fiche de quelqu'un d'autre.
+          </p>
+        )}
+        {pendingImport?.motifs.includes('remplacement') && (
+          <p className="text-sm text-ink-600">
+            Ce médecin a déjà des desiderata saisis. Voulez-vous les remplacer par les données
+            importées ?
+          </p>
+        )}
       </Modal>
 
       {/* Confirmation avant de changer de médecin (saisie non enregistrée) */}
