@@ -22,6 +22,8 @@ serviceAccountKey.json
 
 # Données personnelles (RGPD) — desiderata nominatifs des médecins
 desiderata-*.json
+# Annuaire nominatif des régulateurs (téléphones, emails) — transcription papier
+annuaire-medecins-*.json
 desiderata.txt
 desiderata_individuels/
 Desideratas papiers/

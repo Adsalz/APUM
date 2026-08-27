@@ -8,6 +8,8 @@
     "synchroniser-annuaire": "node synchroniser-annuaire.js",
     "reinitialiser-comptes": "node reinitialiser-comptes-a-reclamer.js",
     "reinitialiser-code": "node reinitialiser-code.js",
+    "rapprocher-annuaire": "node rapprocher-annuaire.js",
+    "creer-comptes-medecins": "node creer-comptes-medecins.js",
     "importer-ordre-choix": "node importer-ordre-choix.js"
   },
   "dependencies": {
