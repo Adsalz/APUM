@@ -6,9 +6,9 @@ import { computePriorite } from '../utils/planningCore';
 
 // eslint-disable-next-line no-restricted-globals
 self.onmessage = (e) => {
-  const { debut, fin, desiderata, mapMedecinNomVersId, listePriorite } = e.data || {};
+  const { debut, fin, desiderata, listePriorite } = e.data || {};
   try {
-    const planning = computePriorite(debut, fin, desiderata, mapMedecinNomVersId, listePriorite);
+    const planning = computePriorite(debut, fin, desiderata, listePriorite);
     // eslint-disable-next-line no-restricted-globals
     self.postMessage({ ok: true, planning });
   } catch (err) {

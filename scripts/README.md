@@ -352,3 +352,34 @@ trimestre suivant.
 Le générateur propose l'ordre du trimestre suivant à partir du dernier trimestre
 enregistré, l'admin l'ajuste et le **fige**. Régénérer le tableau relit alors la
 liste figée : elle ne rebascule qu'au trimestre suivant.
+
+## `migrer-ordre-choix-ids.js` — passer les ordres de choix aux identifiants
+
+Un ordre de choix conservé sous forme de **noms** se rompt au premier
+renommage : le médecin renommé sort de la liste comme « parti » et y rentre
+comme « nouveau », **sans la moindre erreur**. C'est arrivé en production le
+26 août 2026 — ZWANEVELD Nicole et BENOIT Grégoire s'étaient retrouvés parmi les
+arrivants après correction de leur fiche, et la liste les avait renvoyés en bas.
+
+Les documents `ordre_choix_<AAAA-MM>` stockent donc `premierTourIds` /
+`deuxiemeTourIds` (des identifiants Firebase, qui ne bougent jamais). Les champs
+`premierTour` / `deuxiemeTour` gardent les noms **pour la relecture humaine
+uniquement** — plus rien ne s'en sert pour retrouver un médecin.
+
+Ce script convertit les documents restés en noms.
+
+⚠️ **Il ne fonctionne que tant que les noms correspondent encore.** Le
+rapprochement est fait à l'identique contre l'annuaire courant : chaque
+renommage effectué avant la migration est une correspondance perdue. Le script
+**refuse d'écrire** s'il ne résout pas la totalité d'une liste — une liste
+amputée serait pire que pas de migration du tout.
+
+```bash
+node migrer-ordre-choix-ids.js         # aperçu de tous les trimestres
+node migrer-ordre-choix-ids.js --go    # écrit
+```
+
+Options : `--projet <id>`, `--periode <AAAA-MM>` (un seul trimestre).
+
+Les documents déjà en identifiants sont détectés et laissés tels quels : le
+script est rejouable sans risque.

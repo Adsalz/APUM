@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   RefreshCw,
   Users,
@@ -11,7 +11,7 @@ import {
   Lock,
 } from 'lucide-react';
 import { Button, Alert } from './ui';
-import { genererProchainOrdreChoix } from '../utils/ordreChoix';
+import { genererProchainOrdreChoix, idsDeLOrdre } from '../utils/ordreChoix';
 import { idPeriode as calculerIdPeriode, libellePeriode } from '../utils/periodeId';
 import {
   getOrdreChoixPeriode,
@@ -28,10 +28,12 @@ import logger from '../utils/logger';
 //   - « proposé » : premier passage sur ce trimestre → on applique la règle de
 //                   bascule (N=10) à l'ordre du trimestre précédent, et l'admin
 //                   ajuste avant de figer.
+// L'état manipulé ici est une suite d'IDENTIFIANTS. Les noms ne servent qu'à
+// l'affichage : renommer un médecin ne doit pas le faire sortir de la liste.
 const GenerateurTrimestre = ({ onListeGenere, medecins = [], periodeSaisie = null }) => {
-  const [liste, setListe] = useState([]);           // 1er tour (éditable avant validation)
-  const [nouveaux, setNouveaux] = useState([]);
-  const [partis, setPartis] = useState([]);
+  const [liste, setListe] = useState([]);           // 1er tour, en IDs (éditable avant validation)
+  const [nouveaux, setNouveaux] = useState([]);     // IDs
+  const [partis, setPartis] = useState([]);         // noms (les partis n'ont plus de fiche à afficher)
   const [fige, setFige] = useState(false);          // liste déjà validée pour ce trimestre
   const [basePeriode, setBasePeriode] = useState(null); // trimestre dont on a hérité
   const [loading, setLoading] = useState(true);
@@ -41,20 +43,27 @@ const GenerateurTrimestre = ({ onListeGenere, medecins = [], periodeSaisie = nul
   const idPeriode = calculerIdPeriode(periodeSaisie);
   const libelle = libellePeriode(periodeSaisie);
 
+  const nomParId = useMemo(
+    () => new Map(medecins.map((m) => [m.id, `${m.nom} ${m.prenom}`.trim()])),
+    [medecins]
+  );
+  const nomDe = useCallback((id) => nomParId.get(id) || id, [nomParId]);
+
   // forcerRecalcul : ne sert qu'au bouton explicite « repartir du trimestre
   // précédent », jamais au chargement.
   const charger = useCallback(async (forcerRecalcul = false) => {
     setLoading(true);
     setErreur(null);
     try {
-      const noms = medecins.map((m) => `${m.nom} ${m.prenom}`.trim());
+      const ids = medecins.map((m) => m.id);
 
       if (!forcerRecalcul) {
         const existant = await getOrdreChoixPeriode(idPeriode);
-        if (existant?.premierTour?.length) {
-          setListe(existant.premierTour);
+        const lu = idsDeLOrdre(existant, medecins);
+        if (lu.premierTourIds.length > 0) {
+          setListe(lu.premierTourIds);
           setNouveaux([]);
-          setPartis([]);
+          setPartis(lu.nonResolus);
           setBasePeriode(existant.baseSur || null);
           setFige(true);
           return;
@@ -62,10 +71,11 @@ const GenerateurTrimestre = ({ onListeGenere, medecins = [], periodeSaisie = nul
       }
 
       const precedent = await getOrdreChoixPrecedent(idPeriode);
-      const res = genererProchainOrdreChoix(precedent?.premierTour, noms);
+      const base = idsDeLOrdre(precedent, medecins);
+      const res = genererProchainOrdreChoix(base.premierTourIds, ids, nomParId);
       setListe(res.premierTour);
       setNouveaux(res.nouveaux);
-      setPartis(res.partis);
+      setPartis(res.partis.map(nomDe).concat(base.nonResolus));
       setBasePeriode(precedent?.idPeriode || null);
       setFige(false);
     } catch (e) {
@@ -74,7 +84,7 @@ const GenerateurTrimestre = ({ onListeGenere, medecins = [], periodeSaisie = nul
     } finally {
       setLoading(false);
     }
-  }, [medecins, idPeriode]);
+  }, [medecins, idPeriode, nomParId, nomDe]);
 
   useEffect(() => {
     if (medecins.length > 0) {
@@ -104,12 +114,12 @@ const GenerateurTrimestre = ({ onListeGenere, medecins = [], periodeSaisie = nul
     modifierListe(copie);
   };
 
-  const emettre = (premierTour, deuxiemeTour) => {
+  const emettre = (premierTourIds, deuxiemeTourIds) => {
     if (onListeGenere) {
       onListeGenere({
-        premierTour,
-        deuxiemeTour,
-        stats: { totalMedecins: premierTour.length },
+        premierTourIds,
+        deuxiemeTourIds,
+        stats: { totalMedecins: premierTourIds.length },
         medecinsInclus: medecins,
       });
     }
@@ -129,8 +139,10 @@ const GenerateurTrimestre = ({ onListeGenere, medecins = [], periodeSaisie = nul
     setErreur(null);
     try {
       await saveOrdreChoixPeriode(idPeriode, {
-        premierTour,
-        deuxiemeTour,
+        premierTourIds: premierTour,
+        deuxiemeTourIds: deuxiemeTour,
+        premierTour: premierTour.map(nomDe),
+        deuxiemeTour: deuxiemeTour.map(nomDe),
         libelle,
         baseSur: basePeriode,
       });
@@ -148,7 +160,7 @@ const GenerateurTrimestre = ({ onListeGenere, medecins = [], periodeSaisie = nul
     }
   };
 
-  const estNouveau = (nom) => nouveaux.includes(nom);
+  const estNouveau = (id) => nouveaux.includes(id);
 
   return (
     <div className="mx-auto max-w-3xl space-y-5">
@@ -177,7 +189,7 @@ const GenerateurTrimestre = ({ onListeGenere, medecins = [], periodeSaisie = nul
         <div className="flex flex-wrap gap-3 text-sm">
           {nouveaux.length > 0 && (
             <span className="inline-flex items-center gap-1 rounded-lg bg-success-50 px-2 py-1 text-success-700">
-              <Sparkles size={14} aria-hidden="true" /> {nouveaux.length} nouveau(x) : {nouveaux.join(', ')}
+              <Sparkles size={14} aria-hidden="true" /> {nouveaux.length} nouveau(x) : {nouveaux.map(nomDe).join(', ')}
             </span>
           )}
           {partis.length > 0 && (
@@ -201,15 +213,15 @@ const GenerateurTrimestre = ({ onListeGenere, medecins = [], periodeSaisie = nul
             <span className="text-xs font-normal text-ink-400">2ᵉ tour = inverse</span>
           </div>
           <ol className="max-h-96 overflow-y-auto">
-            {liste.map((nom, i) => (
+            {liste.map((id, i) => (
               <li
-                key={nom}
+                key={id}
                 className={`flex items-center gap-2 px-3 py-1.5 ${i % 2 === 0 ? 'bg-ink-50' : 'bg-white'}`}
               >
                 <span className="w-7 shrink-0 font-mono text-xs text-ink-400">{i + 1}.</span>
                 <span className="flex-1 text-sm text-ink-800">
-                  {nom}
-                  {estNouveau(nom) && (
+                  {nomDe(id)}
+                  {estNouveau(id) && (
                     <span className="ml-2 inline-flex items-center gap-1 rounded bg-success-100 px-1.5 py-0.5 text-xs text-success-700">
                       <Sparkles size={11} aria-hidden="true" /> nouveau
                     </span>
@@ -220,7 +232,7 @@ const GenerateurTrimestre = ({ onListeGenere, medecins = [], periodeSaisie = nul
                     type="button"
                     onClick={() => deplacer(i, -1)}
                     disabled={i === 0}
-                    aria-label={`Monter ${nom}`}
+                    aria-label={`Monter ${nomDe(id)}`}
                     className="rounded p-1 text-ink-400 hover:bg-ink-100 hover:text-ink-700 disabled:opacity-30"
                   >
                     <ChevronUp size={16} aria-hidden="true" />
@@ -229,7 +241,7 @@ const GenerateurTrimestre = ({ onListeGenere, medecins = [], periodeSaisie = nul
                     type="button"
                     onClick={() => deplacer(i, 1)}
                     disabled={i === liste.length - 1}
-                    aria-label={`Descendre ${nom}`}
+                    aria-label={`Descendre ${nomDe(id)}`}
                     className="rounded p-1 text-ink-400 hover:bg-ink-100 hover:text-ink-700 disabled:opacity-30"
                   >
                     <ChevronDown size={16} aria-hidden="true" />
@@ -238,7 +250,7 @@ const GenerateurTrimestre = ({ onListeGenere, medecins = [], periodeSaisie = nul
                     type="button"
                     onClick={() => envoyerEnBas(i)}
                     disabled={i === liste.length - 1}
-                    aria-label={`Envoyer ${nom} en bas`}
+                    aria-label={`Envoyer ${nomDe(id)} en bas`}
                     title="Envoyer en bas de liste"
                     className="rounded p-1 text-ink-400 hover:bg-ink-100 hover:text-ink-700 disabled:opacity-30"
                   >

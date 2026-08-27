@@ -49,20 +49,28 @@ describe('un document par trimestre', () => {
     await getOrdreChoixPeriode('2026-11');
     expect(firestore.doc).toHaveBeenCalledWith({}, 'planning', 'ordre_choix_2026-11');
 
-    await saveOrdreChoixPeriode('2026-11', { premierTour: ['A'], deuxiemeTour: ['A'] });
+    await saveOrdreChoixPeriode('2026-11', { premierTourIds: ['id-a'], deuxiemeTourIds: ['id-a'] });
     expect(firestore.doc).toHaveBeenLastCalledWith({}, 'planning', 'ordre_choix_2026-11');
   });
 
   it('n’écrit AUCUN champ `startDate` — sinon getLatestPlanning() prendrait la liste pour un planning', async () => {
-    await saveOrdreChoixPeriode('2026-11', { premierTour: ['A'], deuxiemeTour: ['A'] });
+    await saveOrdreChoixPeriode('2026-11', { premierTourIds: ['id-a'], deuxiemeTourIds: ['id-a'] });
     const [, donnees] = mockSetDoc.mock.calls[0];
     expect(Object.keys(donnees)).not.toContain('startDate');
     expect(Object.keys(donnees)).not.toContain('endDate');
   });
 
   it('refuse d’écrire sans trimestre : mieux vaut échouer que polluer un document fourre-tout', async () => {
-    await expect(saveOrdreChoixPeriode(null, { premierTour: ['A'], deuxiemeTour: ['A'] }))
+    await expect(saveOrdreChoixPeriode(null, { premierTourIds: ['id-a'], deuxiemeTourIds: ['id-a'] }))
       .rejects.toThrow(/Période de saisie/);
+    expect(mockSetDoc).not.toHaveBeenCalled();
+  });
+
+  // Garde-fou du passage aux identifiants : une liste de noms seuls se rompt au
+  // premier renommage. On refuse de l'écrire plutôt que de la laisser pourrir.
+  it('refuse d’écrire une liste sans identifiants', async () => {
+    await expect(saveOrdreChoixPeriode('2026-11', { premierTour: ['DUPONT Jean'] }))
+      .rejects.toThrow(/identifiants/);
     expect(mockSetDoc).not.toHaveBeenCalled();
   });
 });

@@ -14,6 +14,14 @@
 // collection `planning` héberge aussi les plannings, que getLatestPlanning()
 // récupère via orderBy('startDate'). Sans ce champ, un ordre de choix ne peut
 // pas être confondu avec un planning.
+//
+// ── Ce qui fait FOI : les identifiants ──────────────────────────────────────
+// `premierTourIds` / `deuxiemeTourIds` sont la donnée de référence. Les champs
+// `premierTour` / `deuxiemeTour` gardent les NOMS correspondants, uniquement
+// pour qu'un humain puisse relire le document (console Firebase, sauvegarde,
+// export) — ils ne sont jamais utilisés pour retrouver un médecin. Voir
+// l'en-tête de src/utils/ordreChoix.js : une liste de noms se rompt au premier
+// renommage.
 import { db, auth } from '../firebase';
 import {
   doc,
@@ -98,7 +106,10 @@ export const getOrdreChoixPrecedent = async (idPeriode) => {
 
 // Fige l'ordre de choix du trimestre. Réécrire le même trimestre est sans danger :
 // on remplace la liste de CE trimestre, on n'en dérive pas une nouvelle.
-export const saveOrdreChoixPeriode = async (idPeriode, { premierTour, deuxiemeTour, libelle, baseSur }) => {
+export const saveOrdreChoixPeriode = async (
+  idPeriode,
+  { premierTourIds, deuxiemeTourIds, premierTour, deuxiemeTour, libelle, baseSur }
+) => {
   try {
     if (!auth.currentUser) {
       throw new Error('Utilisateur non authentifié');
@@ -106,12 +117,18 @@ export const saveOrdreChoixPeriode = async (idPeriode, { premierTour, deuxiemeTo
     if (!idPeriode) {
       throw new Error('Période de saisie non définie : impossible de figer l’ordre de choix');
     }
+    if (!Array.isArray(premierTourIds) || premierTourIds.length === 0) {
+      throw new Error('Ordre de choix sans identifiants : refus d’écrire une liste de noms seuls');
+    }
     await setDoc(doc(db, PLANNING_COLLECTION, docIdPour(idPeriode)), {
       idPeriode,
       libelle: libelle || null,
       baseSur: baseSur || null,
-      premierTour,
-      deuxiemeTour,
+      premierTourIds,
+      deuxiemeTourIds: deuxiemeTourIds || [...premierTourIds].reverse(),
+      // Noms : lecture humaine seulement (cf. en-tête).
+      premierTour: premierTour || [],
+      deuxiemeTour: deuxiemeTour || [],
       updatedAt: Timestamp.now(),
     });
   } catch (error) {

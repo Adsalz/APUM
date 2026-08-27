@@ -394,15 +394,16 @@ export const creeraitCreneauxConsecutifs = (medecinId, dateString, creneauId, pl
   return aLeCreneau(-1) || aLeCreneau(1);
 };
 
-const remplirJourEnCouverture = (dateString, ordrePriorite, mapMedecinNomVersId, desiderata, planning, gardesAttribuees, gardesParCreneau = {}) => {
+const remplirJourEnCouverture = (dateString, ordrePriorite, desiderata, planning, gardesAttribuees, gardesParCreneau = {}) => {
   const mois = dateString.slice(0, 7);
   const jour = planning[dateString];
   const cids = creneaux.map((c) => c.id).filter((id) => jour[id]); // créneaux ouverts ce jour, ordre canonique
 
   // Liste déterministe des médecins par ordre de choix (rang unique = départage stable).
+  // `ordrePriorite` est une suite d'IDENTIFIANTS : plus aucune résolution par nom
+  // ici, donc plus aucun médecin perdu par un accent ou un renommage.
   const ids = []; const rank = {}; const vus = new Set();
-  for (const nom of ordrePriorite) {
-    const id = mapMedecinNomVersId[nom];
+  for (const id of ordrePriorite) {
     if (id && desiderata[id] && !vus.has(id)) { vus.add(id); rank[id] = ids.length; ids.push(id); }
   }
 
@@ -494,7 +495,7 @@ export const diviserPeriode = (debut, fin) => {
   };
 };
 
-const genererPlanningPourPeriode = (debut, fin, ordrePriorite, mapMedecinNomVersId, desiderata, gardesAttribuees, planning, gardesParCreneau = {}) => {
+const genererPlanningPourPeriode = (debut, fin, ordrePriorite, desiderata, gardesAttribuees, planning, gardesParCreneau = {}) => {
   const currentDate = new Date(debut);
   const endDate = new Date(fin);
 
@@ -514,7 +515,7 @@ const genererPlanningPourPeriode = (debut, fin, ordrePriorite, mapMedecinNomVers
 
     // Remplissage « COUVERTURE D'ABORD » : 1 médecin par créneau (créneaux rares en
     // premier) avant d'en remplir un 2e, quota strict + contraintes dures respectés.
-    remplirJourEnCouverture(dateString, ordrePriorite, mapMedecinNomVersId, desiderata, planning, gardesAttribuees, gardesParCreneau);
+    remplirJourEnCouverture(dateString, ordrePriorite, desiderata, planning, gardesAttribuees, gardesParCreneau);
 
     currentDate.setUTCDate(currentDate.getUTCDate() + 1);
   }
@@ -523,7 +524,11 @@ const genererPlanningPourPeriode = (debut, fin, ordrePriorite, mapMedecinNomVers
 };
 
 // Entrée pure « priorité » : division en deux tours puis attribution séquentielle.
-export const computePriorite = (debut, fin, desiderata, mapMedecinNomVersId, listePriorite) => {
+// listePriorite : { premierTourIds, deuxiemeTourIds } — des IDENTIFIANTS.
+// La signature a changé volontairement (plus de `mapMedecinNomVersId`) pour
+// qu'un appelant resté sur les noms échoue bruyamment plutôt que de produire
+// un planning silencieusement amputé.
+export const computePriorite = (debut, fin, desiderata, listePriorite) => {
   const periodes = diviserPeriode(debut, fin);
 
   // Compteur PARTAGÉ entre les deux tours, indexé par médecin PUIS par mois :
@@ -540,8 +545,7 @@ export const computePriorite = (debut, fin, desiderata, mapMedecinNomVersId, lis
   genererPlanningPourPeriode(
     periodes.premierTour.debut,
     periodes.premierTour.fin,
-    listePriorite.premierTour,
-    mapMedecinNomVersId,
+    listePriorite.premierTourIds,
     desiderata,
     gardesAttribuees,
     planning,
@@ -551,8 +555,7 @@ export const computePriorite = (debut, fin, desiderata, mapMedecinNomVersId, lis
   genererPlanningPourPeriode(
     periodes.deuxiemeTour.debut,
     periodes.deuxiemeTour.fin,
-    listePriorite.deuxiemeTour,
-    mapMedecinNomVersId,
+    listePriorite.deuxiemeTourIds,
     desiderata,
     gardesAttribuees,
     planning,

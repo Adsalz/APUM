@@ -111,7 +111,7 @@ describe('planningCore — computePriorite (déterministe + invariants)', () => 
   const ids = ['d1', 'd2', 'd3', 'd4', 'd5'];
   const noms = { 'Dr 1': 'd1', 'Dr 2': 'd2', 'Dr 3': 'd3', 'Dr 4': 'd4', 'Dr 5': 'd5', 'Dr Non': 'dNon' };
   const ordre = ['Dr 1', 'Dr 2', 'Dr 3', 'Dr 4', 'Dr 5', 'Dr Non'];
-  const listePriorite = { premierTour: ordre, deuxiemeTour: [...ordre].reverse() };
+  const listePriorite = { premierTourIds: ordre.map((n) => noms[n]), deuxiemeTourIds: [...ordre].reverse().map((n) => noms[n]) };
   const debut = '2025-06-01';
   const fin = '2025-06-20'; // 20 jours → 2 tours (10 + 10), tout en juin
 
@@ -120,10 +120,10 @@ describe('planningCore — computePriorite (déterministe + invariants)', () => 
     ...desiderataUniforme(['dNon'], debut, fin, 'Non', { souhaitees: 6, max: 5 }),
   };
 
-  const planning = computePriorite(debut, fin, desiderata, noms, listePriorite);
+  const planning = computePriorite(debut, fin, desiderata, listePriorite);
 
   it('est déterministe (même entrée → même sortie)', () => {
-    const planning2 = computePriorite(debut, fin, desiderata, noms, listePriorite);
+    const planning2 = computePriorite(debut, fin, desiderata, listePriorite);
     expect(planning2).toEqual(planning);
   });
 
@@ -166,7 +166,7 @@ describe('planningCore — correctifs d’audit (B1 consécutifs, B3 plafond/jou
   // quota mensuel qui bloque le 31/08 se réinitialise en septembre.
   it('B1 — la passe largeur ne crée jamais 3 jours consécutifs (frontière de mois)', () => {
     const noms = { X: 'X' };
-    const listePriorite = { premierTour: ['X'], deuxiemeTour: ['X'] };
+    const listePriorite = { premierTourIds: ['X'].map((n) => noms[n]), deuxiemeTourIds: ['X'].map((n) => noms[n]) };
     const desiderata = {
       X: {
         nombreGardesSouhaitees: 2,
@@ -180,7 +180,7 @@ describe('planningCore — correctifs d’audit (B1 consécutifs, B3 plafond/jou
         },
       },
     };
-    const planning = computePriorite('2026-08-01', '2026-09-05', desiderata, noms, listePriorite);
+    const planning = computePriorite('2026-08-01', '2026-09-05', desiderata, listePriorite);
     // Le validateur symétrique (contrainte dure) doit être satisfait.
     expect(verifierContraintes(planning, desiderata)).toBe(true);
     // X ne doit pas cumuler les trois jours 31/08 + 01/09 + 02/09.
@@ -193,9 +193,9 @@ describe('planningCore — correctifs d’audit (B1 consécutifs, B3 plafond/jou
     const ids = ['a', 'b', 'c'];
     const noms = { A: 'a', B: 'b', C: 'c' };
     const ordre = ['A', 'B', 'C'];
-    const listePriorite = { premierTour: ordre, deuxiemeTour: [...ordre].reverse() };
+    const listePriorite = { premierTourIds: ordre.map((n) => noms[n]), deuxiemeTourIds: [...ordre].reverse().map((n) => noms[n]) };
     const desiderata = desiderataUniforme(ids, '2026-06-01', '2026-06-20', 'Oui', { souhaitees: 100, max: 7 });
-    const planning = computePriorite('2026-06-01', '2026-06-20', desiderata, noms, listePriorite);
+    const planning = computePriorite('2026-06-01', '2026-06-20', desiderata, listePriorite);
     for (const date in planning) {
       ids.forEach((id) => {
         const nb = Object.values(planning[date]).filter((s) => s.includes(id)).length;
@@ -208,12 +208,12 @@ describe('planningCore — correctifs d’audit (B1 consécutifs, B3 plafond/jou
   // passe largeur, même s'il est le seul disponible (le créneau reste vide sinon).
   it('B2 — aucune passe ne dépasse le quota donné par le médecin', () => {
     const noms = { A: 'a', B: 'b' };
-    const listePriorite = { premierTour: ['A', 'B'], deuxiemeTour: ['B', 'A'] };
+    const listePriorite = { premierTourIds: ['A', 'B'].map((n) => noms[n]), deuxiemeTourIds: ['B', 'A'].map((n) => noms[n]) };
     const desiderata = {
       ...desiderataUniforme(['a'], '2026-06-01', '2026-06-20', 'Oui', { souhaitees: 1, max: 7 }),
       ...desiderataUniforme(['b'], '2026-06-01', '2026-06-20', 'Non', { souhaitees: 1, max: 7 }),
     };
-    const planning = computePriorite('2026-06-01', '2026-06-20', desiderata, noms, listePriorite);
+    const planning = computePriorite('2026-06-01', '2026-06-20', desiderata, listePriorite);
     const totalA = Object.values(planning).reduce((n, jour) =>
       n + Object.values(jour).filter((s) => s.includes('a')).length, 0);
     expect(totalA).toBe(1); // exactement son souhait, jamais plus
@@ -225,12 +225,12 @@ describe('planningCore — correctifs d’audit (B1 consécutifs, B3 plafond/jou
   // rare QUART_2, B sur QUART_1).
   it('couverture d’abord — couvre un créneau que le glouton laisserait vide', () => {
     const noms = { A: 'a', B: 'b' };
-    const listePriorite = { premierTour: ['A', 'B'], deuxiemeTour: ['B', 'A'] };
+    const listePriorite = { premierTourIds: ['A', 'B'].map((n) => noms[n]), deuxiemeTourIds: ['B', 'A'].map((n) => noms[n]) };
     const desiderata = {
       a: { nombreGardesSouhaitees: 10, nombreGardesMaxParSemaine: 1, preferences: { '2026-06-01': { QUART_1: 'Oui', QUART_2: 'Oui' } } },
       b: { nombreGardesSouhaitees: 10, nombreGardesMaxParSemaine: 1, preferences: { '2026-06-01': { QUART_1: 'Oui' } } },
     };
-    const planning = computePriorite('2026-06-01', '2026-06-01', desiderata, noms, listePriorite);
+    const planning = computePriorite('2026-06-01', '2026-06-01', desiderata, listePriorite);
     const jour = planning['2026-06-01'];
     const couvert = (cid) => jour[cid].some((m) => m !== null);
     expect(couvert('QUART_1')).toBe(true);
@@ -241,12 +241,12 @@ describe('planningCore — correctifs d’audit (B1 consécutifs, B3 plafond/jou
   // vacances (le quota par défaut ne s'applique qu'à la passe principale).
   it('B2bis — un médecin sans souhait explicite peut dépasser le quota par défaut', () => {
     const noms = { A: 'a', B: 'b' };
-    const listePriorite = { premierTour: ['A', 'B'], deuxiemeTour: ['B', 'A'] };
+    const listePriorite = { premierTourIds: ['A', 'B'].map((n) => noms[n]), deuxiemeTourIds: ['B', 'A'].map((n) => noms[n]) };
     const desiderata = {
       ...desiderataUniforme(['a'], '2026-06-01', '2026-06-20', 'Oui', { souhaitees: 0, max: 7 }),
       ...desiderataUniforme(['b'], '2026-06-01', '2026-06-20', 'Non', { souhaitees: 0, max: 7 }),
     };
-    const planning = computePriorite('2026-06-01', '2026-06-20', desiderata, noms, listePriorite);
+    const planning = computePriorite('2026-06-01', '2026-06-20', desiderata, listePriorite);
     const totalA = Object.values(planning).reduce((n, jour) =>
       n + Object.values(jour).filter((s) => s.includes('a')).length, 0);
     expect(totalA).toBeGreaterThan(8); // dépasse le DEFAUT_GARDES_MENSUEL (comble les vacances)
@@ -258,7 +258,7 @@ describe('planningCore — correctifs d’audit (B1 consécutifs, B3 plafond/jou
 // APUM ASO26 et validées avec la coordinatrice.
 describe('planningCore — 1er quart : équité mensuelle et pas deux nuits d\'affilée', () => {
   const noms = { A: 'a', B: 'b', C: 'c' };
-  const listePriorite = { premierTour: ['A', 'B', 'C'], deuxiemeTour: ['C', 'B', 'A'] };
+  const listePriorite = { premierTourIds: ['A', 'B', 'C'].map((n) => noms[n]), deuxiemeTourIds: ['C', 'B', 'A'].map((n) => noms[n]) };
 
   const nuitsDe = (planning, id) =>
     Object.values(planning).filter((jour) => (jour.QUART_1 || []).includes(id)).length;
@@ -267,7 +267,7 @@ describe('planningCore — 1er quart : équité mensuelle et pas deux nuits d\'a
     // Trois médecins également disponibles : sans équité, « A » (1er de l'ordre)
     // raflerait les nuits jusqu'à épuisement de son quota.
     const desiderata = desiderataUniforme(['a', 'b', 'c'], '2026-06-01', '2026-06-30', 'Oui');
-    const planning = computePriorite('2026-06-01', '2026-06-30', desiderata, noms, listePriorite);
+    const planning = computePriorite('2026-06-01', '2026-06-30', desiderata, listePriorite);
     const nuits = ['a', 'b', 'c'].map((id) => nuitsDe(planning, id));
     // Écart maximal d'une nuit entre le plus et le moins servi.
     expect(Math.max(...nuits) - Math.min(...nuits)).toBeLessThanOrEqual(1);
@@ -275,7 +275,7 @@ describe('planningCore — 1er quart : équité mensuelle et pas deux nuits d\'a
 
   it('ne place JAMAIS deux nuits consécutives, quitte à laisser la place vide', () => {
     const desiderata = desiderataUniforme(['a', 'b', 'c'], '2026-06-01', '2026-06-30', 'Oui');
-    const planning = computePriorite('2026-06-01', '2026-06-30', desiderata, noms, listePriorite);
+    const planning = computePriorite('2026-06-01', '2026-06-30', desiderata, listePriorite);
     const dates = Object.keys(planning).sort();
     for (let i = 1; i < dates.length; i += 1) {
       const veille = (planning[dates[i - 1]].QUART_1 || []).filter(Boolean);
@@ -296,8 +296,8 @@ describe('planningCore — 1er quart : équité mensuelle et pas deux nuits d\'a
         },
       },
     };
-    const planning = computePriorite('2026-06-01', '2026-06-02', desiderata, { A: 'a' },
-      { premierTour: ['A'], deuxiemeTour: ['A'] });
+    const planning = computePriorite('2026-06-01', '2026-06-02', desiderata,
+      { premierTourIds: ['a'], deuxiemeTourIds: ['a'] });
     const nuits1 = planning['2026-06-01'].QUART_1.filter(Boolean);
     const nuits2 = planning['2026-06-02'].QUART_1.filter(Boolean);
     expect(nuits1).toContain('a');

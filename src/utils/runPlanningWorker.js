@@ -5,8 +5,8 @@
 
 async function computeSync(payload) {
   const { computePriorite } = await import('./planningCore');
-  const { debut, fin, desiderata, mapMedecinNomVersId, listePriorite } = payload;
-  return computePriorite(debut, fin, desiderata, mapMedecinNomVersId, listePriorite);
+  const { debut, fin, desiderata, listePriorite } = payload;
+  return computePriorite(debut, fin, desiderata, listePriorite);
 }
 
 export default function runPlanningWorker(payload) {

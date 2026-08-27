@@ -5,6 +5,7 @@ import GenerateurTrimestre from '../../GenerateurTrimestre';
 import { Modal, Button, Alert } from '../../ui';
 import { idPeriode as calculerIdPeriode, libellePeriode } from '../../../utils/periodeId';
 import { getOrdreChoixPeriode } from '../../../services/ordreChoixService';
+import { idsDeLOrdre } from '../../../utils/ordreChoix';
 import logger from '../../../utils/logger';
 
 const GeneratePlanningModal = ({
@@ -31,11 +32,13 @@ const GeneratePlanningModal = ({
     (async () => {
       try {
         const existant = await getOrdreChoixPeriode(idPeriode);
-        if (annule || !existant?.premierTour?.length) { return; }
+        if (annule || !existant) { return; }
+        const { premierTourIds, deuxiemeTourIds } = idsDeLOrdre(existant, medecins);
+        if (!premierTourIds.length) { return; }
         setListePriorite({
-          premierTour: existant.premierTour,
-          deuxiemeTour: existant.deuxiemeTour || [...existant.premierTour].reverse(),
-          stats: { totalMedecins: existant.premierTour.length },
+          premierTourIds,
+          deuxiemeTourIds,
+          stats: { totalMedecins: premierTourIds.length },
           medecinsInclus: medecins,
         });
         setOrdreFige(true);
@@ -139,8 +142,8 @@ const GeneratePlanningModal = ({
                     </Button>
                   </div>
                   <p className="text-sm text-ink-500">
-                    Premier tour : {listePriorite.premierTour.length} médecins •
-                    Deuxième tour : {listePriorite.deuxiemeTour.length} médecins
+                    Premier tour : {listePriorite.premierTourIds.length} médecins •
+                    Deuxième tour : {listePriorite.deuxiemeTourIds.length} médecins
                   </p>
                   {ordreFige && (
                     <p className="mt-1 text-xs text-ink-400">

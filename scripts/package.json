@@ -10,7 +10,8 @@
     "reinitialiser-code": "node reinitialiser-code.js",
     "rapprocher-annuaire": "node rapprocher-annuaire.js",
     "creer-comptes-medecins": "node creer-comptes-medecins.js",
-    "importer-ordre-choix": "node importer-ordre-choix.js"
+    "importer-ordre-choix": "node importer-ordre-choix.js",
+    "migrer-ordre-choix-ids": "node migrer-ordre-choix-ids.js"
   },
   "dependencies": {
     "exceljs": "^4.4.0",

@@ -1,5 +1,7 @@
 // Tests de la règle d'évolution de l'ordre de choix (genererProchainOrdreChoix).
-import { genererProchainOrdreChoix, N_BASCULE } from '../ordreChoix';
+// Les listes manipulées sont des suites d'IDENTIFIANTS : c'est ce qui rend la
+// chaîne insensible aux renommages (cf. l'en-tête de ../ordreChoix).
+import { genererProchainOrdreChoix, idsDeLOrdre, N_BASCULE } from '../ordreChoix';
 
 describe('genererProchainOrdreChoix — règle N=10 (bascule tête→queue)', () => {
   it('fait basculer les 10 premiers en bas et place le nouveau APRÈS eux', () => {
@@ -39,9 +41,48 @@ describe('genererProchainOrdreChoix — règle N=10 (bascule tête→queue)', ()
     expect(deuxiemeTour).toEqual([...premierTour].reverse());
   });
 
-  it('sans liste précédente : ordre alphabétique reproductible', () => {
-    const { premierTour } = genererProchainOrdreChoix(null, ['CASAR D', 'ALEMAN A', 'BELLIOT E']);
-    expect(premierTour).toEqual(['ALEMAN A', 'BELLIOT E', 'CASAR D']);
+  it('sans liste précédente : ordre alphabétique des NOMS, sur des identifiants', () => {
+    const nomParId = new Map([['id-c', 'CASAR D'], ['id-a', 'ALEMAN A'], ['id-b', 'BELLIOT E']]);
+    const { premierTour } = genererProchainOrdreChoix(null, ['id-c', 'id-a', 'id-b'], nomParId);
+    expect(premierTour).toEqual(['id-a', 'id-b', 'id-c']);
+  });
+
+  // Le cœur du passage aux identifiants : renommer un médecin ne doit RIEN
+  // changer. Avec des noms, l'ancien code le voyait « parti » puis « nouveau »
+  // et le renvoyait en bas de liste (arrivé en production le 2026-08-26).
+  it('renommer un médecin ne le déplace pas dans la liste', () => {
+    const prec = Array.from({ length: 12 }, (_, i) => `id${i}`);
+    const { premierTour, nouveaux, partis } = genererProchainOrdreChoix(prec, prec);
+    // Même population, quel que soit l'état civil affiché.
+    expect(nouveaux).toEqual([]);
+    expect(partis).toEqual([]);
+    expect(premierTour.slice(-10)).toEqual(prec.slice(0, 10));
+  });
+});
+
+describe('idsDeLOrdre — lecture d’un document stocké', () => {
+  const medecins = [
+    { id: 'id-a', nom: 'ZWANEVELD', prenom: 'Nicole' },
+    { id: 'id-b', nom: 'BENOIT', prenom: 'Grégoire' },
+  ];
+
+  it('prend les identifiants quand ils sont là, sans regarder les noms', () => {
+    const doc = {
+      premierTourIds: ['id-b', 'id-a'],
+      premierTour: ['un nom devenu faux', 'un autre'],
+    };
+    const { premierTourIds, deuxiemeTourIds, migre } = idsDeLOrdre(doc, medecins);
+    expect(premierTourIds).toEqual(['id-b', 'id-a']);
+    expect(deuxiemeTourIds).toEqual(['id-a', 'id-b']);
+    expect(migre).toBe(true);
+  });
+
+  it('résout les anciens documents (noms seuls) et SIGNALE ce qu’il n’a pas pu résoudre', () => {
+    const doc = { premierTour: ['ZWANEVELD Nicole', 'INCONNU Jean', 'BENOIT Grégoire'] };
+    const { premierTourIds, nonResolus, migre } = idsDeLOrdre(doc, medecins);
+    expect(premierTourIds).toEqual(['id-a', 'id-b']);
+    expect(nonResolus).toEqual(['INCONNU Jean']);
+    expect(migre).toBe(false);
   });
 
   it('N_BASCULE vaut 10', () => {

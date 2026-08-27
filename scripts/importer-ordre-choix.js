@@ -83,13 +83,14 @@ const cleCollee = (s) => cle(s).replace(/ /g, '');           // « M RABET » = 
 const jetons = (s) => cle(s).split(' ').filter(Boolean);
 const cleJetonsTries = (s) => [...jetons(s)].sort().join(' '); // « LEROY-STEFANI » = « STEFANI-LEROY »
 
-// Renvoie { nom, motif } — nom = orthographe DE LA BASE — ou null.
+// Renvoie { id, nom, motif } — nom = orthographe DE LA BASE — ou null.
+// C'est l'IDENTIFIANT qui sera stocké ; le nom n'accompagne que pour relecture.
 // Chaque niveau exige une correspondance UNIQUE : deux candidats = ambiguïté,
 // qu'on refuse de trancher toute seule.
 const rapprocher = (nomFeuille, medecins) => {
   const unique = (predicat, motif) => {
     const trouves = medecins.filter(predicat);
-    return trouves.length === 1 ? { nom: trouves[0].nomComplet, motif } : null;
+    return trouves.length === 1 ? { id: trouves[0].id, nom: trouves[0].nomComplet, motif } : null;
   };
   return (
     unique((m) => m.nomComplet === nettoyer(nomFeuille), 'exact') ||
@@ -172,22 +173,23 @@ const libelleDepuisNom = (fichier) => {
     ? JSON.parse(fs.readFileSync(valeur('--correspondances', null), 'utf8'))
     : {};
 
-  const resolus = [];
+  const resolus = [];   // { id, nom }
   const corriges = [];
   const inconnus = [];
   brut.premierTour.forEach((nomFeuille) => {
     const force = table[nomFeuille];
+    const parNom = force ? medecins.find((m) => m.nomComplet === force) : null;
     const trouve = force
-      ? { nom: force, motif: 'table de correspondances' }
+      ? (parNom ? { id: parNom.id, nom: parNom.nomComplet, motif: 'table de correspondances' } : null)
       : rapprocher(nomFeuille, medecins);
     if (!trouve) { inconnus.push(nomFeuille); return; }
     if (trouve.nom !== nomFeuille) corriges.push({ feuille: nomFeuille, base: trouve.nom, motif: trouve.motif });
-    resolus.push(trouve.nom);
+    resolus.push(trouve);
   });
 
-  const doublons = resolus.filter((n, i) => resolus.indexOf(n) !== i);
-  const dansListe = new Set(resolus);
-  const absentsDeLaListe = medecins.filter((m) => !dansListe.has(m.nomComplet)).map((m) => m.nomComplet);
+  const doublons = resolus.map((r) => r.nom).filter((n, i, t) => t.indexOf(n) !== i);
+  const dansListe = new Set(resolus.map((r) => r.id));
+  const absentsDeLaListe = medecins.filter((m) => !dansListe.has(m.id)).map((m) => m.nomComplet);
 
   console.log(`\nFichier   : ${FICHIER}`);
   console.log(`Trimestre : ${ID_PERIODE} (${libelle})`);
@@ -225,11 +227,13 @@ const libelleDepuisNom = (fichier) => {
     throw new Error('Des noms n’ont pas pu être rapprochés — rien n’a été écrit.');
   }
 
-  const premierTour = resolus;
+  const premierTourIds = resolus.map((r) => r.id);
+  const deuxiemeTourIds = [...premierTourIds].reverse();
+  const premierTour = resolus.map((r) => r.nom);
   const deuxiemeTour = [...premierTour].reverse();
 
   console.log(`\n1er tour retenu (${premierTour.length}) :`);
-  premierTour.forEach((n, i) => console.log(`  ${String(i + 1).padStart(2)}. ${n}`));
+  resolus.forEach((r, i) => console.log(`  ${String(i + 1).padStart(2)}. ${r.nom.padEnd(26)} ${r.id}`));
 
   const existant = await session.get(chemin);
   if (existant && !FORCE) {
@@ -247,6 +251,10 @@ const libelleDepuisNom = (fichier) => {
     libelle,
     baseSur: null,
     source: `import ${path.basename(FICHIER)}`,
+    // Ce qui fait foi : les identifiants. Les noms n'accompagnent que pour
+    // qu'un humain puisse relire le document.
+    premierTourIds,
+    deuxiemeTourIds,
     premierTour,
     deuxiemeTour,
   });

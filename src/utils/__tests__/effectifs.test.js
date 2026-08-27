@@ -56,7 +56,7 @@ describe('effectifPour', () => {
 describe('génération — tailles des créneaux selon le type de jour', () => {
   // Sans médecins ni desiderata : la structure (tailles de tableaux) reste
   // déterministe, seul le remplissage varie.
-  const planning = computePriorite('2026-07-01', '2026-07-14', {}, {}, { premierTour: [], deuxiemeTour: [] });
+  const planning = computePriorite('2026-07-01', '2026-07-14', {}, { premierTourIds: [], deuxiemeTourIds: [] });
 
   it('semaine (mer 01/07) : effectif de base, pas de renfort 10h/13h', () => {
     const jour = planning['2026-07-01'];
