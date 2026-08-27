@@ -7,9 +7,11 @@
     "supprimer-compte": "node supprimer-compte-auth.js",
     "synchroniser-annuaire": "node synchroniser-annuaire.js",
     "reinitialiser-comptes": "node reinitialiser-comptes-a-reclamer.js",
-    "reinitialiser-code": "node reinitialiser-code.js"
+    "reinitialiser-code": "node reinitialiser-code.js",
+    "importer-ordre-choix": "node importer-ordre-choix.js"
   },
   "dependencies": {
+    "exceljs": "^4.4.0",
     "firebase-admin": "^12.0.0"
   }
 }
