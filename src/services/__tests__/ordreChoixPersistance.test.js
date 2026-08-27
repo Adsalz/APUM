@@ -6,6 +6,13 @@
 // trimestre appliquait dix fois la bascule des 10 premiers — la liste dérivait
 // alors qu'elle aurait dû rester identique. Ces tests verrouillent le contrat.
 
+import {
+  getOrdreChoixPeriode,
+  getOrdreChoixPrecedent,
+  saveOrdreChoixPeriode,
+} from '../ordreChoixService';
+import { genererProchainOrdreChoix } from '../../utils/ordreChoix';
+
 const mockSetDoc = jest.fn(() => Promise.resolve());
 const mockGetDoc = jest.fn(() => Promise.resolve({ exists: () => false }));
 const mockGetDocs = jest.fn(() => Promise.resolve({ empty: true, docs: [] }));
@@ -28,13 +35,6 @@ jest.mock('firebase/firestore', () => ({
     static now() { return new Timestamp(); }
   },
 }));
-
-import {
-  getOrdreChoixPeriode,
-  getOrdreChoixPrecedent,
-  saveOrdreChoixPeriode,
-} from '../ordreChoixService';
-import { genererProchainOrdreChoix } from '../../utils/ordreChoix';
 
 const firestore = require('firebase/firestore');
 

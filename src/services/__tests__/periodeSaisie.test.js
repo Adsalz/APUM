@@ -8,6 +8,8 @@
 //
 // Le mock de firebase/firestore est hoisté par Jest au-dessus des imports.
 
+import { setPeriodeSaisie } from '../planningService';
+
 const mockSetDoc = jest.fn(() => Promise.resolve());
 const mockGetDocs = jest.fn(() => Promise.resolve({ docs: [] }));
 const mockDeleteDoc = jest.fn(() => Promise.resolve());
@@ -39,8 +41,6 @@ jest.mock('firebase/firestore', () => ({
     toDate() { return this.__date; }
   },
 }));
-
-import { setPeriodeSaisie } from '../planningService';
 
 describe('setPeriodeSaisie — aucune suppression en cascade', () => {
   beforeEach(() => { jest.clearAllMocks(); });

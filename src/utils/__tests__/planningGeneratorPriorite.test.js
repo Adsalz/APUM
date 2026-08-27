@@ -3,14 +3,14 @@
 //
 // Comme planningGenerator, ce module importe en cascade Firebase via les
 // services : on les neutralise par des mocks factory.
+import { diviserPeriode } from '../planningGeneratorPriorite';
+
 jest.mock('../../services/planningService', () => ({
   getDesiderataForPeriod: jest.fn()
 }));
 jest.mock('../../services/userService', () => ({
   getAllUsers: jest.fn()
 }));
-
-import { diviserPeriode } from '../planningGeneratorPriorite';
 
 // Calculs de dates déterministes quel que soit le fuseau de la machine.
 process.env.TZ = 'UTC';
