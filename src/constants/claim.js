@@ -20,5 +20,23 @@ export const CODE_A_RECLAMER = 'apum-compte-a-reclamer';
 export const CODE_MEDECIN_LONGUEUR = 6;
 export const CODE_MEDECIN_REGEX = /^\d{6}$/;
 
+// Réclamation en cours : la session est ouverte avec le code partagé et la
+// seconde saisie est attendue. Mémorisée dans sessionStorage, car si l'onglet
+// est rechargé à cet instant l'état React est perdu alors que la session
+// Firebase persiste — sans ce marqueur, le médecin entrerait dans l'application
+// avec un compte toujours « à réclamer ». Les accès sont protégés : un stockage
+// indisponible (navigation privée stricte) ne doit jamais bloquer la connexion.
+const RECLAMATION_KEY = 'apum.reclamation-en-cours';
+
+export const marquerReclamationEnCours = () => {
+  try { window.sessionStorage.setItem(RECLAMATION_KEY, '1'); } catch (e) { /* stockage indisponible */ }
+};
+export const effacerReclamationEnCours = () => {
+  try { window.sessionStorage.removeItem(RECLAMATION_KEY); } catch (e) { /* stockage indisponible */ }
+};
+export const reclamationEnCours = () => {
+  try { return window.sessionStorage.getItem(RECLAMATION_KEY) === '1'; } catch (e) { return false; }
+};
+
 // Normalise une saisie en gardant au plus 6 chiffres.
 export const nettoyerCode = (valeur) => (valeur || '').replace(/\D/g, '').slice(0, CODE_MEDECIN_LONGUEUR);

@@ -36,6 +36,18 @@ const labelWith = (prenom, nom, k) => {
   return `${p} ${capitalize(n.slice(0, k))}.`.trim();
 };
 
+// Clé de comparaison des labels : accents, casse, tirets, espaces et points
+// ignorés. « Jean-Luc F. » et « Jean Luc F. » sont deux personnes différentes,
+// mais se lisent pareil dans une liste déroulante : on les traite comme une
+// collision — sinon, à la première connexion, l'un fixerait son code sur le
+// compte de l'autre sans s'en apercevoir.
+export const cleLabel = (lbl) =>
+  (lbl || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+
 // Calcule des labels UNIQUES pour l'ensemble des médecins.
 //
 // On part de « Prénom N. » et, tant que deux médecins partagent le même label,
@@ -50,15 +62,15 @@ export function computeAnnuaireLabels(medecins) {
   for (let iter = 0; iter < 30; iter += 1) {
     const counts = {};
     entries.forEach((e) => {
-      const lbl = labelWith(e.prenom, e.nom, e.k);
-      counts[lbl] = (counts[lbl] || 0) + 1;
+      const cle = cleLabel(labelWith(e.prenom, e.nom, e.k));
+      counts[cle] = (counts[cle] || 0) + 1;
     });
 
     let changed = false;
     entries.forEach((e) => {
-      const lbl = labelWith(e.prenom, e.nom, e.k);
+      const cle = cleLabel(labelWith(e.prenom, e.nom, e.k));
       const nomLen = (e.nom || '').trim().length;
-      if (counts[lbl] > 1 && e.k < nomLen) {
+      if (counts[cle] > 1 && e.k < nomLen) {
         e.k += 1;
         changed = true;
       }
@@ -66,16 +78,19 @@ export function computeAnnuaireLabels(medecins) {
     if (!changed) break;
   }
 
-  const finals = entries.map((e) => ({ id: e.id, lbl: labelWith(e.prenom, e.nom, e.k) }));
+  const finals = entries.map((e) => {
+    const lbl = labelWith(e.prenom, e.nom, e.k);
+    return { id: e.id, lbl, cle: cleLabel(lbl) };
+  });
   const groupCount = {};
-  finals.forEach((f) => { groupCount[f.lbl] = (groupCount[f.lbl] || 0) + 1; });
+  finals.forEach((f) => { groupCount[f.cle] = (groupCount[f.cle] || 0) + 1; });
 
   const seen = {};
   const result = {};
   finals.forEach((f) => {
-    if (groupCount[f.lbl] > 1) {
-      seen[f.lbl] = (seen[f.lbl] || 0) + 1;
-      result[f.id] = `${f.lbl} (${seen[f.lbl]})`;
+    if (groupCount[f.cle] > 1) {
+      seen[f.cle] = (seen[f.cle] || 0) + 1;
+      result[f.id] = `${f.lbl} (${seen[f.cle]})`;
     } else {
       result[f.id] = f.lbl;
     }

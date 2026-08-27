@@ -15,7 +15,13 @@ import { getUser } from '../services/userService';
 import { getAnnuaire } from '../services/annuaireService';
 import { getPeriodeSaisie } from '../services/planningService';
 import { getInscriptionOuverte } from '../services/inscriptionService';
-import { CODE_MEDECIN_LONGUEUR, CODE_MEDECIN_REGEX } from '../constants/claim';
+import {
+  CODE_MEDECIN_LONGUEUR,
+  CODE_MEDECIN_REGEX,
+  marquerReclamationEnCours,
+  effacerReclamationEnCours,
+  reclamationEnCours,
+} from '../constants/claim';
 import { useAuth } from '../contexts/AuthContext';
 import { Alert, Button, Card, CodePad, FormField, Modal, Select } from './ui';
 import logger from '../utils/logger';
@@ -36,7 +42,7 @@ const mapAuthError = (err) => {
 };
 
 function Login() {
-  const { firebaseUser, role, loading: authLoading } = useAuth();
+  const { firebaseUser, role, loading: authLoading, profileIndisponible } = useAuth();
   const navigate = useNavigate();
 
   // 'medecin' = liste déroulante + code à 6 chiffres (parcours des médecins)
@@ -73,6 +79,11 @@ function Login() {
   // de frappe deviendrait le code du médecin, sans erreur affichée.
   const [confirmation, setConfirmation] = useState(false);
   const [codeConfirme, setCodeConfirme] = useState('');
+
+  // Réclamation interrompue : l'onglet a été rechargé pendant la seconde saisie
+  // (marqueur sessionStorage). La session Firebase est encore ouverte avec le
+  // code partagé — on la referme dès qu'elle est restaurée, et on explique.
+  const [reclamationInterrompue, setReclamationInterrompue] = useState(() => reclamationEnCours());
 
   // Modale « code oublié » (parcours médecin) : envoi d'un lien de
   // réinitialisation à l'adresse que l'annuaire associe au nom choisi — le
@@ -141,6 +152,30 @@ function Login() {
       .then((open) => setInscriptionOuverte(open))
       .catch(() => setInscriptionOuverte(false));
   }, []);
+
+  useEffect(() => {
+    if (!reclamationInterrompue || authLoading) { return; }
+    effacerReclamationEnCours();
+    annulerReclamation().finally(() => {
+      setReclamationInterrompue(false);
+      setError(
+        'La définition de votre code a été interrompue. Recommencez : choisissez votre nom, '
+        + 'puis saisissez le code souhaité.'
+      );
+    });
+  }, [reclamationInterrompue, authLoading]);
+
+  // Session ouverte sans profil exploitable (compte supprimé, profil illisible) :
+  // rien ne peut s'afficher dans l'application, on referme la session et on
+  // explique — plutôt que de laisser l'utilisateur connecté sur une page vide.
+  useEffect(() => {
+    if (authLoading || !firebaseUser || !profileIndisponible || isLoading || confirmation) { return; }
+    logoutUser().catch((err) => logger.error('Déconnexion (profil indisponible):', err));
+    setError(
+      'Votre profil est introuvable : votre compte n\'est peut-être plus actif. '
+      + 'Contactez votre administrateur.'
+    );
+  }, [authLoading, firebaseUser, profileIndisponible, isLoading, confirmation]);
 
   // Focus du champ email quand on bascule en mode email.
   useEffect(() => {
@@ -213,6 +248,7 @@ function Login() {
       // session est déjà ouverte (code partagé) — d'où le garde `confirmation`
       // sur la redirection plus bas.
       if (statut === 'a_confirmer') {
+        marquerReclamationEnCours();
         setCodeConfirme('');
         setConfirmation(true);
         setIsLoading(false);
@@ -240,6 +276,7 @@ function Login() {
     setIsLoading(true);
     try {
       await fixerCodeMedecin(code);
+      effacerReclamationEnCours();
       const user = auth.currentUser;
       if (!user) {
         throw new Error('Session perdue pendant la confirmation');
@@ -249,6 +286,7 @@ function Login() {
     } catch (err) {
       // fixerCodeMedecin déconnecte en cas d'échec : on repart de zéro.
       logger.error('Erreur lors de la définition du code:', err);
+      effacerReclamationEnCours();
       setConfirmation(false);
       setCode('');
       setCodeConfirme('');
@@ -260,6 +298,7 @@ function Login() {
   // Abandon : referme la session ouverte avec le code partagé. Le compte reste
   // sans code, le médecin pourra recommencer.
   const annulerConfirmation = async () => {
+    effacerReclamationEnCours();
     setConfirmation(false);
     setCode('');
     setCodeConfirme('');
@@ -365,7 +404,7 @@ function Login() {
   // AVANT que updatePassword ne soit résolu ; sans ce garde, on redirigerait avec
   // une session encore au code de réclamation. La navigation est alors pilotée
   // uniquement par finishLogin, après réclamation réussie.
-  if (!authLoading && firebaseUser && role && !isLoading && !confirmation) {
+  if (!authLoading && firebaseUser && role && !isLoading && !confirmation && !reclamationInterrompue) {
     return (
       <Navigate to={role === 'admin' ? '/dashboard-admin' : '/accueil'} replace />
     );
@@ -409,10 +448,20 @@ function Login() {
         {/* ---------- Première connexion : seconde saisie du code ---------- */}
         {mode === 'medecin' && confirmation ? (
           <form onSubmit={handleConfirmationSubmit} className="p-6">
+            {/* Le nom est rappelé en évidence : avec des libellés proches dans
+                la liste, c'est le dernier moment pour s'apercevoir qu'on est en
+                train de fixer le code d'un confrère. */}
             <Alert kind="info" className="mb-4">
-              Ce compte n'a pas encore de code. Ressaisissez celui que vous venez de choisir
-              pour le confirmer&nbsp;: il sera le vôtre pour tout le trimestre.
+              Vous définissez le code de{' '}
+              <strong className="text-ink-900">
+                {selectedEntry ? selectedEntry.label : 'ce compte'}
+              </strong>
+              . Ce compte n'a pas encore de code&nbsp;: ressaisissez celui que vous venez de
+              choisir pour le confirmer, il sera le vôtre pour tout le trimestre.
             </Alert>
+            <p className="mb-4 text-center text-xs text-ink-500">
+              Ce n'est pas vous&nbsp;? Cliquez sur «&nbsp;Annuler et recommencer&nbsp;» ci-dessous.
+            </p>
 
             <div className="mb-2">
               <span className="mb-3 block text-center text-sm font-semibold text-ink-700">

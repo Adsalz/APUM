@@ -15,6 +15,9 @@ const AuthContext = createContext({
   firebaseUser: null,
   profile: null,
   role: null,
+  // true quand la session Firebase existe mais que le profil users/{uid} est
+  // introuvable (compte supprimé) ou illisible : l'app ne peut rien en faire.
+  profileIndisponible: false,
   loading: true,
   logout: async () => {},
 });
@@ -22,6 +25,7 @@ const AuthContext = createContext({
 export function AuthProvider({ children }) {
   const [firebaseUser, setFirebaseUser] = useState(null);
   const [profile, setProfile] = useState(null);
+  const [profileIndisponible, setProfileIndisponible] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -31,12 +35,15 @@ export function AuthProvider({ children }) {
         try {
           const userProfile = await getUser(user.uid);
           setProfile(userProfile);
+          setProfileIndisponible(!userProfile);
         } catch (error) {
           logger.error('Erreur lors du chargement du profil utilisateur:', error);
           setProfile(null);
+          setProfileIndisponible(true);
         }
       } else {
         setProfile(null);
+        setProfileIndisponible(false);
       }
       setLoading(false);
     });
@@ -53,6 +60,7 @@ export function AuthProvider({ children }) {
     firebaseUser,
     profile,
     role: profile ? profile.role : null,
+    profileIndisponible,
     loading,
     logout,
   };

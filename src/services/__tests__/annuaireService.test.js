@@ -48,6 +48,24 @@ describe('computeAnnuaireLabels', () => {
     expect(unique.size).toBe(medecins.length);
   });
 
+  it('distingue des libellés qui se lisent pareil (tiret, espace, accent)', () => {
+    // Deux personnes différentes, mais « Jean-Luc F. » et « Jean Luc F. » sont
+    // indiscernables dans une liste : on élargit comme pour un homonyme.
+    const labels = computeAnnuaireLabels([
+      { id: '1', prenom: 'Jean-Luc', nom: 'Fallot' },
+      { id: '2', prenom: 'Jean Luc', nom: 'Ferrer' },
+      { id: '3', prenom: 'Amelie', nom: 'Girard' },
+      { id: '4', prenom: 'Amélie', nom: 'Gomez' },
+      { id: '5', prenom: 'Céline', nom: 'Costa' },
+    ]);
+    expect(labels['1']).toBe('Jean-Luc Fa.');
+    expect(labels['2']).toBe('Jean Luc Fe.');
+    expect(labels['3']).toBe('Amelie Gi.');
+    expect(labels['4']).toBe('Amélie Go.');
+    // Initiale différente : pas de collision, libellé court conservé.
+    expect(labels['5']).toBe('Céline C.');
+  });
+
   it('reste robuste sur un nom manquant', () => {
     const labels = computeAnnuaireLabels([{ id: '1', prenom: 'Jean', nom: '' }]);
     expect(labels['1']).toBe('Jean');

@@ -27,60 +27,8 @@
 
 const admin = require('firebase-admin');
 
-// ⚠️ Miroir de computeAnnuaireLabels (src/services/annuaireService.js), couvert
-// par src/services/__tests__/annuaireService.test.js. Garder les deux alignés :
-// « Prénom N. » élargi en cas d'homonymes, suffixe (1)/(2) en dernier recours.
-const capitalize = (s) => {
-  const t = (s || '').trim();
-  return t ? t.charAt(0).toUpperCase() + t.slice(1).toLowerCase() : '';
-};
-
-const labelWith = (prenom, nom, k) => {
-  const p = (prenom || '').trim();
-  const n = (nom || '').trim();
-  if (!n) return p || '(sans nom)';
-  if (k >= n.length) return `${p} ${capitalize(n)}`.trim();
-  return `${p} ${capitalize(n.slice(0, k))}.`.trim();
-};
-
-function computeAnnuaireLabels(medecins) {
-  const entries = medecins.map((m) => ({ id: m.id, prenom: m.prenom, nom: m.nom, k: 1 }));
-
-  for (let iter = 0; iter < 30; iter += 1) {
-    const counts = {};
-    entries.forEach((e) => {
-      const lbl = labelWith(e.prenom, e.nom, e.k);
-      counts[lbl] = (counts[lbl] || 0) + 1;
-    });
-
-    let changed = false;
-    entries.forEach((e) => {
-      const lbl = labelWith(e.prenom, e.nom, e.k);
-      const nomLen = (e.nom || '').trim().length;
-      if (counts[lbl] > 1 && e.k < nomLen) {
-        e.k += 1;
-        changed = true;
-      }
-    });
-    if (!changed) break;
-  }
-
-  const finals = entries.map((e) => ({ id: e.id, lbl: labelWith(e.prenom, e.nom, e.k) }));
-  const groupCount = {};
-  finals.forEach((f) => { groupCount[f.lbl] = (groupCount[f.lbl] || 0) + 1; });
-
-  const seen = {};
-  const result = {};
-  finals.forEach((f) => {
-    if (groupCount[f.lbl] > 1) {
-      seen[f.lbl] = (seen[f.lbl] || 0) + 1;
-      result[f.id] = `${f.lbl} (${seen[f.lbl]})`;
-    } else {
-      result[f.id] = f.lbl;
-    }
-  });
-  return result;
-}
+// Algorithme des libellés : miroir partagé dans lib/labels.js (voir son en-tête).
+const { computeAnnuaireLabels } = require('./lib/labels');
 
 async function main() {
   const dryRun = process.argv.includes('--dry-run');

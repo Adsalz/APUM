@@ -8,10 +8,11 @@
 import React from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { reclamationEnCours } from '../constants/claim';
 import LoadingScreen from './ui/LoadingScreen';
 
 function ProtectedRoute({ roles }) {
-  const { firebaseUser, role, loading } = useAuth();
+  const { firebaseUser, role, loading, profileIndisponible } = useAuth();
 
   if (loading) {
     return <LoadingScreen />;
@@ -19,6 +20,24 @@ function ProtectedRoute({ roles }) {
 
   if (!firebaseUser) {
     return <Navigate to="/" replace />;
+  }
+
+  // Réclamation interrompue (onglet rechargé pendant la seconde saisie du
+  // code) : la session est encore au code partagé. Retour à la connexion, qui
+  // la referme et explique.
+  if (reclamationEnCours()) {
+    return <Navigate to="/" replace />;
+  }
+
+  if (!role) {
+    // Profil introuvable ou illisible : retour à la connexion, qui déconnecte
+    // et explique. Auparavant on renvoyait vers /accueil — lui-même réservé au
+    // rôle médecin — et la page restait blanche.
+    if (profileIndisponible) {
+      return <Navigate to="/" replace />;
+    }
+    // Session restaurée mais profil pas encore chargé : on attend.
+    return <LoadingScreen />;
   }
 
   if (roles && !roles.includes(role)) {

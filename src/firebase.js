@@ -21,5 +21,8 @@ if (!firebaseConfig.apiKey) {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
+// Langue des emails et pages hébergées par Firebase Auth (lien « Code
+// oublié ») : sans ça, la page « nouveau mot de passe » s'affiche en anglais.
+auth.languageCode = 'fr';
 
 export { db, auth };
