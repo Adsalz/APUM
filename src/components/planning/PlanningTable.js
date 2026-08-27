@@ -174,11 +174,11 @@ const Legende = () => (
     </span>
     <span className="inline-flex items-center gap-1.5">
       <span className="h-3 w-3 rounded bg-danger-100 ring-1 ring-inset ring-danger-300" />
-      Contrainte dure violée (chevauchement, 3 jours consécutifs, max/semaine)
+      Contrainte dure violée (chevauchement, deux nuits d'affilée, max/semaine)
     </span>
     <span className="inline-flex items-center gap-1.5">
       <span className="h-3 w-3 rounded bg-warning-100 ring-1 ring-inset ring-warning-300" />
-      À vérifier (a répondu « Non », quota mensuel dépassé)
+      À vérifier (a répondu « Non », quota mensuel dépassé, 3 jours consécutifs)
     </span>
   </div>
 );

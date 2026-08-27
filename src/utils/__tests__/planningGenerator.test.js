@@ -98,13 +98,13 @@ describe('planningGenerator — verifierContraintes', () => {
     expect(verifierContraintes(planning)).toBe(false);
   });
 
-  it('rejette trois jours de garde consécutifs pour le même médecin', () => {
+  it('n\'invalide plus trois jours de garde consécutifs (tolérés en dernier recours depuis le 27/08/2026)', () => {
     const planning = {
-      '2025-06-17': { QUART_1: ['m1'] },
-      '2025-06-18': { QUART_1: ['m1'] },
-      '2025-06-19': { QUART_1: ['m1'] }
+      '2025-06-17': { QUART_2: ['m1'] },
+      '2025-06-18': { QUART_2: ['m1'] },
+      '2025-06-19': { QUART_2: ['m1'] }
     };
-    expect(verifierContraintes(planning)).toBe(false);
+    expect(verifierContraintes(planning)).toBe(true);
   });
 });
 

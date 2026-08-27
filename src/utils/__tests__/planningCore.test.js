@@ -128,21 +128,22 @@ describe('planningCore — computePriorite (déterministe + invariants)', () => 
     expect(planning2).toEqual(planning);
   });
 
-  it('n’assigne jamais 3 jours de garde consécutifs (règle appliquée au mode priorité)', () => {
-    const dates = datesEntre(debut, fin);
-    ids.forEach((id) => {
-      const jours = joursTravailles(planning, id);
-      dates.forEach((date) => {
-        const j = new Date(date);
-        const veille = new Date(j); veille.setUTCDate(j.getUTCDate() - 1);
-        const avant = new Date(j); avant.setUTCDate(j.getUTCDate() - 2);
-        const trois =
-          jours.has(date) &&
-          jours.has(veille.toISOString().split('T')[0]) &&
-          jours.has(avant.toISOString().split('T')[0]);
-        expect(trois).toBe(false);
-      });
-    });
+  it('3 jours consécutifs : ÉVITÉS au tirage quand une alternative existe…', () => {
+    // X veut 3 gardes, disponible les 1, 2, 3 et 4 juin sur le 3e quart : le tirage prend
+    // les 1 et 2, saute le 3 (troisième jour d'affilée) et prend le 4.
+    const desiderata = { X: { nombreGardesSouhaitees: 3, nombreGardesMaxParSemaine: 7, preferences: {
+      '2026-06-01': { QUART_3: 'Oui' }, '2026-06-02': { QUART_3: 'Oui' }, '2026-06-03': { QUART_3: 'Oui' }, '2026-06-04': { QUART_3: 'Oui' } } } };
+    const p = computePriorite('2026-06-01', '2026-07-31', desiderata, { premierTourIds: ['X'], deuxiemeTourIds: ['X'] });
+    const surX = (d) => p[d].QUART_3.includes('X');
+    expect([surX('2026-06-01'), surX('2026-06-02'), surX('2026-06-03'), surX('2026-06-04')]).toEqual([true, true, false, true]);
+  });
+
+  it('…mais TOLÉRÉS au comblement, en dernier recours, plutôt que de laisser la place vide', () => {
+    // Même X, disponible seulement les 1, 2 et 3 juin : sans le 3, la place resterait vide.
+    const desiderata = { X: { nombreGardesSouhaitees: 3, nombreGardesMaxParSemaine: 7, preferences: {
+      '2026-06-01': { QUART_3: 'Oui' }, '2026-06-02': { QUART_3: 'Oui' }, '2026-06-03': { QUART_3: 'Oui' } } } };
+    const p = computePriorite('2026-06-01', '2026-07-31', desiderata, { premierTourIds: ['X'], deuxiemeTourIds: ['X'] });
+    expect(['2026-06-01', '2026-06-02', '2026-06-03'].every((d) => p[d].QUART_3.includes('X'))).toBe(true);
   });
 
   it('ne place jamais un médecin non volontaire (« Non »)', () => {
@@ -165,7 +166,7 @@ describe('planningCore — correctifs d’audit (B1 consécutifs, B3 plafond/jou
   // PAS créer une série de 3 jours consécutifs en comblant une place restée vide
   // alors que J+1 et J+2 sont déjà des gardes. Cas réaliste : frontière de mois, le
   // quota mensuel qui bloque le 31/08 se réinitialise en septembre.
-  it('B1 — la passe largeur ne crée jamais 3 jours consécutifs (frontière de mois)', () => {
+  it('B1 — pas de 3 jours consécutifs à la frontière de mois quand une autre règle (nuits) les évite', () => {
     const noms = { X: 'X' };
     const listePriorite = { premierTourIds: ['X'].map((n) => noms[n]), deuxiemeTourIds: ['X'].map((n) => noms[n]) };
     const desiderata = {

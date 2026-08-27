@@ -287,7 +287,6 @@ export const verifierContraintes = (planning, desiderata = {}) => {
   for (let i = 0; i < dates.length; i++) {
     const date = dates[i];
     const semaine = cleSemaineISO(date);
-    const medecinsDuJour = new Set();
 
     // Chevauchements + comptage des gardes (occurrences de créneaux) par semaine
     for (const creneauId in planning[date]) {
@@ -299,7 +298,6 @@ export const verifierContraintes = (planning, desiderata = {}) => {
           return false;
         }
 
-        medecinsDuJour.add(medecinId);
 
         if (!gardesParMedecinParSemaine[medecinId]) {
           gardesParMedecinParSemaine[medecinId] = {};
@@ -311,25 +309,6 @@ export const verifierContraintes = (planning, desiderata = {}) => {
       }
     }
 
-    // Vérifier les gardes consécutives (pas plus de 2 jours d'affilée)
-    for (const medecinId of medecinsDuJour) {
-      if (i >= 2) {
-        const hierMedecins = new Set();
-        const avantHierMedecins = new Set();
-
-        Object.values(planning[dates[i - 1]]).forEach(medecins => {
-          medecins.forEach(m => { if (m !== null) { hierMedecins.add(m); } });
-        });
-
-        Object.values(planning[dates[i - 2]]).forEach(medecins => {
-          medecins.forEach(m => { if (m !== null) { avantHierMedecins.add(m); } });
-        });
-
-        if (hierMedecins.has(medecinId) && avantHierMedecins.has(medecinId)) {
-          return false;
-        }
-      }
-    }
   }
 
   // Respect du nombre maximum de gardes par semaine, PROPRE À CHAQUE MÉDECIN
@@ -351,7 +330,7 @@ export const verifierContraintes = (planning, desiderata = {}) => {
 // ============================================================================
 
 // Renvoie true si affecter ce médecin à cette date créerait une série de 3 jours
-// de garde consécutifs. Contrôle SYMÉTRIQUE : on interdit J si l'une des trois
+// de garde consécutifs (évitée au tirage, tolérée au comblement — voir TROIS_JOURS_CONSECUTIFS). Contrôle SYMÉTRIQUE : on interdit J si l'une des trois
 // fenêtres glissantes contenant J serait entièrement couverte —
 // (J-2,J-1,J), (J-1,J,J+1) ou (J,J+1,J+2). Le contrôle « en arrière seul »
 // (J-1 & J-2) était insuffisant pour la passe LARGEUR, qui s'exécute après coup
@@ -386,18 +365,28 @@ export const creeraitCreneauxConsecutifs = (medecinId, dateString, creneauId, pl
   return aLeCreneau(-1) || aLeCreneau(1);
 };
 
+// Trois jours de garde d'affilée : ÉVITÉS au tirage, AUTORISÉS au comblement (dernier
+// recours). Décision du 27/08/2026 : la coordinatrice le fait 76 fois sur le trimestre
+// ASO26, sans le réserver aux places rares — ce n'est pas un interdit chez elle.
+// Mesuré sur ASO26 : interdit partout 881 places ; dernier recours 905 (38 séquences de
+// 3 jours) ; libre partout 901 (109 séquences). Le dernier recours domine sur tout :
+// plus de places, quatre fois moins d'enchaînements, meilleure fidélité au manuel.
+// L'écran d'édition le signale comme un point FORT (à vérifier), plus comme un blocage.
+export const TROIS_JOURS_CONSECUTIFS = 'dernier-recours';
+
 // ============================================================================
 // Contraintes DURES communes au tirage et au comblement — source unique.
 // (La préférence et le quota sont vérifiés par l'appelant : ils diffèrent d'une passe à l'autre.)
+// `troisJoursAutorises` : true pour le comblement (dernier recours), false au tirage.
 // ============================================================================
-const contrainteDureBloque = (id, dateString, cid, desiderata, planning) => {
+const contrainteDureBloque = (id, dateString, cid, desiderata, planning, troisJoursAutorises = false) => {
   const maxSem = desiderata[id].nombreGardesMaxParSemaine || 7;
   if (compterGardesParSemaine(id, dateString, planning) >= maxSem) { return true; }
   const jour = planning[dateString];
   if (Object.values(jour).reduce((n, arr) => n + (arr.includes(id) ? 1 : 0), 0) >= MAX_CRENEAUX_PAR_JOUR) { return true; }
   if (aCreneauxChevauchants(id, dateString, cid, planning)) { return true; }
   if (creeraitCreneauxConsecutifs(id, dateString, cid, planning)) { return true; }
-  if (creeraitTroisJoursConsecutifs(id, dateString, planning)) { return true; }
+  if (!troisJoursAutorises && creeraitTroisJoursConsecutifs(id, dateString, planning)) { return true; }
   return false;
 };
 
@@ -453,7 +442,7 @@ const remplirJourEnCouverture = (dateString, ordrePriorite, desiderata, planning
     if (pref !== 'Oui' && pref !== 'Possible') { return null; }
     const souhait = desiderata[id].nombreGardesSouhaitees;
     if (souhait && gardesMois(id) >= souhait) { return null; }            // quota mensuel jamais dépassé
-    if (contrainteDureBloque(id, dateString, cid, desiderata, planning)) { return null; }
+    if (contrainteDureBloque(id, dateString, cid, desiderata, planning, TROIS_JOURS_CONSECUTIFS === 'dernier-recours')) { return null; }
     return pref;
   };
 
@@ -692,7 +681,7 @@ export const computePriorite = (debut, fin, desiderata, listePriorite, options =
   joursTour2.forEach((d) => remplirJourEnCouverture(d, listePriorite.deuxiemeTourIds || [], desiderata, planning, gardesAttribuees, gardesParCreneau));
 
   // Filet de sécurité : le planning généré DOIT satisfaire les contraintes dures
-  // (max hebdo, pas 3 jours consécutifs, pas de chevauchement). Tripwire de non-
+  // (max hebdo, pas de chevauchement). Tripwire de non-
   // régression — n'altère pas le planning, signale seulement une éventuelle violation.
   if (!verifierContraintes(planning, desiderata)) {
     logger.warn('computePriorite: le planning généré viole verifierContraintes (contrainte dure).');

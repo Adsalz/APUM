@@ -112,7 +112,7 @@ export const NIVEAUX = { DUR: 'dur', FORT: 'fort', INFO: 'info' };
 const PROBLEMES = {
   doublon: { niveau: NIVEAUX.DUR, libelle: 'Déjà sur ce créneau' },
   chevauchement: { niveau: NIVEAUX.DUR, libelle: 'Créneaux qui se chevauchent' },
-  troisJours: { niveau: NIVEAUX.DUR, libelle: '3 jours de garde consécutifs' },
+  troisJours: { niveau: NIVEAUX.FORT, libelle: '3 jours de garde consécutifs (dernier recours)' },
   nuitsConsecutives: { niveau: NIVEAUX.DUR, libelle: 'Deux nuits (1h-7h) d\'affilée' },
   maxSemaine: { niveau: NIVEAUX.DUR, libelle: 'Max/semaine dépassé' },
   indisponible: { niveau: NIVEAUX.FORT, libelle: 'A répondu « Non »' },
