@@ -479,7 +479,11 @@ export const diviserPeriode = (debut, fin) => {
   const endDate = new Date(fin);
   const totalDays = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24)) + 1;
 
-  const premierTourDays = Math.min(45, Math.floor(totalDays / 2));
+  // Coupe à la MOITIÉ exacte de la période (1er tour = liste directe, 2e tour =
+  // liste inversée), comme le fait la coordinatrice. L'ancien plafond de 45 jours,
+  // hérité du code d'origine sans justification, décalait la bascule d'un jour sur
+  // les trimestres de 92 jours (45/47 au lieu de 46/46).
+  const premierTourDays = Math.floor(totalDays / 2);
   const deuxiemeTourStart = new Date(startDate);
   deuxiemeTourStart.setUTCDate(deuxiemeTourStart.getUTCDate() + premierTourDays);
 

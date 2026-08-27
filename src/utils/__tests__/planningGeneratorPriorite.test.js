@@ -39,11 +39,18 @@ describe('planningGeneratorPriorite — diviserPeriode', () => {
     expect(ecartJours).toBe(1);
   });
 
-  it('plafonne le premier tour à 45 jours sur une longue période', () => {
+  it('coupe à la moitié exacte, même sur une longue période (plus de plafond à 45 jours)', () => {
     const result = diviserPeriode('2025-01-01', '2025-06-30');
-    // 45 jours après le 01/01/2025 -> le second tour démarre le 15/02/2025.
+    // 181 jours → 90 + 91 : le second tour démarre 90 jours après le 01/01/2025, soit le 01/04/2025.
     expect(result.premierTour.debut).toBe('2025-01-01');
-    expect(result.deuxiemeTour.debut).toBe('2025-02-15');
+    expect(result.premierTour.fin).toBe('2025-03-31');
+    expect(result.deuxiemeTour.debut).toBe('2025-04-01');
     expect(result.deuxiemeTour.fin).toBe('2025-06-30');
+  });
+
+  it('un trimestre de 92 jours (août→octobre) se coupe 46/46, bascule au 16 septembre', () => {
+    const result = diviserPeriode('2026-08-01', '2026-10-31');
+    expect(result.premierTour).toEqual({ debut: '2026-08-01', fin: '2026-09-15' });
+    expect(result.deuxiemeTour).toEqual({ debut: '2026-09-16', fin: '2026-10-31' });
   });
 });
