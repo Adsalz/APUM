@@ -204,9 +204,10 @@ habituel se reconnecte sans rien remarquer (l'app échoue, réessaie avec le cod
 partagé, puis adopte le code tapé). Seul celui qui a **oublié** son code en
 choisit un nouveau — c'est tout l'intérêt.
 
-⚠️ Corollaire : le premier code tapé après la remise à zéro est adopté **sans
-confirmation**. Une faute de frappe devient le code du médecin, sans message
-d'erreur ; il faudra le débloquer à la main (`reinitialiser-code.js`).
+Le premier code tapé après la remise à zéro est confirmé par une **seconde
+saisie** sur l'écran de connexion : une faute de frappe ne peut pas devenir le
+code du médecin à son insu. Et s'il oublie son code plus tard, il se dépanne
+seul avec « Code oublié ? ».
 
 ⚠️ Tant que la fenêtre d'inscription reste ouverte, un compte dont le code n'a
 pas encore été redéfini peut être pris par un tiers connaissant la valeur

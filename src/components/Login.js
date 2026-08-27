@@ -4,7 +4,13 @@ import { useNavigate, Navigate } from 'react-router-dom';
 import { Calendar, ArrowLeft } from 'lucide-react';
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { auth } from '../firebase';
-import { loginUser, loginMedecin, logoutUser } from '../services/authService';
+import {
+  loginUser,
+  loginMedecin,
+  logoutUser,
+  fixerCodeMedecin,
+  annulerReclamation,
+} from '../services/authService';
 import { getUser } from '../services/userService';
 import { getAnnuaire } from '../services/annuaireService';
 import { getPeriodeSaisie } from '../services/planningService';
@@ -61,6 +67,12 @@ function Login() {
 
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  // Double saisie à la première connexion : quand le compte n'a pas encore de
+  // code, on demande une confirmation AVANT de le fixer — sans quoi une faute
+  // de frappe deviendrait le code du médecin, sans erreur affichée.
+  const [confirmation, setConfirmation] = useState(false);
+  const [codeConfirme, setCodeConfirme] = useState('');
 
   // Modale « code oublié » (parcours médecin) : envoi d'un lien de
   // réinitialisation à l'adresse que l'annuaire associe au nom choisi — le
@@ -188,16 +200,70 @@ function Login() {
 
     setIsLoading(true);
     try {
-      const userCredential = await loginMedecin(selectedEmail, code, inscriptionOuverte === true);
-      if (!userCredential || !userCredential.user) {
+      const { statut, credential } = await loginMedecin(
+        selectedEmail,
+        code,
+        inscriptionOuverte === true
+      );
+      if (!credential || !credential.user) {
         throw new Error('Échec de l\'authentification');
       }
-      await finishLogin(userCredential.user.uid);
+      // Compte sans code : on demande la seconde saisie avant de le fixer. La
+      // session est déjà ouverte (code partagé) — d'où le garde `confirmation`
+      // sur la redirection plus bas.
+      if (statut === 'a_confirmer') {
+        setCodeConfirme('');
+        setConfirmation(true);
+        setIsLoading(false);
+        return;
+      }
+      await finishLogin(credential.user.uid);
     } catch (err) {
       logger.error('Erreur de connexion (médecin):', err);
       setError(mapAuthError(err));
       setIsLoading(false);
     }
+  };
+
+  // Seconde saisie : les deux codes doivent concorder pour être adoptés.
+  const handleConfirmationSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+
+    if (codeConfirme !== code) {
+      setCodeConfirme('');
+      setError('Les deux saisies ne correspondent pas. Ressaisissez votre code.');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      await fixerCodeMedecin(code);
+      const user = auth.currentUser;
+      if (!user) {
+        throw new Error('Session perdue pendant la confirmation');
+      }
+      setConfirmation(false);
+      await finishLogin(user.uid);
+    } catch (err) {
+      // fixerCodeMedecin déconnecte en cas d'échec : on repart de zéro.
+      logger.error('Erreur lors de la définition du code:', err);
+      setConfirmation(false);
+      setCode('');
+      setCodeConfirme('');
+      setError('Le code n\'a pas pu être enregistré. Reprenez la connexion.');
+      setIsLoading(false);
+    }
+  };
+
+  // Abandon : referme la session ouverte avec le code partagé. Le compte reste
+  // sans code, le médecin pourra recommencer.
+  const annulerConfirmation = async () => {
+    setConfirmation(false);
+    setCode('');
+    setCodeConfirme('');
+    setError('');
+    await annulerReclamation();
   };
 
   const handleEmailSubmit = async (e) => {
@@ -298,7 +364,7 @@ function Login() {
   // AVANT que updatePassword ne soit résolu ; sans ce garde, on redirigerait avec
   // une session encore au code de réclamation. La navigation est alors pilotée
   // uniquement par finishLogin, après réclamation réussie.
-  if (!authLoading && firebaseUser && role && !isLoading) {
+  if (!authLoading && firebaseUser && role && !isLoading && !confirmation) {
     return (
       <Navigate to={role === 'admin' ? '/dashboard-admin' : '/dashboard-medecin'} replace />
     );
@@ -324,9 +390,11 @@ function Login() {
           </div>
           <h1 className="text-2xl font-extrabold tracking-tight text-white">Planning APUM</h1>
           <p className="mt-1 text-sm text-primary-100">
-            {mode === 'medecin'
-              ? 'Choisissez votre nom pour vous connecter'
-              : 'Espace administrateur'}
+            {mode !== 'medecin'
+              ? 'Espace administrateur'
+              : confirmation
+              ? 'Confirmez le code que vous avez choisi'
+              : 'Choisissez votre nom pour vous connecter'}
           </p>
         </div>
 
@@ -337,8 +405,51 @@ function Login() {
           </div>
         )}
 
-        {/* ---------- Parcours médecin (liste déroulante + code à 6 chiffres) ---------- */}
-        {mode === 'medecin' ? (
+        {/* ---------- Première connexion : seconde saisie du code ---------- */}
+        {mode === 'medecin' && confirmation ? (
+          <form onSubmit={handleConfirmationSubmit} className="p-6">
+            <Alert kind="info" className="mb-4">
+              Ce compte n'a pas encore de code. Ressaisissez celui que vous venez de choisir
+              pour le confirmer&nbsp;: il sera le vôtre pour tout le trimestre.
+            </Alert>
+
+            <div className="mb-2">
+              <span className="mb-3 block text-center text-sm font-semibold text-ink-700">
+                Ressaisissez votre code
+              </span>
+              <CodePad
+                value={codeConfirme}
+                onChange={setCodeConfirme}
+                length={CODE_MEDECIN_LONGUEUR}
+                ariaLabel="Confirmation du code à 6 chiffres"
+              />
+            </div>
+
+            {error && (
+              <Alert kind="error" className="mb-4 mt-4">
+                {error}
+              </Alert>
+            )}
+
+            <Button
+              type="submit"
+              loading={isLoading}
+              disabled={isLoading || !CODE_MEDECIN_REGEX.test(codeConfirme)}
+              className="mt-4 w-full"
+            >
+              {isLoading ? 'Enregistrement…' : 'Valider mon code'}
+            </Button>
+
+            <button
+              type="button"
+              onClick={annulerConfirmation}
+              className="mt-5 block w-full text-center text-xs text-ink-500 hover:text-ink-700 hover:underline"
+            >
+              Annuler et recommencer
+            </button>
+          </form>
+        ) : /* ---------- Parcours médecin (liste déroulante + code à 6 chiffres) ---------- */
+        mode === 'medecin' ? (
           <form onSubmit={handleMedecinSubmit} className="p-6">
             {annuaireError ? (
               <Alert kind="error" className="mb-4">
@@ -408,7 +519,7 @@ function Login() {
             {inscriptionOuverte !== null && (
               <p id="code-hint" className="mb-4 mt-3 text-center text-xs text-ink-500">
                 {inscriptionOuverte
-                  ? 'Le code que vous saisissez devient le vôtre pour tout le trimestre — notez-le bien.'
+                  ? 'Le code que vous saisissez deviendra le vôtre pour tout le trimestre : vous le confirmerez à l\'écran suivant.'
                   : 'Définition des codes fermée : saisissez le code que vous avez choisi. Code oublié, ou jamais défini ? Contactez votre administrateur.'}
               </p>
             )}

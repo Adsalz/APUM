@@ -86,21 +86,28 @@ export const loginUser = async (email, password) => {
   }
 };
 
-// Connexion médecin par code à 6 chiffres, avec réclamation « premier code = le sien ».
+// Connexion médecin par code à 6 chiffres — PREMIÈRE PHASE.
 //
-//  1. On tente le code saisi comme mot de passe : si ça marche, le compte est
-//     déjà réclamé et le code est correct → connexion.
+//  1. On tente le code saisi comme mot de passe : si ça marche, le compte a
+//     déjà son code et il est correct → { statut: 'connecte' }.
 //  2. Sinon, et SEULEMENT si les inscriptions sont ouvertes, on tente de se
 //     connecter avec le code de réclamation partagé :
-//       - succès → le compte était « à réclamer » : on adopte le code choisi
-//         (updatePassword) → le compte est désormais réclamé avec ce code ;
-//       - échec → le compte est déjà réclamé (le code saisi est simplement
+//       - succès → le compte n'a pas encore de code. On NE le fixe PAS ici :
+//         on rend { statut: 'a_confirmer' } pour que l'interface demande une
+//         seconde saisie (une faute de frappe deviendrait sinon le code du
+//         médecin, sans erreur, et il faudrait le débloquer à la main) ;
+//       - échec → le compte a déjà son code (le code saisi est simplement
 //         incorrect) : on propage l'erreur initiale.
 //  3. Si les inscriptions sont fermées, on ne tente pas la réclamation :
 //     échec = code incorrect.
+//
+// ⚠️ Dans l'état 'a_confirmer', la session est OUVERTE avec le code partagé :
+// l'appelant doit enchaîner sur fixerCodeMedecin(), ou sur annulerReclamation()
+// s'il abandonne — jamais laisser l'utilisateur naviguer dans cet état.
 export const loginMedecin = async (email, code, inscriptionsOuvertes) => {
   try {
-    return await signInWithEmailAndPassword(auth, email, code);
+    const credential = await signInWithEmailAndPassword(auth, email, code);
+    return { statut: 'connecte', credential };
   } catch (error) {
     // On ne tente la réclamation que si les inscriptions sont ouvertes ET que
     // l'échec est bien un problème d'identifiant (pas un throttling ni une
@@ -115,21 +122,35 @@ export const loginMedecin = async (email, code, inscriptionsOuvertes) => {
     try {
       claimCredential = await signInWithEmailAndPassword(auth, email, CODE_A_RECLAMER);
     } catch (claimError) {
-      // Compte déjà réclamé (ou autre) : le code saisi est simplement incorrect.
+      // Compte ayant déjà son code (ou autre) : le code saisi est incorrect.
       throw error;
     }
-    // Compte « à réclamer » : on fixe le code choisi par le médecin. Si
-    // updatePassword échoue, on déconnecte pour ne pas laisser une session
-    // « à moitié réclamée » (connecté mais code encore au code de réclamation).
-    try {
-      await updatePassword(claimCredential.user, code);
-    } catch (updateError) {
-      await signOut(auth).catch((e) => logger.error('signOut après échec de réclamation:', e));
-      throw updateError;
-    }
-    logger.debug('Compte réclamé — premier code défini');
-    return claimCredential;
+    logger.debug('Compte sans code — confirmation demandée');
+    return { statut: 'a_confirmer', credential: claimCredential };
   }
+};
+
+// SECONDE PHASE : fixe le code une fois la double saisie concordante.
+// Si updatePassword échoue, on déconnecte pour ne pas laisser une session
+// « à moitié réclamée » (connectée, mais code encore au code partagé).
+export const fixerCodeMedecin = async (code) => {
+  const user = auth.currentUser;
+  if (!user) {
+    throw new Error('Aucun utilisateur connecté');
+  }
+  try {
+    await updatePassword(user, code);
+    logger.debug('Premier code défini');
+  } catch (updateError) {
+    await signOut(auth).catch((e) => logger.error('signOut après échec de réclamation:', e));
+    throw updateError;
+  }
+};
+
+// Abandon en cours de confirmation : referme la session ouverte avec le code
+// partagé. Le compte reste sans code, le médecin pourra recommencer.
+export const annulerReclamation = async () => {
+  await signOut(auth).catch((e) => logger.error('signOut après abandon de réclamation:', e));
 };
 
 export const logoutUser = async () => {

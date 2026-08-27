@@ -34,9 +34,9 @@
 // code tapé. Il ne voit rien. Seul celui qui a OUBLIÉ son code en choisit un
 // nouveau, ce qui est le but. Aucune annonce n'est donc nécessaire.
 //
-// ⚠️ Corollaire : le premier code tapé après la remise à zéro est adopté SANS
-// confirmation. Une faute de frappe devient le code du médecin, sans message
-// d'erreur — et il faudra le débloquer à la main (reinitialiser-code.js).
+// Le premier code tapé après la remise à zéro est confirmé par une SECONDE
+// saisie (écran de connexion) : une faute de frappe ne peut plus devenir le
+// code du médecin à son insu.
 //
 // ⚠️ Tant que la fenêtre d'inscription reste ouverte, un compte dont le code
 // n'a pas encore été défini peut être pris par un tiers qui connaît la valeur
