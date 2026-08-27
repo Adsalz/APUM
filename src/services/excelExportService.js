@@ -390,30 +390,48 @@ export const generateDatesList = (periode) => {
 };
 
 /**
- * Génère le nom de fichier basé sur la période
+ * Génère le nom de fichier basé sur la période, à la manière des fiches papier
+ * de l'APUM : l'INITIALE de chaque mois couvert, puis l'année sur deux
+ * chiffres. « DESIDERATA ASO26 » = Août, Septembre, Octobre 2026 ; une période
+ * à cheval sur deux années donne « DESIDERATA NDJ25-26 ».
  * @param {Object} periode - {startDate, endDate}
  * @returns {string} - Nom du fichier
  */
+const INITIALES_MOIS = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
+
+// Les dates de période arrivent en 'YYYY-MM-DD' : on lit l'année et le mois
+// dans la chaîne plutôt que via Date, pour qu'aucun fuseau ne décale le mois.
+const anneeEtMois = (valeur) => {
+  const iso = String(valeur).match(/^(\d{4})-(\d{2})/);
+  if (iso) { return { annee: Number(iso[1]), mois: Number(iso[2]) - 1 }; }
+  const date = new Date(valeur);
+  return { annee: date.getFullYear(), mois: date.getMonth() };
+};
+
 const generateFileName = (periode) => {
   if (!periode || !periode.startDate || !periode.endDate) {
-    return 'DESIDERATA_EXPORT.xlsx';
+    return 'DESIDERATA.xlsx';
   }
 
-  const startDate = new Date(periode.startDate);
-  const endDate = new Date(periode.endDate);
+  const debut = anneeEtMois(periode.startDate);
+  const fin = anneeEtMois(periode.endDate);
 
-  // Extraire les mois et années
-  const startMonth = startDate.toLocaleDateString('fr-FR', { month: 'short' }).toUpperCase();
-  const startYear = startDate.getFullYear();
-  const endMonth = endDate.toLocaleDateString('fr-FR', { month: 'short' }).toUpperCase();
-  const endYear = endDate.getFullYear();
-
-  // Format: DESIDERATA NDJ25-26.xlsx (pour Nov-Déc-Jan 2025-2026)
-  if (startYear === endYear) {
-    return `DESIDERATA ${startMonth}${endMonth}${startYear.toString().slice(-2)}.xlsx`;
-  } else {
-    return `DESIDERATA ${startMonth}${startYear.toString().slice(-2)}-${endMonth}${endYear.toString().slice(-2)}.xlsx`;
+  // Une initiale par mois couvert, du premier au dernier.
+  const lettres = [];
+  for (
+    let curseur = debut.annee * 12 + debut.mois;
+    curseur <= fin.annee * 12 + fin.mois;
+    curseur++
+  ) {
+    lettres.push(INITIALES_MOIS[curseur % 12]);
   }
+
+  const aa = (annee) => String(annee).slice(-2);
+  const annees = debut.annee === fin.annee
+    ? aa(debut.annee)
+    : `${aa(debut.annee)}-${aa(fin.annee)}`;
+
+  return `DESIDERATA ${lettres.join('')}${annees}.xlsx`;
 };
 
 /**
@@ -486,7 +504,8 @@ export const exportFicheViergeToExcel = async (periode) => {
     const ExcelJS = await loadExcelJS();
     const workbook = new ExcelJS.Workbook();
 
-    const fileName = generateFileName(periode).replace('DESIDERATA', 'DESIDERATA_VIERGE');
+    // Même nom que la fiche officielle : c'est elle qu'on envoie aux médecins.
+    const fileName = generateFileName(periode);
     const worksheet = workbook.addWorksheet('Désidératas');
 
     // Ni médecin ni desiderata : le générateur laisse la ligne de nom à

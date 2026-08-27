@@ -176,6 +176,33 @@ describe('export Excel des desiderata', () => {
   });
 });
 
+describe('nom du fichier (convention des fiches papier)', () => {
+  // « DESIDERATA ASO26 » = Août, Septembre, Octobre 2026 — comme la fiche de
+  // référence de l'APUM.
+  const nomPour = async (startDate, endDate) => {
+    const { fileName } = await exportFicheViergeToExcel({ startDate, endDate });
+    return fileName;
+  };
+
+  it('donne une initiale par mois couvert, puis l\'année', async () => {
+    expect(await nomPour('2026-08-01', '2026-10-31')).toBe('DESIDERATA ASO26.xlsx');
+    expect(await nomPour('2027-01-01', '2027-03-31')).toBe('DESIDERATA JFM27.xlsx');
+  });
+
+  it('marque les deux années quand la période est à cheval', async () => {
+    expect(await nomPour('2026-11-01', '2027-01-31')).toBe('DESIDERATA NDJ26-27.xlsx');
+  });
+
+  it('n\'écrit pas « vierge » : c\'est la fiche officielle qu\'on envoie', async () => {
+    expect(await nomPour('2026-08-01', '2026-10-31')).not.toMatch(/vierge/i);
+  });
+
+  it('gère une période d\'un seul mois, ou plus longue qu\'un trimestre', async () => {
+    expect(await nomPour('2026-09-01', '2026-09-30')).toBe('DESIDERATA S26.xlsx');
+    expect(await nomPour('2026-08-01', '2026-12-31')).toBe('DESIDERATA ASOND26.xlsx');
+  });
+});
+
 describe('export Excel de la fiche VIERGE', () => {
   let feuille;
   let xmlFeuille;
