@@ -5,6 +5,7 @@
 //  - desiderata : bordure épaisse au premier jour de chaque nouveau mois.
 // Les classeurs sont écrits puis relus avec ExcelJS (pas de test d'implémentation).
 import ExcelJS from 'exceljs';
+import JSZip from 'jszip';
 import {
   exportPlanningToExcel,
   exportDesiderataToExcel,
@@ -35,6 +36,14 @@ beforeAll(() => {
   // jsdom n'implémente pas la navigation déclenchée par a.click()
   HTMLAnchorElement.prototype.click = () => {};
 });
+
+const blobEnArrayBuffer = () =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsArrayBuffer(dernierBlob);
+  });
 
 const lireClasseurCapture = async () => {
   const buffer = await new Promise((resolve, reject) => {
@@ -169,6 +178,7 @@ describe('export Excel des desiderata', () => {
 
 describe('export Excel de la fiche VIERGE', () => {
   let feuille;
+  let xmlFeuille;
 
   beforeAll(async () => {
     // jeu 30/07 → dim 02/08 2026 : 4 jours, dont un samedi et un changement de mois.
@@ -176,6 +186,10 @@ describe('export Excel de la fiche VIERGE', () => {
     const workbook = await lireClasseurCapture();
     feuille = workbook.getWorksheet('Désidératas');
     expect(feuille).toBeTruthy();
+    // Le XML brut : ExcelJS relit son propre modèle, il ne dirait rien des
+    // attributs qu'il a perdus à l'écriture.
+    const zip = await JSZip.loadAsync(await blobEnArrayBuffer());
+    xmlFeuille = await zip.file('xl/worksheets/sheet1.xml').async('string');
   });
 
   it('laisse le nom et les questions à compléter', () => {
@@ -240,6 +254,18 @@ describe('export Excel de la fiche VIERGE', () => {
     expect(couleurPour('non')).toBe('FFFF0000');       // rouge
     expect(couleurPour('possible')).toBe('FFFFC000');  // ambre
     cf.rules.forEach((r) => expect(r.type).toBe('containsText'));
+  });
+
+  it('écrit les attributs de règle sans lesquels Numbers n\'affiche rien', () => {
+    // ExcelJS omet `operator` et `text` ; Excel évalue quand même la formule,
+    // Numbers non. Le rattrapage post-écriture doit les avoir réinjectés.
+    ['oui', 'non', 'possible'].forEach((texte) => {
+      expect(xmlFeuille).toContain(`operator="containsText" text="${texte}"`);
+    });
+    // …sans casser la formule du modèle, qui reste la référence pour Excel.
+    expect(xmlFeuille).toContain('NOT(ISERROR(SEARCH(&quot;oui&quot;,B11)))');
+    // Un seul jeu d'attributs par règle (pas de double rattrapage).
+    expect(xmlFeuille.match(/operator="containsText"/g)).toHaveLength(3);
   });
 
   it('reprend la mise en page imprimable du modèle', () => {

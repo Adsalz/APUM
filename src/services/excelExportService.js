@@ -5,10 +5,54 @@ import { typeDeJour } from '../utils/planningCore';
 // exceljs (~lourd) est chargé à la demande (import dynamique) pour ne pas
 // alourdir le bundle initial : il n'est utile qu'au moment d'un export.
 const loadExcelJS = async () => (await import('exceljs')).default;
+const loadJSZip = async () => (await import('jszip')).default;
+
+// ExcelJS écrit bien `type="containsText"` et la formule du modèle, mais perd
+// les deux autres attributs de la règle : `operator`, parce qu'il vaut la
+// valeur par défaut, et `text`, qu'il ne sérialise jamais. Excel s'en passe (il
+// évalue la formule), mais Numbers s'appuie sur ces attributs et n'affiche
+// alors AUCUNE couleur — vérifié sur la fiche de l'APUM. Un .xlsx étant un ZIP,
+// on rouvre celui qu'ExcelJS vient de produire pour les réinjecter.
+// La regex ignore les règles portant déjà un `operator` : rien à rattraper.
+const CF_A_COMPLETER =
+  /<cfRule type="containsText"((?:(?!operator=)[^>])*)><formula>NOT\(ISERROR\(SEARCH\(&quot;([^&]+)&quot;/g;
+
+const completerReglesConditionnelles = async (buffer) => {
+  const JSZip = await loadJSZip();
+  const zip = await JSZip.loadAsync(buffer);
+  const feuilles = Object.keys(zip.files).filter((nom) =>
+    /^xl\/worksheets\/sheet\d+\.xml$/.test(nom)
+  );
+
+  let modifie = false;
+  for (const nom of feuilles) {
+    // eslint-disable-next-line no-await-in-loop
+    const xml = await zip.file(nom).async('string');
+    const complete = xml.replace(
+      CF_A_COMPLETER,
+      (_bloc, attrs, texte) =>
+        `<cfRule type="containsText"${attrs} operator="containsText" text="${texte}">` +
+        `<formula>NOT(ISERROR(SEARCH(&quot;${texte}&quot;`
+    );
+    if (complete !== xml) {
+      zip.file(nom, complete);
+      modifie = true;
+    }
+  }
+
+  if (!modifie) { return buffer; }
+  return zip.generateAsync({ type: 'arraybuffer', compression: 'DEFLATE' });
+};
 
 // Écrit le classeur et déclenche son téléchargement par le navigateur.
-const telechargerClasseur = async (workbook, fileName) => {
-  const buffer = await workbook.xlsx.writeBuffer();
+// `reglesConditionnelles` déclenche le rattrapage ci-dessus — réservé aux
+// fiches de desiderata, seules à en porter, pour ne pas charger JSZip sans
+// raison à l'export du planning.
+const telechargerClasseur = async (workbook, fileName, { reglesConditionnelles = false } = {}) => {
+  let buffer = await workbook.xlsx.writeBuffer();
+  if (reglesConditionnelles) {
+    buffer = await completerReglesConditionnelles(buffer);
+  }
   const blob = new Blob([buffer], {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
   });
@@ -59,7 +103,7 @@ export const exportDesiderataToExcel = async (medecins, desiderataList, periode)
       await createMedecinWorksheet(worksheet, medecin, medecinDesiderata, datesList);
     }
 
-    await telechargerClasseur(workbook, fileName);
+    await telechargerClasseur(workbook, fileName, { reglesConditionnelles: true });
 
     return {
       success: true,
@@ -396,7 +440,7 @@ export const exportMedecinDesiderataToExcel = async (medecin, desiderata, period
     // Générer le contenu de la feuille
     await createMedecinWorksheet(worksheet, medecin, desiderata, datesList);
 
-    await telechargerClasseur(workbook, fileName);
+    await telechargerClasseur(workbook, fileName, { reglesConditionnelles: true });
 
     return {
       success: true,
@@ -449,7 +493,7 @@ export const exportFicheViergeToExcel = async (periode) => {
     // compléter, « OUI  NON » à trancher et toutes les cases du tableau vides.
     await createMedecinWorksheet(worksheet, null, null, generateDatesList(periode));
 
-    await telechargerClasseur(workbook, fileName);
+    await telechargerClasseur(workbook, fileName, { reglesConditionnelles: true });
 
     return {
       success: true,
