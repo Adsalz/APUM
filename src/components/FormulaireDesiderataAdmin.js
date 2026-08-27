@@ -11,6 +11,7 @@ import {
   getDesiderataByUser,
   updateDesiderata,
 } from '../services/planningService';
+import { importDesiderataFromExcel } from '../services/excelImportService';
 import logger from '../utils/logger';
 import { Calendar, Save, Upload, CalendarRange, Users } from 'lucide-react';
 import QuickFill from './QuickFill';
@@ -135,37 +136,83 @@ function FormulaireDesiderataAdmin() {
     return () => { cancelled = true; };
   }, [selectedMedecinId, periodeSaisie, hydrate, reset]);
 
-  // Import d'un fichier JSON de desiderata.
+  // Import d'une fiche de desiderata : JSON (export de l'appli) ou Excel
+  // (la « fiche vierge » remplie et renvoyée par un médecin).
   const applyImportedData = (importedData) => {
     hydrate(importedData, true);
+    const jours = Object.keys(importedData.desiderata).length;
+    // Rien n'est enregistré ici : l'admin relit la grille puis valide.
     toast.success(
-      `Desiderata importés avec succès ! ${Object.keys(importedData.desiderata).length} jours chargés.`
+      `${jours} jour${jours > 1 ? 's' : ''} chargé${jours > 1 ? 's' : ''}. `
+      + 'Vérifiez la grille, puis enregistrez.'
     );
+  };
+
+  // Lit une fiche Excel et la ramène à la forme attendue par le formulaire.
+  const lireFichierExcel = async (file) => {
+    const lu = await importDesiderataFromExcel(file);
+
+    // Les dates hors de la période en cours ne s'afficheraient pas : on prévient
+    // plutôt que de laisser croire à un import complet.
+    const dansLaPeriode = Object.keys(lu.desiderata).filter(
+      (date) => date >= periodeSaisie.startDate.split('T')[0]
+        && date <= periodeSaisie.endDate.split('T')[0]
+    ).length;
+    if (dansLaPeriode === 0) {
+      throw new Error(
+        'Aucune date de ce fichier ne tombe dans la période de saisie en cours. '
+        + 'S\'agit-il de la fiche du bon trimestre ?'
+      );
+    }
+    const horsPeriode = Object.keys(lu.desiderata).length - dansLaPeriode;
+    if (horsPeriode > 0) {
+      toast.warning(`${horsPeriode} jour(s) hors période de saisie ont été ignorés.`);
+    }
+    if (lu.stats.casesIllisibles > 0) {
+      toast.warning(
+        `${lu.stats.casesIllisibles} case(s) ignorée(s) : réponse autre que Oui, Possible ou Non.`
+      );
+    }
+
+    // Une préférence absente de la fiche garde sa valeur par défaut.
+    return {
+      desiderata: lu.desiderata,
+      nombreGardesSouhaitees: lu.nombreGardesSouhaitees ?? 0,
+      gardesGroupees: lu.gardesGroupees ?? false,
+      renfortsAssocies: lu.renfortsAssocies ?? false,
+    };
+  };
+
+  const lireFichierJson = async (file) => {
+    const importedData = JSON.parse(await file.text());
+    if (!importedData.desiderata || typeof importedData.desiderata !== 'object') {
+      throw new Error('Structure JSON invalide : le champ « desiderata » est manquant.');
+    }
+    return importedData;
   };
 
   const handleFileImport = async (event) => {
     const file = event.target.files[0];
     if (!file) { return; }
 
+    const estExcel = file.name.toLowerCase().endsWith('.xlsx');
+    const estJson = file.name.toLowerCase().endsWith('.json');
+
     if (!selectedMedecinId) {
       toast.warning('Veuillez d\'abord sélectionner un médecin');
       event.target.value = '';
       return;
     }
-    if (!file.name.endsWith('.json')) {
-      toast.error('Le fichier doit être au format JSON');
+    if (!estExcel && !estJson) {
+      toast.error('Le fichier doit être une fiche Excel (.xlsx) ou un export JSON');
       event.target.value = '';
       return;
     }
 
     try {
-      const fileContent = await file.text();
-      const importedData = JSON.parse(fileContent);
-      if (!importedData.desiderata || typeof importedData.desiderata !== 'object') {
-        toast.error('Structure JSON invalide: le champ "desiderata" est manquant');
-        event.target.value = '';
-        return;
-      }
+      const importedData = estExcel
+        ? await lireFichierExcel(file)
+        : await lireFichierJson(file);
       event.target.value = '';
       // Si des desiderata existent déjà, confirmer avant de remplacer.
       if (existingDesiderataId) {
@@ -175,7 +222,7 @@ function FormulaireDesiderataAdmin() {
       applyImportedData(importedData);
     } catch (err) {
       logger.error('Erreur lors de l\'import du fichier:', err);
-      toast.error('Erreur lors de la lecture du fichier JSON: ' + err.message);
+      toast.error(err.message || 'Erreur lors de la lecture du fichier');
       event.target.value = '';
     }
   };
@@ -254,14 +301,14 @@ function FormulaireDesiderataAdmin() {
               size="sm"
               icon={<Upload size={16} />}
               onClick={() => fileInputRef.current?.click()}
-              title="Importer les desiderata depuis un fichier JSON"
+              title="Importer une fiche remplie : Excel (.xlsx) renvoyé par un médecin, ou export JSON"
             >
-              <span className="hidden sm:inline">Importer JSON</span>
+              <span className="hidden sm:inline">Importer une fiche</span>
             </Button>
             <input
               ref={fileInputRef}
               type="file"
-              accept=".json"
+              accept=".xlsx,.json"
               onChange={handleFileImport}
               className="hidden"
             />

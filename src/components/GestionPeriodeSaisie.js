@@ -1,30 +1,15 @@
 // src/components/GestionPeriodeSaisie.js
 import React, { useState, useEffect } from 'react';
 import { setPeriodeSaisie, getPeriodeSaisie } from '../services/planningService';
-import { lancerNouveauTour } from '../services/nouveauTourService';
 import { Save } from 'lucide-react';
-import { AppHeader, LoadingScreen, Button, Card, Alert, Checkbox, Modal, useToast } from './ui';
+import { AppHeader, LoadingScreen, Button, Card, Alert, useToast } from './ui';
 import logger from '../utils/logger';
-
-const formatJour = (jour) => {
-  if (!jour) { return '—'; }
-  const d = new Date(jour);
-  return Number.isNaN(d.getTime())
-    ? jour
-    : d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
-};
 
 function GestionPeriodeSaisie() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-
-  // Remise à zéro des codes : décochée par défaut, pour qu'une simple
-  // rectification de dates ne fasse pas redéfinir son code à tout le monde.
-  const [remettreCodes, setRemettreCodes] = useState(false);
-  const [showConfirm, setShowConfirm] = useState(false);
-
   const toast = useToast();
 
   // Auth/rôle garantis par ProtectedRoute : on charge uniquement la période
@@ -48,58 +33,19 @@ function GestionPeriodeSaisie() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Enregistre la période, puis — si demandé — efface les codes et ouvre les
-  // inscriptions (Cloud Function : le navigateur n'a pas les droits pour ça).
-  const enregistrer = async (avecRemiseAZero) => {
-    setShowConfirm(false);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (isSaving) {return;} // anti double-submit
     setIsSaving(true);
-    let periodeEnregistree = false;
     try {
       await setPeriodeSaisie(startDate, endDate);
-      periodeEnregistree = true;
-
-      if (!avecRemiseAZero) {
-        toast.success('Période de saisie mise à jour avec succès !');
-        return;
-      }
-
-      const { ok, total, echecs = [] } = await lancerNouveauTour();
-      setRemettreCodes(false);
-
-      if (echecs.length) {
-        // Les médecins en échec gardent leur ancien code : ils se connectent
-        // toujours, mais ne seront pas invités à en choisir un nouveau.
-        logger.error('Codes non remis à zéro:', echecs);
-        toast.error(
-          `${ok}/${total} codes remis à zéro. ${echecs.length} échec(s) : ` +
-          echecs.map((e) => e.email).join(', ')
-        );
-        return;
-      }
-      toast.success(
-        `Nouveau tour lancé : ${ok} code(s) remis à zéro, inscriptions ouvertes.`
-      );
+      toast.success('Période de saisie mise à jour avec succès !');
     } catch (error) {
-      logger.error('Erreur lors du lancement du nouveau tour:', error);
-      toast.error(
-        periodeEnregistree
-          ? 'Période enregistrée, mais la remise à zéro des codes a échoué : les codes actuels restent valables.'
-          : 'Une erreur est survenue lors de la mise à jour de la période de saisie'
-      );
+      logger.error('Erreur lors de la mise à jour de la période de saisie:', error);
+      toast.error('Une erreur est survenue lors de la mise à jour de la période de saisie');
     } finally {
       setIsSaving(false);
     }
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (isSaving) {return;} // anti double-submit
-    // La remise à zéro est irréversible : jamais sans confirmation explicite.
-    if (remettreCodes) {
-      setShowConfirm(true);
-      return;
-    }
-    enregistrer(false);
   };
 
   if (loading) {
@@ -177,20 +123,6 @@ function GestionPeriodeSaisie() {
               </div>
             </div>
 
-            {/* Nouveau tour de choix : remise à zéro des codes + inscriptions */}
-            <div className="mt-5 rounded-xl border border-ink-200 bg-ink-50/60 p-4">
-              <Checkbox
-                checked={remettreCodes}
-                onChange={setRemettreCodes}
-                label="Nouveau tour de choix — remettre les codes des médecins à zéro"
-                description={
-                  'Chaque médecin fixera son code à sa prochaine connexion, pour tout le trimestre. ' +
-                  'Celui qui connaît le sien peut le retaper : il redevient le sien, sans rien remarquer. ' +
-                  'Les inscriptions sont ouvertes automatiquement — pensez à les refermer ensuite.'
-                }
-              />
-            </div>
-
             {/* Message d'information persistant */}
             <Alert kind="info" className="mt-5">
               Les médecins verront le formulaire de cette période dès validation. Aucun desiderata
@@ -199,40 +131,6 @@ function GestionPeriodeSaisie() {
           </form>
         </Card>
       </main>
-
-      {/* Confirmation — la remise à zéro est irréversible */}
-      <Modal
-        open={showConfirm}
-        onClose={() => setShowConfirm(false)}
-        title="Lancer un nouveau tour de choix ?"
-        size="md"
-        footer={
-          <div className="flex flex-wrap justify-end gap-2">
-            <Button variant="secondary" onClick={() => setShowConfirm(false)}>
-              Annuler
-            </Button>
-            <Button variant="primary" loading={isSaving} onClick={() => enregistrer(true)}>
-              Lancer le nouveau tour
-            </Button>
-          </div>
-        }
-      >
-        <p className="text-sm text-ink-700">
-          Période enregistrée : <strong>du {formatJour(startDate)} au {formatJour(endDate)}</strong>.
-        </p>
-        <ul className="mt-3 list-disc space-y-1.5 pl-5 text-sm text-ink-600">
-          <li>
-            Le code de <strong>tous les médecins</strong> est effacé. C'est irréversible : les codes
-            actuels ne sont pas récupérables.
-          </li>
-          <li>
-            À sa prochaine connexion, chacun fixe le code à 6 chiffres qu'il tape. Celui qui connaît
-            le sien le retape et ne voit aucune différence.
-          </li>
-          <li>Les inscriptions sont ouvertes. Refermez-les une fois tout le monde connecté.</li>
-          <li>Les desiderata ne sont pas touchés.</li>
-        </ul>
-      </Modal>
     </div>
   );
 }

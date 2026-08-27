@@ -13,7 +13,6 @@ les administrateurs génèrent, ajustent et publient les **plannings**.
 | Frontend | React 17 · React Router 5 · TailwindCSS 3 |
 | Backend | Firebase (Firestore + Authentication) |
 | Emails | Extension Firebase « Trigger Email » (collection `email_queue`) |
-| Serveur | Cloud Function `lancerNouveauTour` (remise à zéro des codes, plan Blaze) |
 | Exports | ExcelJS (Excel) · jsPDF (PDF) · ics (calendrier) |
 | Hébergement | Firebase Hosting |
 | Build | react-scripts 5 (Create React App) |

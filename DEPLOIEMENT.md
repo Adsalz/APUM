@@ -31,7 +31,7 @@ npm install
 # 5. Construire
 npm run build
 
-# 6. Déployer (site + règles Firestore + Cloud Functions)
+# 6. Déployer (site + règles Firestore)
 npx firebase-tools@latest deploy
 ```
 
@@ -39,10 +39,6 @@ npx firebase-tools@latest deploy
 > poste (« could not determine executable to run ») : utiliser
 > `npx firebase-tools@latest deploy`, ou installer l'outil une fois
 > (`npm i -g firebase-tools`).
->
-> Depuis août 2026 le dépôt contient des **Cloud Functions** (`functions/`,
-> plan Blaze). `firebase deploy` les publie avec le reste ; pour ne toucher
-> qu'elles : `npx firebase-tools@latest deploy --only functions`.
 
 ## Vérifications après déploiement
 
