@@ -5,6 +5,7 @@ import {
   evaluerPlanning,
   computePriorite,
   creeraitCreneauxConsecutifs,
+  TIRAGE,
 } from '../planningCore';
 
 // Dates déterministes quel que soit le fuseau de la machine.
@@ -314,5 +315,99 @@ describe('planningCore — 1er quart : équité mensuelle et pas deux nuits d\'a
   it('contrôle SYMÉTRIQUE : le lendemain déjà rempli bloque aussi', () => {
     const planning = { '2026-06-03': { QUART_1: ['a'] } };
     expect(creeraitCreneauxConsecutifs('a', '2026-06-02', 'QUART_1', planning)).toBe(true);
+  });
+});
+
+// Le TIRAGE : la règle de l'ordre de choix — le premier de la liste prend ses gardes,
+// puis le deuxième, puis le troisième… — avec les réglages lus dans le planning de la
+// coordinatrice (voir la constante TIRAGE dans planningCore.js).
+describe('planningCore — tirage (le premier de la liste prend ses gardes)', () => {
+  const fiche = (prefs, q = 1) => ({
+    nombreGardesSouhaitees: q, nombreGardesMaxParSemaine: 7, gardesGroupees: false, renfortsAssocies: false, preferences: prefs,
+  });
+  const liste = (t1, t2) => ({ premierTourIds: t1, deuxiemeTourIds: t2 || [...t1].reverse() });
+  const gardesDe = (planning, id) => {
+    const out = [];
+    for (const d of Object.keys(planning).sort()) {
+      for (const [cid, arr] of Object.entries(planning[d])) { if (arr.includes(id)) { out.push(`${d} ${cid}`); } }
+    }
+    return out;
+  };
+  const tousLesJours = (mois, cid, pref) => {
+    const prefs = {};
+    for (let j = 1; j <= 30; j += 1) { prefs[`${mois}-${String(j).padStart(2, '0')}`] = { [cid]: pref }; }
+    return prefs;
+  };
+  // Juin→juillet 2026 : 61 jours, le 1er tour couvre juin ENTIER (30 j), le 2e juillet (31 j).
+  const DEBUT = '2026-06-01'; const FIN = '2026-07-31';
+
+  it('à égalité, le premier de la liste est servi et le second ne l\'est pas — et l\'inverse au 2e tour', () => {
+    // Une seule place disputée par mois : le renfort 20h-00h (effectif 1).
+    const desiderata = {
+      a: fiche({ '2026-06-10': { RENFORT_2: 'Oui' }, '2026-07-10': { RENFORT_2: 'Oui' } }),
+      b: fiche({ '2026-06-10': { RENFORT_2: 'Oui' }, '2026-07-10': { RENFORT_2: 'Oui' } }),
+    };
+    const planning = computePriorite(DEBUT, FIN, desiderata, liste(['a', 'b']));
+    expect(planning['2026-06-10'].RENFORT_2).toEqual(['a']); // 1er tour : a choisit avant b
+    expect(planning['2026-07-10'].RENFORT_2).toEqual(['b']); // 2e tour : liste inversée, b choisit avant a
+  });
+
+  it('pose chaque médecin là où il est le plus utile : le seul volontaire d\'un jour y est envoyé', () => {
+    // a est volontaire le 10 (disputé avec b) et le 20 (seul), quota 1 : a va le 20, b prend le 10.
+    // Dans l'ordre du calendrier, a prendrait le 10 et b ne serait pas servi.
+    const desiderata = {
+      a: fiche({ '2026-06-10': { RENFORT_2: 'Oui' }, '2026-06-20': { RENFORT_2: 'Oui' } }),
+      b: fiche({ '2026-06-10': { RENFORT_2: 'Oui' } }),
+    };
+    const planning = computePriorite(DEBUT, FIN, desiderata, liste(['a', 'b']));
+    expect(planning['2026-06-20'].RENFORT_2).toEqual(['a']);
+    expect(planning['2026-06-10'].RENFORT_2).toEqual(['b']);
+  });
+
+  it('les « Possible » ne sont servis qu\'après TOUS les « Oui », même ceux des moins bien placés', () => {
+    const desiderata = {
+      a: fiche({ '2026-06-10': { RENFORT_2: 'Possible' } }), // 1er de la liste, mais « Possible »
+      b: fiche({ '2026-06-10': { RENFORT_2: 'Oui' } }),      // 2e, mais « Oui »
+    };
+    const planning = computePriorite(DEBUT, FIN, desiderata, liste(['a', 'b']));
+    expect(planning['2026-06-10'].RENFORT_2).toEqual(['b']);
+  });
+
+  it('un mois coupé par les deux tours est servi au prorata : moitié avant la coupe, moitié après', () => {
+    // Juin seul : 1er tour du 1er au 15, 2e du 16 au 30. Un médecin, quota 4, disponible tous
+    // les jours sur le 3e quart (3 places). Sans prorata il prendrait ses 4 gardes avant le 15.
+    const planning = computePriorite('2026-06-01', '2026-06-30', { a: fiche(tousLesJours('2026-06', 'QUART_3', 'Oui'), 4) }, liste(['a']));
+    const gardes = gardesDe(planning, 'a');
+    expect(gardes).toHaveLength(4);
+    expect(gardes.filter((g) => g.slice(0, 10) <= '2026-06-15')).toHaveLength(2);
+  });
+
+  it('les flexibles (souhait 0) tirent après les médecins à quota, même mieux placés', () => {
+    const desiderata = {
+      a: fiche({ '2026-06-10': { RENFORT_2: 'Oui' } }, 0), // 1er de la liste, flexible
+      b: fiche({ '2026-06-10': { RENFORT_2: 'Oui' } }, 1), // 2e, avec un quota
+    };
+    const planning = computePriorite(DEBUT, FIN, desiderata, liste(['a', 'b']));
+    expect(planning['2026-06-10'].RENFORT_2).toEqual(['b']);
+  });
+
+  it('une seule nuit par mois pendant le tirage : le premier de la liste n\'accapare pas les nuits', () => {
+    // a (1er) et b volontaires toutes les nuits de juin, quotas larges : sans plafond, a
+    // prendrait les nuits jusqu'à son max hebdo avant que b en ait une seule.
+    const desiderata = { a: fiche(tousLesJours('2026-06', 'QUART_1', 'Oui'), 20), b: fiche(tousLesJours('2026-06', 'QUART_1', 'Oui'), 20) };
+    const planning = computePriorite(DEBUT, FIN, desiderata, liste(['a', 'b']));
+    const nuits = (id) => gardesDe(planning, id).filter((g) => g.endsWith('QUART_1')).length;
+    expect(Math.abs(nuits('a') - nuits('b'))).toBeLessThanOrEqual(1);
+    expect(nuits('a')).toBeGreaterThan(1); // le comblement redistribue bien les nuits restantes
+  });
+
+  it('le réglage « calendrier » redonne l\'ancien comportement : le premier de la liste prend les premiers jours', () => {
+    const desiderata = {
+      a: fiche({ '2026-06-10': { RENFORT_2: 'Oui' }, '2026-06-20': { RENFORT_2: 'Oui' } }),
+      b: fiche({ '2026-06-10': { RENFORT_2: 'Oui' } }),
+    };
+    const planning = computePriorite(DEBUT, FIN, desiderata, liste(['a', 'b']), { ...TIRAGE, choixDesJours: 'calendrier' });
+    expect(planning['2026-06-10'].RENFORT_2).toEqual(['a']);
+    expect(planning['2026-06-20'].RENFORT_2).toEqual([null]); // b n'était pas volontaire le 20
   });
 });
