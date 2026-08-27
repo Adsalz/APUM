@@ -414,6 +414,7 @@ function GestionPlanning() {
         onConfirm={handleGeneratePlanning}
         planning={planning}
         medecins={medecins}
+        periodeSaisie={periodeSaisie}
       />
 
       <PublishPlanningModal

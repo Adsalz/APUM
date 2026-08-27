@@ -8,83 +8,141 @@ import {
   ArrowDownToLine,
   Sparkles,
   UserMinus,
+  Lock,
 } from 'lucide-react';
 import { Button, Alert } from './ui';
 import { genererProchainOrdreChoix } from '../utils/ordreChoix';
-import { getOrdreChoix, saveOrdreChoix } from '../services/ordreChoixService';
+import { idPeriode as calculerIdPeriode, libellePeriode } from '../utils/periodeId';
+import {
+  getOrdreChoixPeriode,
+  getOrdreChoixPrecedent,
+  saveOrdreChoixPeriode,
+} from '../services/ordreChoixService';
 import logger from '../utils/logger';
 
-const GenerateurTrimestre = ({ onListeGenere, medecins = [] }) => {
-  const [liste, setListe] = useState([]);           // 1er tour proposé (éditable)
+// L'ordre de choix appartient au TRIMESTRE, pas à la génération de planning.
+// Deux états possibles à l'ouverture :
+//   - « figé »    : ce trimestre a déjà son ordre de choix validé → on le relit
+//                   tel quel. Régénérer le tableau autant de fois qu'on veut ne
+//                   le fait PAS évoluer.
+//   - « proposé » : premier passage sur ce trimestre → on applique la règle de
+//                   bascule (N=10) à l'ordre du trimestre précédent, et l'admin
+//                   ajuste avant de figer.
+const GenerateurTrimestre = ({ onListeGenere, medecins = [], periodeSaisie = null }) => {
+  const [liste, setListe] = useState([]);           // 1er tour (éditable avant validation)
   const [nouveaux, setNouveaux] = useState([]);
   const [partis, setPartis] = useState([]);
+  const [fige, setFige] = useState(false);          // liste déjà validée pour ce trimestre
+  const [basePeriode, setBasePeriode] = useState(null); // trimestre dont on a hérité
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [erreur, setErreur] = useState(null);
 
-  const construireProposition = useCallback(async () => {
+  const idPeriode = calculerIdPeriode(periodeSaisie);
+  const libelle = libellePeriode(periodeSaisie);
+
+  // forcerRecalcul : ne sert qu'au bouton explicite « repartir du trimestre
+  // précédent », jamais au chargement.
+  const charger = useCallback(async (forcerRecalcul = false) => {
     setLoading(true);
     setErreur(null);
     try {
-      const precedent = await getOrdreChoix();
       const noms = medecins.map((m) => `${m.nom} ${m.prenom}`.trim());
+
+      if (!forcerRecalcul) {
+        const existant = await getOrdreChoixPeriode(idPeriode);
+        if (existant?.premierTour?.length) {
+          setListe(existant.premierTour);
+          setNouveaux([]);
+          setPartis([]);
+          setBasePeriode(existant.baseSur || null);
+          setFige(true);
+          return;
+        }
+      }
+
+      const precedent = await getOrdreChoixPrecedent(idPeriode);
       const res = genererProchainOrdreChoix(precedent?.premierTour, noms);
       setListe(res.premierTour);
       setNouveaux(res.nouveaux);
       setPartis(res.partis);
+      setBasePeriode(precedent?.idPeriode || null);
+      setFige(false);
     } catch (e) {
       logger.error('Génération de l’ordre de choix impossible:', e);
       setErreur('Impossible de charger l’ordre de choix précédent.');
     } finally {
       setLoading(false);
     }
-  }, [medecins]);
+  }, [medecins, idPeriode]);
 
   useEffect(() => {
     if (medecins.length > 0) {
-      construireProposition();
+      charger();
     } else {
       setLoading(false);
     }
-  }, [medecins, construireProposition]);
+  }, [medecins, charger]);
+
+  const modifierListe = (maj) => {
+    setFige(false); // toute retouche manuelle redemande une validation explicite
+    setListe(maj);
+  };
 
   const deplacer = (index, delta) => {
-    setListe((prev) => {
-      const cible = index + delta;
-      if (cible < 0 || cible >= prev.length) { return prev; }
-      const copie = [...prev];
-      [copie[index], copie[cible]] = [copie[cible], copie[index]];
-      return copie;
-    });
+    const cible = index + delta;
+    if (cible < 0 || cible >= liste.length) { return; }
+    const copie = [...liste];
+    [copie[index], copie[cible]] = [copie[cible], copie[index]];
+    modifierListe(copie);
   };
 
   const envoyerEnBas = (index) => {
-    setListe((prev) => {
-      const copie = [...prev];
-      const [item] = copie.splice(index, 1);
-      copie.push(item);
-      return copie;
-    });
+    const copie = [...liste];
+    const [item] = copie.splice(index, 1);
+    copie.push(item);
+    modifierListe(copie);
+  };
+
+  const emettre = (premierTour, deuxiemeTour) => {
+    if (onListeGenere) {
+      onListeGenere({
+        premierTour,
+        deuxiemeTour,
+        stats: { totalMedecins: premierTour.length },
+        medecinsInclus: medecins,
+      });
+    }
   };
 
   const valider = async () => {
+    const premierTour = liste;
+    const deuxiemeTour = [...liste].reverse();
+
+    // Liste déjà figée et non retouchée : rien à réécrire, on la transmet.
+    if (fige) {
+      emettre(premierTour, deuxiemeTour);
+      return;
+    }
+
     setSaving(true);
     setErreur(null);
     try {
-      const premierTour = liste;
-      const deuxiemeTour = [...liste].reverse();
-      await saveOrdreChoix({ premierTour, deuxiemeTour });
-      if (onListeGenere) {
-        onListeGenere({
-          premierTour,
-          deuxiemeTour,
-          stats: { totalMedecins: premierTour.length },
-          medecinsInclus: medecins,
-        });
-      }
+      await saveOrdreChoixPeriode(idPeriode, {
+        premierTour,
+        deuxiemeTour,
+        libelle,
+        baseSur: basePeriode,
+      });
+      setFige(true);
+      emettre(premierTour, deuxiemeTour);
     } catch (e) {
       logger.error('Sauvegarde de l’ordre de choix impossible:', e);
-      setErreur('La sauvegarde de l’ordre de choix a échoué.');
+      setErreur(
+        idPeriode
+          ? 'La sauvegarde de l’ordre de choix a échoué.'
+          : 'Définissez d’abord la période de saisie du trimestre.'
+      );
     } finally {
       setSaving(false);
     }
@@ -96,8 +154,24 @@ const GenerateurTrimestre = ({ onListeGenere, medecins = [] }) => {
     <div className="mx-auto max-w-3xl space-y-5">
       <h2 className="flex items-center justify-center gap-2 text-center text-xl font-bold text-ink-900">
         <RefreshCw size={20} aria-hidden="true" />
-        Ordre de choix — proposition
+        Ordre de choix{libelle ? ` — ${libelle}` : ''}
       </h2>
+
+      {fige ? (
+        <Alert kind="info">
+          <span className="inline-flex items-center gap-1.5">
+            <Lock size={14} aria-hidden="true" />
+            Ordre de choix déjà figé pour ce trimestre : il est réutilisé tel quel à chaque
+            génération du tableau. Il n’évoluera qu’au trimestre suivant.
+          </span>
+        </Alert>
+      ) : (
+        <Alert kind="warning">
+          Proposition {basePeriode ? `dérivée de l’ordre de choix ${basePeriode}` : 'initiale'} —
+          les 10 premiers du trimestre précédent basculent en bas de liste. Ajustez si besoin,
+          puis validez : la liste sera figée pour tout le trimestre.
+        </Alert>
+      )}
 
       {(nouveaux.length > 0 || partis.length > 0) && (
         <div className="flex flex-wrap gap-3 text-sm">
@@ -180,11 +254,12 @@ const GenerateurTrimestre = ({ onListeGenere, medecins = [] }) => {
       <div className="flex flex-wrap items-center justify-end gap-2">
         <Button
           variant="secondary"
-          onClick={construireProposition}
+          onClick={() => charger(true)}
           disabled={loading || saving}
           icon={<RefreshCw size={16} aria-hidden="true" />}
+          title="Écrase la liste affichée et réapplique la règle de bascule à l’ordre du trimestre précédent"
         >
-          Réinitialiser la proposition
+          Recalculer depuis le trimestre précédent
         </Button>
         <Button
           variant="primary"
@@ -192,7 +267,7 @@ const GenerateurTrimestre = ({ onListeGenere, medecins = [] }) => {
           disabled={loading || saving || liste.length === 0}
           icon={<CheckCircle2 size={16} aria-hidden="true" />}
         >
-          {saving ? 'Enregistrement…' : 'Valider cet ordre de choix'}
+          {saving ? 'Enregistrement…' : fige ? 'Utiliser cet ordre de choix' : 'Figer cet ordre de choix'}
         </Button>
       </div>
     </div>

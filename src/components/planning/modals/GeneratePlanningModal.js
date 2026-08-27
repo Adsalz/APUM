@@ -1,25 +1,59 @@
 // src/components/planning/modals/GeneratePlanningModal.js
-import React, { useState } from 'react';
-import { ArrowLeft, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ArrowLeft, CheckCircle2, Lock } from 'lucide-react';
 import GenerateurTrimestre from '../../GenerateurTrimestre';
 import { Modal, Button, Alert } from '../../ui';
+import { idPeriode as calculerIdPeriode, libellePeriode } from '../../../utils/periodeId';
+import { getOrdreChoixPeriode } from '../../../services/ordreChoixService';
+import logger from '../../../utils/logger';
 
 const GeneratePlanningModal = ({
   isOpen,
   onClose,
   onConfirm,
   planning,
-  medecins = []
+  medecins = [],
+  periodeSaisie = null
 }) => {
   const [listePriorite, setListePriorite] = useState(null);
   const [showGenerator, setShowGenerator] = useState(false);
+  const [ordreFige, setOrdreFige] = useState(false);
+
+  const idPeriode = calculerIdPeriode(periodeSaisie);
+  const libelle = libellePeriode(periodeSaisie);
+
+  // L'ordre de choix du trimestre, une fois figé, est REPRIS TEL QUEL : régénérer
+  // le tableau ne doit ni le recalculer ni le faire évoluer. On le précharge donc
+  // ici, et l'admin n'a plus qu'à lancer la génération.
+  useEffect(() => {
+    if (!isOpen || !idPeriode) { return undefined; }
+    let annule = false;
+    (async () => {
+      try {
+        const existant = await getOrdreChoixPeriode(idPeriode);
+        if (annule || !existant?.premierTour?.length) { return; }
+        setListePriorite({
+          premierTour: existant.premierTour,
+          deuxiemeTour: existant.deuxiemeTour || [...existant.premierTour].reverse(),
+          stats: { totalMedecins: existant.premierTour.length },
+          medecinsInclus: medecins,
+        });
+        setOrdreFige(true);
+      } catch (e) {
+        logger.error('Lecture de l’ordre de choix du trimestre impossible:', e);
+      }
+    })();
+    return () => { annule = true; };
+  }, [isOpen, idPeriode, medecins]);
 
   const handleConfirm = () => {
     onConfirm(listePriorite);
   };
 
+  // Le générateur ne remonte la liste qu'une fois celle-ci figée pour le trimestre.
   const handleListeGenere = (nouvelleListe) => {
     setListePriorite(nouvelleListe);
+    setOrdreFige(true);
     setShowGenerator(false);
   };
 
@@ -59,6 +93,7 @@ const GeneratePlanningModal = ({
           <GenerateurTrimestre
             onListeGenere={handleListeGenere}
             medecins={medecins}
+            periodeSaisie={periodeSaisie}
           />
         </div>
       ) : (
@@ -92,8 +127,12 @@ const GeneratePlanningModal = ({
                 <div>
                   <div className="mb-1 flex items-center justify-between gap-2">
                     <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-success-700">
-                      <CheckCircle2 size={16} aria-hidden="true" />
-                      Liste d&apos;ordre de choix configurée
+                      {ordreFige
+                        ? <Lock size={16} aria-hidden="true" />
+                        : <CheckCircle2 size={16} aria-hidden="true" />}
+                      {ordreFige
+                        ? `Ordre de choix ${libelle || 'du trimestre'} — figé`
+                        : 'Liste d\u2019ordre de choix configurée'}
                     </span>
                     <Button variant="ghost" size="sm" onClick={() => setShowGenerator(true)}>
                       Modifier
@@ -103,6 +142,12 @@ const GeneratePlanningModal = ({
                     Premier tour : {listePriorite.premierTour.length} médecins •
                     Deuxième tour : {listePriorite.deuxiemeTour.length} médecins
                   </p>
+                  {ordreFige && (
+                    <p className="mt-1 text-xs text-ink-400">
+                      Réutilisé à l&apos;identique à chaque régénération du tableau ; il n&apos;évoluera
+                      qu&apos;au trimestre suivant.
+                    </p>
+                  )}
                 </div>
               )}
             </div>
