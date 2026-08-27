@@ -162,14 +162,15 @@ function Login() {
     setIsLoading(false);
   };
 
-  // Redirige vers le bon tableau de bord après une connexion réussie.
+  // Redirige vers le point d'entrée du rôle après une connexion réussie. Le
+  // médecin passe par /accueil, qui le pose aussitôt sur l'écran d'actualité.
   const finishLogin = async (uid) => {
     const user = await getUser(uid);
     if (!user) {
       throw new Error('Utilisateur non trouvé dans Firestore');
     }
     if (user.role === 'medecin') {
-      navigate('/dashboard-medecin');
+      navigate('/accueil', { replace: true });
     } else if (user.role === 'admin') {
       navigate('/dashboard-admin');
     } else {
@@ -358,7 +359,7 @@ function Login() {
     }
   };
 
-  // Utilisateur déjà connecté : renvoi direct vers son tableau de bord.
+  // Utilisateur déjà connecté : renvoi direct vers son point d'entrée.
   // On EXCLUT le cas d'une soumission en cours (isLoading) : sur le parcours de
   // réclamation, la connexion au code de réclamation déclenche onAuthStateChanged
   // AVANT que updatePassword ne soit résolu ; sans ce garde, on redirigerait avec
@@ -366,7 +367,7 @@ function Login() {
   // uniquement par finishLogin, après réclamation réussie.
   if (!authLoading && firebaseUser && role && !isLoading && !confirmation) {
     return (
-      <Navigate to={role === 'admin' ? '/dashboard-admin' : '/dashboard-medecin'} replace />
+      <Navigate to={role === 'admin' ? '/dashboard-admin' : '/accueil'} replace />
     );
   }
 

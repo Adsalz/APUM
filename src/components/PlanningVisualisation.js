@@ -1,9 +1,11 @@
 // src/components/PlanningVisualisation.js
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { twMerge } from 'tailwind-merge';
 import { getMedecins } from '../services/userService';
 import { getPublishedPlanning, getPeriodeSaisie } from '../services/planningService';
-import { Download, SlidersHorizontal, Eye, User, CalendarX } from 'lucide-react';
+import { ROUTE_DESIDERATA, saisieOuverte } from '../utils/accueilMedecin';
+import { Download, SlidersHorizontal, Eye, User, CalendarX, ClipboardList } from 'lucide-react';
 import {
   AppHeader,
   LoadingScreen,
@@ -24,6 +26,9 @@ import { CRENEAUX as creneaux } from '../constants/creneaux';
 
 function PlanningVisualisation() {
   const [planning, setPlanning] = useState(null);
+  // Période du trimestre à planifier : sert au raccourci vers la saisie (les
+  // bornes `startDate`/`endDate` ci-dessous, elles, bougent avec les filtres).
+  const [periodeSaisie, setPeriodeSaisie] = useState(null);
   const [medecins, setMedecins] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -34,6 +39,7 @@ function PlanningVisualisation() {
 
   const { profile, role } = useAuth();
   const toast = useToast();
+  const navigate = useNavigate();
 
   useEffect(() => {
     let cancelled = false;
@@ -49,6 +55,7 @@ function PlanningVisualisation() {
           setError('Aucune période de saisie n\'a été définie');
           return;
         }
+        setPeriodeSaisie(periode);
         setStartDate(periode.startDate.split('T')[0]);
         setEndDate(periode.endDate.split('T')[0]);
 
@@ -177,14 +184,32 @@ function PlanningVisualisation() {
   // plusieurs (demande admin : « ligne de séparation entre les mois »).
   const multiMois = new Set(filteredDates.map(date => date.slice(0, 7))).size > 1;
 
+  // Le planning affiché est celui du trimestre en cours, mais la saisie du
+  // suivant est déjà ouverte : sans tableau de bord médecin, ce raccourci est
+  // le seul chemin vers le formulaire.
+  const saisieEnCours = role !== 'admin' && saisieOuverte(periodeSaisie, planning);
+
   return (
     <div className="min-h-screen bg-ink-100">
       <AppHeader
-        backTo={role === 'admin' ? '/dashboard-admin' : '/dashboard-medecin'}
+        backTo={role === 'admin' ? '/dashboard-admin' : undefined}
         actions={
-          <Button variant="secondary" size="sm" icon={<Download size={16} />} onClick={exportToICS}>
-            <span className="hidden sm:inline">Exporter</span> ICS
-          </Button>
+          <>
+            {saisieEnCours && (
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={<ClipboardList size={16} />}
+                onClick={() => navigate(ROUTE_DESIDERATA)}
+                title="Saisir mes desiderata pour le trimestre à venir"
+              >
+                <span className="hidden sm:inline">Mes desiderata</span>
+              </Button>
+            )}
+            <Button variant="secondary" size="sm" icon={<Download size={16} />} onClick={exportToICS}>
+              <span className="hidden sm:inline">Exporter</span> ICS
+            </Button>
+          </>
         }
       />
 

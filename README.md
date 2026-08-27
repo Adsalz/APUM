@@ -63,7 +63,7 @@ src/
 │   ├── ui/                    # Design system (Button, Card, Modal, Alert…)
 │   ├── Login.js               # Connexion + réinitialisation mot de passe
 │   ├── DashboardAdmin.js      # Tableau de bord administrateur
-│   ├── DashboardMedecin.js    # Tableau de bord médecin
+│   ├── AccueilMedecin.js      # Aiguillage du médecin (saisie ou planning)
 │   ├── FormulaireDesirata.js  # Saisie des desiderata (médecin)
 │   ├── FormulaireDesiderataAdmin.js # Saisie pour un médecin (admin)
 │   ├── GestionUtilisateurs.js # CRUD utilisateurs (admin)

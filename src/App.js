@@ -7,15 +7,20 @@ import {
   RouterProvider,
   Outlet,
   Link,
+  Navigate,
 } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { ToastProvider, LoadingScreen } from './components/ui';
 import ProtectedRoute from './components/ProtectedRoute';
 import Login from './components/Login';
+// Aiguillage d'entrée du médecin : première étape après la connexion, donc
+// gardé dans le bundle initial (le charger à la demande ajouterait un
+// aller-retour réseau avant même de savoir où l'on va).
+import AccueilMedecin from './components/AccueilMedecin';
 
-// Écrans chargés à la demande (code-splitting par route) : seul l'écran de
-// connexion est dans le bundle initial, le reste est récupéré à la navigation.
-const DashboardMedecin = lazy(() => import('./components/DashboardMedecin'));
+// Écrans chargés à la demande (code-splitting par route) : seuls l'écran de
+// connexion et l'aiguillage sont dans le bundle initial, le reste est récupéré
+// à la navigation.
 const DashboardAdmin = lazy(() => import('./components/DashboardAdmin'));
 const FormulaireDesirata = lazy(() => import('./components/FormulaireDesirata'));
 const FormulaireDesiderataAdmin = lazy(() => import('./components/FormulaireDesiderataAdmin'));
@@ -63,10 +68,15 @@ const router = createBrowserRouter(
     <Route element={<RootLayout />}>
       <Route path="/" element={<Login />} />
 
-      {/* Espace médecin */}
+      {/* Espace médecin : pas de tableau de bord — /accueil dépose le médecin
+          sur l'écran d'actualité (saisie des desiderata, ou planning publié). */}
       <Route element={<ProtectedRoute roles={['medecin']} />}>
-        <Route path="/dashboard-medecin" element={<DashboardMedecin />} />
+        <Route path="/accueil" element={<AccueilMedecin />} />
       </Route>
+
+      {/* Anciens favoris : le tableau de bord médecin n'existe plus, on ne
+          laisse pas ces liens tomber sur un 404. */}
+      <Route path="/dashboard-medecin" element={<Navigate to="/accueil" replace />} />
 
       {/* Écrans partagés médecin + admin */}
       <Route element={<ProtectedRoute roles={['medecin', 'admin']} />}>

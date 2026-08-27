@@ -22,8 +22,9 @@ function ProtectedRoute({ roles }) {
   }
 
   if (roles && !roles.includes(role)) {
-    // Rôle non autorisé : renvoi vers le tableau de bord correspondant
-    const home = role === 'admin' ? '/dashboard-admin' : '/dashboard-medecin';
+    // Rôle non autorisé : renvoi vers son point d'entrée — tableau de bord pour
+    // l'admin, aiguillage vers l'écran d'actualité pour le médecin.
+    const home = role === 'admin' ? '/dashboard-admin' : '/accueil';
     return <Navigate to={home} replace />;
   }
 

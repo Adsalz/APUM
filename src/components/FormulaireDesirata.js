@@ -3,15 +3,18 @@
 // La logique et la présentation communes sont factorisées dans
 // ./desiderata (useDesiderataForm, DesiderataPreferences, DesiderataTable).
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   addDesiderata,
   getPeriodeSaisie,
   getDesiderataByUser,
+  getPublishedPlanning,
   updateDesiderata,
 } from '../services/planningService';
 import { exportMedecinDesiderataToExcel } from '../services/excelExportService';
 import logger from '../utils/logger';
-import { Save, Download, CalendarRange } from 'lucide-react';
+import { ROUTE_PLANNING } from '../utils/accueilMedecin';
+import { Save, Download, CalendarRange, CalendarDays } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { AppHeader, LoadingScreen, ErrorScreen, Button, Badge, useToast } from './ui';
 import QuickFill from './QuickFill';
@@ -30,10 +33,15 @@ function FormulaireDesirata() {
   const [existingDesiderataId, setExistingDesiderataId] = useState(null);
   const [isExporting, setIsExporting] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  // Un planning publié existe-t-il ? Le médecin n'a pas de tableau de bord d'où
+  // rebondir : sans ce raccourci dans l'en-tête, le planning du trimestre en
+  // cours devient inatteignable pendant la saisie du trimestre suivant.
+  const [planningPublie, setPlanningPublie] = useState(false);
 
-  const { profile } = useAuth();
+  const { profile, role } = useAuth();
   const user = profile;
   const toast = useToast();
+  const navigate = useNavigate();
 
   const {
     desiderata,
@@ -78,6 +86,13 @@ function FormulaireDesirata() {
             setExistingDesiderataId(relevant.id);
             hydrate(relevant, false);
           }
+          // Best-effort : un échec ne prive que du raccourci vers le planning.
+          const publie = await getPublishedPlanning().catch((err) => {
+            logger.error('Lecture du planning publié impossible:', err);
+            return null;
+          });
+          if (cancelled) { return; }
+          setPlanningPublie(Boolean(publie));
         } else {
           setError('Aucune période de saisie n\'a été définie par l\'administrateur.');
         }
@@ -157,9 +172,20 @@ function FormulaireDesirata() {
   return (
     <div className="min-h-screen bg-ink-100">
       <AppHeader
-        backTo="/dashboard-medecin"
+        backTo={role === 'admin' ? '/dashboard-admin' : undefined}
         actions={
           <>
+            {planningPublie && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => navigate(ROUTE_PLANNING)}
+                icon={<CalendarDays size={16} />}
+                title="Consulter le planning publié"
+              >
+                <span className="hidden sm:inline">Planning</span>
+              </Button>
+            )}
             <Button
               variant="secondary"
               size="sm"
