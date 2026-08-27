@@ -5,7 +5,11 @@
 //  - desiderata : bordure épaisse au premier jour de chaque nouveau mois.
 // Les classeurs sont écrits puis relus avec ExcelJS (pas de test d'implémentation).
 import ExcelJS from 'exceljs';
-import { exportPlanningToExcel, exportDesiderataToExcel } from '../excelExportService';
+import {
+  exportPlanningToExcel,
+  exportDesiderataToExcel,
+  exportFicheViergeToExcel,
+} from '../excelExportService';
 
 const PINK = 'FFFF99FF';
 const BLEU = 'FFB4C6E7';
@@ -159,6 +163,52 @@ describe('export Excel des desiderata', () => {
     expect(argbDe(feuille.getCell('B14'))).toBe('FFD0CECE');
     // Les cases condamnées n'offrent pas la liste déroulante, les autres si.
     expect(feuille.getCell('B11').dataValidation).toBeTruthy();
+    expect(feuille.getCell('D11').dataValidation).toBeFalsy();
+  });
+});
+
+describe('export Excel de la fiche VIERGE', () => {
+  let feuille;
+
+  beforeAll(async () => {
+    // jeu 30/07 → dim 02/08 2026 : 4 jours, dont un samedi et un changement de mois.
+    await exportFicheViergeToExcel({ startDate: '2026-07-30', endDate: '2026-08-02' });
+    const workbook = await lireClasseurCapture();
+    feuille = workbook.getWorksheet('Désidératas');
+    expect(feuille).toBeTruthy();
+  });
+
+  it('laisse le nom et les questions à compléter', () => {
+    expect(feuille.getCell('A1').value).toBe('NOM et Prénom : ');
+    // Rien entre « souhaité : » et « /mois », et « OUI  NON » à trancher.
+    expect(String(feuille.getCell('A4').value)).toMatch(/souhaité :\s+\/mois$/);
+    expect(String(feuille.getCell('A5').value)).toContain('OUI  NON');
+    expect(String(feuille.getCell('A6').value)).toContain('OUI  NON');
+  });
+
+  it('reprend la mise en forme de la fiche avec toutes les cases vides', () => {
+    // En-tête et dates au format habituel…
+    expect(String(feuille.getCell('A10').value)).toBe('DATES');
+    expect(String(feuille.getCell('G10').value)).toContain('RENFORT 20H / 00H');
+    expect(feuille.getCell('A11').value.toISOString().slice(0, 10)).toBe('2026-07-30');
+    expect(feuille.getCell('A14').value.toISOString().slice(0, 10)).toBe('2026-08-02');
+    expect(feuille.getCell('A15').value).toBeFalsy();
+
+    // …mais aucune réponse pré-remplie sur les 4 jours de la période.
+    [11, 12, 13, 14].forEach((ligne) => {
+      ['B', 'C', 'D', 'E', 'F', 'G'].forEach((col) => {
+        expect(feuille.getCell(`${col}${ligne}`).value).toBeFalsy();
+      });
+    });
+  });
+
+  it('garde les listes déroulantes Oui / Possible / Non pour la saisie', () => {
+    expect(feuille.getCell('K10').value).toBe('Oui ');
+    expect(feuille.getCell('K11').value).toBe('Non');
+    expect(feuille.getCell('K12').value).toBe('Possible');
+    expect(feuille.getCell('B11').dataValidation?.formulae).toEqual(['$K$10:$K$12']);
+    // Renfort samedi : ouvert le samedi (l.13), condamné les autres jours.
+    expect(feuille.getCell('D13').dataValidation).toBeTruthy();
     expect(feuille.getCell('D11').dataValidation).toBeFalsy();
   });
 });

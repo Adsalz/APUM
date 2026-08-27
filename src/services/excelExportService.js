@@ -6,6 +6,23 @@ import { typeDeJour } from '../utils/planningCore';
 // alourdir le bundle initial : il n'est utile qu'au moment d'un export.
 const loadExcelJS = async () => (await import('exceljs')).default;
 
+// Écrit le classeur et déclenche son téléchargement par le navigateur.
+const telechargerClasseur = async (workbook, fileName) => {
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+  });
+
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  window.URL.revokeObjectURL(url);
+};
+
 /**
  * Service pour l'export des desiderata au format Excel
  * Reproduit exactement le format du modèle APUM
@@ -42,22 +59,7 @@ export const exportDesiderataToExcel = async (medecins, desiderataList, periode)
       await createMedecinWorksheet(worksheet, medecin, medecinDesiderata, datesList);
     }
 
-    // Générer le buffer Excel
-    const buffer = await workbook.xlsx.writeBuffer();
-
-    // Créer un blob et déclencher le téléchargement
-    const blob = new Blob([buffer], {
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    });
-
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
+    await telechargerClasseur(workbook, fileName);
 
     return {
       success: true,
@@ -132,7 +134,10 @@ const createMedecinWorksheet = async (worksheet, medecin, desiderata, datesList)
   // LIGNE 1 — NOM et Prénom
   worksheet.getRow(1).height = 36;
   const nomCell = worksheet.getCell('A1');
-  nomCell.value = `NOM et Prénom : ${medecin.prenom} ${(medecin.nom || '').toUpperCase()}`;
+  // Sans médecin (fiche vierge), on laisse la ligne à compléter à la main
+  // plutôt que d'écrire un nom vide.
+  const nomComplet = `${medecin?.prenom || ''} ${(medecin?.nom || '').toUpperCase()}`.trim();
+  nomCell.value = nomComplet ? `NOM et Prénom : ${nomComplet}` : 'NOM et Prénom : ';
   nomCell.font = { name: 'Calibri', bold: true, size: 28 };
   nomCell.alignment = { horizontal: 'left', vertical: 'middle' };
 
@@ -341,22 +346,7 @@ export const exportMedecinDesiderataToExcel = async (medecin, desiderata, period
     // Générer le contenu de la feuille
     await createMedecinWorksheet(worksheet, medecin, desiderata, datesList);
 
-    // Générer le buffer Excel
-    const buffer = await workbook.xlsx.writeBuffer();
-
-    // Créer un blob et déclencher le téléchargement
-    const blob = new Blob([buffer], {
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    });
-
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
+    await telechargerClasseur(workbook, fileName);
 
     return {
       success: true,
@@ -382,6 +372,45 @@ const generateMedecinFileName = (medecin, periode) => {
   // Remplacer "DESIDERATA" par "DESIDERATA_[NOM]"
   const medecinName = `${medecin.nom}_${medecin.prenom}`.toUpperCase().replace(/\s+/g, '_');
   return baseName.replace('DESIDERATA', `DESIDERATA_${medecinName}`);
+};
+
+/**
+ * Exporte une fiche de desiderata VIERGE aux dates de la période de saisie :
+ * ni nom, ni réponses, mais la mise en forme et les listes déroulantes
+ * (Oui / Possible / Non) de la fiche de référence « DESIDERATA ASO26 ».
+ * Destinée aux médecins qui ne passent pas par l'application : ils la
+ * remplissent dans Excel et la renvoient à l'admin, qui reporte la saisie via
+ * l'écran « Remplir desiderata ».
+ * @param {Object} periode - Période de saisie {startDate, endDate}
+ */
+export const exportFicheViergeToExcel = async (periode) => {
+  if (!periode || !periode.startDate || !periode.endDate) {
+    throw new Error('Aucune période de saisie définie');
+  }
+
+  try {
+    const ExcelJS = await loadExcelJS();
+    const workbook = new ExcelJS.Workbook();
+
+    const fileName = generateFileName(periode).replace('DESIDERATA', 'DESIDERATA_VIERGE');
+    const worksheet = workbook.addWorksheet('Désidératas');
+
+    // Ni médecin ni desiderata : le générateur laisse la ligne de nom à
+    // compléter, « OUI  NON » à trancher et toutes les cases du tableau vides.
+    await createMedecinWorksheet(worksheet, null, null, generateDatesList(periode));
+
+    await telechargerClasseur(workbook, fileName);
+
+    return {
+      success: true,
+      fileName: fileName,
+      message: `Fiche vierge générée : ${fileName}`
+    };
+
+  } catch (error) {
+    logger.error('Erreur lors de la génération de la fiche vierge:', error);
+    throw error;
+  }
 };
 
 /**
@@ -742,19 +771,7 @@ export const exportPlanningToExcel = async (planning, medecins, options = {}) =>
     });
 
     const fileName = generatePlanningFileName(moisPlanning.map((m) => m.monthKey));
-    const buffer = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer], {
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    });
-
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
+    await telechargerClasseur(workbook, fileName);
 
     return {
       success: true,

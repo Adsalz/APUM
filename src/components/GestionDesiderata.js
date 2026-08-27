@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { getMedecins } from '../services/userService';
 import { getDesiderataStatus, getPeriodeSaisie } from '../services/planningService';
-import { Search, Mail, Download } from 'lucide-react';
+import { Search, Mail, Download, FileSpreadsheet } from 'lucide-react';
 import DesiderataStatus from './DesiderataStatus';
 import RelanceEmailModal from './RelanceEmailModal';
 import { getMedecinsSansDesiderata } from '../services/emailService';
-import { exportDesiderataToExcel } from '../services/excelExportService';
+import { exportDesiderataToExcel, exportFicheViergeToExcel } from '../services/excelExportService';
 import { trierMedecinsParNom } from '../utils/medecins';
 import {
   AppHeader,
@@ -28,6 +28,7 @@ function GestionDesiderata() {
   const [statusFilter, setStatusFilter] = useState('tous');
   const [showRelanceModal, setShowRelanceModal] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isGeneratingVierge, setIsGeneratingVierge] = useState(false);
   const toast = useToast();
 
   // Auth/rôle admin garantis par ProtectedRoute : on charge uniquement les données
@@ -110,6 +111,28 @@ function GestionDesiderata() {
     }
   };
 
+  // Fiche vierge (dates de la période, aucune réponse) : à envoyer aux médecins
+  // qui ne saisissent pas leurs desiderata dans l'application. Ils la remplissent
+  // dans Excel et la renvoient ; l'admin la reporte via « Remplir desiderata ».
+  const handleFicheVierge = async () => {
+    setIsGeneratingVierge(true);
+    try {
+      const periode = await getPeriodeSaisie();
+      if (!periode) {
+        toast.error('Aucune période de saisie définie');
+        return;
+      }
+
+      const result = await exportFicheViergeToExcel(periode);
+      toast.success(result.message);
+    } catch (error) {
+      logger.error('Erreur lors de la génération de la fiche vierge:', error);
+      toast.error('Erreur lors de la génération de la fiche vierge');
+    } finally {
+      setIsGeneratingVierge(false);
+    }
+  };
+
   if (loading) {
     return <LoadingScreen />;
   }
@@ -136,6 +159,16 @@ function GestionDesiderata() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="secondary"
+              icon={<FileSpreadsheet size={16} />}
+              loading={isGeneratingVierge}
+              disabled={isGeneratingVierge}
+              onClick={handleFicheVierge}
+              title="Télécharger une fiche vierge aux dates de la période, à envoyer aux médecins qui n'utilisent pas l'application"
+            >
+              Fiche vierge
+            </Button>
             <Button
               variant="success"
               icon={<Download size={16} />}
