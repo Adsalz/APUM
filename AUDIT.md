@@ -212,6 +212,13 @@ Vérifié : **lint OK, 53 tests, build OK, smoke test navigation headless 4/4**.
 
 ## Vague 5 — juillet 2026 : révocation sans Cloud Function (plan gratuit)
 
+> **Correctif, août 2026** — l'affirmation « le projet reste sur le plan Spark »
+> était fausse : l'extension Trigger Email (`firestore-send-email`, ACTIVE) ne
+> s'installe **que** sur le plan Blaze, où le projet se trouve donc depuis son
+> installation. Les Cloud Functions sont déployables — la première l'est
+> (`lancerNouveauTour`, cf. vague 7). Le raisonnement ci-dessous reste valable
+> sur le fond (la révocation par les règles suffit), mais pas sa justification.
+
 Le projet reste sur le plan **Spark** (gratuit) : la Cloud Function de révocation
 est écartée (son déploiement exigerait le plan Blaze).
 
@@ -410,3 +417,35 @@ Aucune action de déploiement particulière (fonctionnalité purement front, auc
 changement de règles Firestore).
 
 Vérifié : **lint OK, 64 tests, build OK**.
+
+---
+
+## Vague 7 — août 2026 : nouveau tour de choix depuis l'application
+
+Chaque trimestre, ouvrir un tour de choix suppose trois gestes : écrire la
+période de saisie, effacer les codes des médecins, ouvrir la fenêtre
+d'inscription. Les deux derniers sont hors de portée d'un navigateur (le SDK
+client ne change que le mot de passe de l'utilisateur **connecté**).
+
+- **Cloud Function `lancerNouveauTour`** (`functions/index.js`, callable,
+  europe-west1) : vérifie le rôle **administrateur** dans `users/{uid}` — un
+  jeton valide ne suffit pas, tout médecin en possède un — puis remet les
+  comptes `role: 'medecin'` à `CODE_A_RECLAMER` et ouvre `config/inscription`
+  **en dernier**.
+- **Déclenchement explicite** : case à cocher *décochée par défaut* sur l'écran
+  « Définir la période de saisie » + modale de confirmation. Un déclencheur
+  automatique sur l'écriture de `planning/periode_saisie` a été écarté :
+  `scripts/basculer-periode-saisie.js` change cette période pour *consulter* un
+  trimestre passé, ce qui aurait effacé 54 codes par accident.
+- **Surface ajoutée** : un point d'entrée capable d'effacer tous les codes.
+  Atténuations — rôle vérifié côté serveur, `maxInstances: 2`, appels journalisés
+  (`logger.info` avec l'uid de l'appelant), aucun paramètre accepté (rien à
+  falsifier dans la requête).
+- **Rappel du risque assumé** (inchangé, cf. `src/constants/claim.js`) : pendant
+  que la fenêtre d'inscription est ouverte, un compte dont le code n'a pas encore
+  été redéfini peut être pris par un tiers connaissant la valeur partagée
+  (publique, embarquée dans le bundle). Ce risque revient désormais à **chaque
+  trimestre** au lieu d'une fois — la protection reste de refermer la fenêtre
+  rapidement.
+- **Repli** : `scripts/nouveaux-choix.js` fait la même chose depuis un poste, si
+  le déploiement des fonctions est cassé.

@@ -164,10 +164,15 @@ Ensuite, impérativement :
 2. **ouvrir la fenêtre d'inscription** (app → *Gestion des utilisateurs*), sinon
    ils ne peuvent pas définir leur code. Le script affiche son état courant.
 
-## `nouveaux-choix.js` — lancer un nouveau trimestre de choix
+## `nouveaux-choix.js` — lancer un nouveau trimestre de choix (repli)
 
-**Le geste de rentrée**, à chaque nouveau tour de choix. Une commande, trois
-effets, dans cet ordre :
+> Depuis août 2026, **le geste normal se fait dans l'application** : *Définir la
+> période de saisie* → cocher « Nouveau tour de choix — remettre les codes des
+> médecins à zéro » → confirmer. La Cloud Function `lancerNouveauTour` fait
+> exactement ce que fait ce script. Garde celui-ci pour le dépannage : fonctions
+> non déployées, échec partiel à rattraper, ou lancement depuis un poste.
+
+Une commande, trois effets, dans cet ordre :
 
 1. écrit la **période de saisie** (aucun desiderata supprimé — ceux des
    trimestres passés restent consultables) ;

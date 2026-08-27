@@ -1,0 +1,13 @@
+{
+  "name": "apum-functions",
+  "description": "Cloud Functions APUM — lancement d'un nouveau tour de choix",
+  "private": true,
+  "main": "index.js",
+  "engines": {
+    "node": "22"
+  },
+  "dependencies": {
+    "firebase-admin": "^13.0.2",
+    "firebase-functions": "^6.3.0"
+  }
+}
