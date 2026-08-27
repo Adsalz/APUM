@@ -60,6 +60,14 @@ function Login() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
+  // Modale « code oublié » (parcours médecin) : envoi d'un lien de
+  // réinitialisation à l'adresse que l'annuaire associe au nom choisi — le
+  // médecin n'a donc pas à connaître ni saisir son email.
+  const [showCodeOublie, setShowCodeOublie] = useState(false);
+  const [oubliError, setOubliError] = useState('');
+  const [oubliSuccess, setOubliSuccess] = useState('');
+  const [oubliLoading, setOubliLoading] = useState(false);
+
   // Modale de réinitialisation par email (parcours admin uniquement)
   const [showResetModal, setShowResetModal] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
@@ -204,6 +212,43 @@ function Login() {
       logger.error('Erreur de connexion (email):', err);
       setError(mapAuthError(err));
       setIsLoading(false);
+    }
+  };
+
+  const openCodeOublie = () => {
+    setOubliError('');
+    setOubliSuccess('');
+    setShowCodeOublie(true);
+  };
+
+  // Envoie le lien de réinitialisation Firebase Auth. Ces emails partent de
+  // Firebase directement (pas de l'extension Trigger Email), donc sans
+  // dépendance à la configuration SMTP du projet.
+  const handleCodeOublie = async () => {
+    setOubliError('');
+    setOubliSuccess('');
+    if (!selectedEmail) {
+      setOubliError('Sélectionnez d\'abord votre nom dans la liste.');
+      return;
+    }
+    setOubliLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, selectedEmail, {
+        url: `${window.location.origin}/`,
+        handleCodeInApp: false,
+      });
+      setOubliSuccess(
+        `Un email vient d'être envoyé à ${selectedEmail}. Ouvrez le lien qu'il contient, ` +
+        'puis saisissez 6 chiffres : ce sera votre nouveau code.'
+      );
+    } catch (err) {
+      logger.error('Erreur lors de l\'envoi du lien de réinitialisation (médecin):', err);
+      setOubliError(
+        'Envoi impossible pour le moment. Réessayez dans quelques minutes, ' +
+        'ou contactez votre administrateur.'
+      );
+    } finally {
+      setOubliLoading(false);
     }
   };
 
@@ -370,6 +415,14 @@ function Login() {
 
             <button
               type="button"
+              onClick={openCodeOublie}
+              className="mt-4 block w-full text-center text-sm font-semibold text-primary-600 hover:text-primary-700 hover:underline"
+            >
+              Code oublié&nbsp;?
+            </button>
+
+            <button
+              type="button"
               onClick={() => switchMode('email')}
               className="mt-5 block w-full text-center text-xs text-ink-500 hover:text-ink-700 hover:underline"
             >
@@ -425,6 +478,55 @@ function Login() {
           </form>
         )}
       </Card>
+
+      {/* Modale « code oublié » (parcours médecin) */}
+      <Modal
+        open={showCodeOublie}
+        onClose={() => setShowCodeOublie(false)}
+        title="Code oublié"
+        size="sm"
+      >
+        {selectedEntry ? (
+          <>
+            <p className="mb-4 text-sm text-ink-600">
+              Un lien de réinitialisation sera envoyé à l'adresse enregistrée pour{' '}
+              <strong className="text-ink-900">{selectedEntry.label}</strong> :
+              <br />
+              <span className="font-semibold text-ink-900">{selectedEmail}</span>
+            </p>
+            <p className="mb-4 text-xs text-ink-500">
+              Le lien vous demandera un nouveau code&nbsp;: saisissez{' '}
+              <strong>{CODE_MEDECIN_LONGUEUR} chiffres</strong>, rien d'autre. Pensez à
+              regarder dans les courriers indésirables.
+            </p>
+          </>
+        ) : (
+          <Alert kind="info" className="mb-4">
+            Sélectionnez d'abord votre nom dans la liste, puis rouvrez cette fenêtre&nbsp;:
+            le lien part vers l'adresse qui vous est associée.
+          </Alert>
+        )}
+
+        {oubliError && (
+          <Alert kind="error" className="mb-4">
+            {oubliError}
+          </Alert>
+        )}
+        {oubliSuccess && (
+          <Alert kind="success" className="mb-4">
+            {oubliSuccess}
+          </Alert>
+        )}
+
+        <Button
+          onClick={handleCodeOublie}
+          loading={oubliLoading}
+          disabled={!selectedEmail || Boolean(oubliSuccess)}
+          className="w-full"
+        >
+          {oubliLoading ? 'Envoi…' : 'Envoyer le lien'}
+        </Button>
+      </Modal>
 
       {/* Modale de réinitialisation par email (parcours administrateur) */}
       <Modal
