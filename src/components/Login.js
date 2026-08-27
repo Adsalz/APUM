@@ -342,13 +342,19 @@ function Login() {
                 onChange={setCode}
                 length={CODE_MEDECIN_LONGUEUR}
                 ariaLabel="Saisie du code à 6 chiffres"
-                describedById={inscriptionOuverte === true ? 'code-hint' : undefined}
+                describedById={inscriptionOuverte === null ? undefined : 'code-hint'}
               />
             </div>
 
-            {inscriptionOuverte === true && (
+            {/* Deux états, deux messages : ouverte, le code saisi est adopté ;
+                fermée, un médecin dont le code a été remis à zéro se verrait
+                sinon refuser sans comprendre pourquoi. L'état des inscriptions
+                est public (config/inscription), l'afficher ne révèle rien. */}
+            {inscriptionOuverte !== null && (
               <p id="code-hint" className="mb-4 mt-3 text-center text-xs text-ink-500">
-                Première connexion&nbsp;? Le code que vous saisissez devient le vôtre — notez-le bien.
+                {inscriptionOuverte
+                  ? 'Le code que vous saisissez devient le vôtre pour tout le trimestre — notez-le bien.'
+                  : 'Définition des codes fermée : saisissez le code que vous avez choisi. Code oublié, ou jamais défini ? Contactez votre administrateur.'}
               </p>
             )}
 
