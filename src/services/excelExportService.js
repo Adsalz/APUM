@@ -123,6 +123,22 @@ const createMedecinWorksheet = async (worksheet, medecin, desiderata, datesList)
   };
   const yellowFill = { type: 'pattern', pattern: 'solid', fgColor: { argb: DESID_YELLOW } };
 
+  // MISE EN PAGE du modèle : A4 portrait, réduit et ajusté sur 2 pages en
+  // hauteur, marges étroites — la fiche s'imprime telle quelle.
+  worksheet.pageSetup = {
+    paperSize: 9,
+    orientation: 'portrait',
+    scale: 46,
+    fitToPage: true,
+    fitToWidth: 1,
+    fitToHeight: 2,
+    margins: {
+      left: 0.31496062992125984, right: 0.31496062992125984,
+      top: 0.35433070866141736, bottom: 0.35433070866141736,
+      header: 0.31496062992125984, footer: 0.31496062992125984,
+    },
+  };
+
   // Largeurs de colonnes A→K — valeurs EXACTES reprises du fichier de référence
   // (Excel stocke des largeurs fractionnaires ; on les reproduit au pixel près).
   worksheet.columns = [
@@ -141,9 +157,11 @@ const createMedecinWorksheet = async (worksheet, medecin, desiderata, datesList)
   nomCell.font = { name: 'Calibri', bold: true, size: 28 };
   nomCell.alignment = { horizontal: 'left', vertical: 'middle' };
 
-  // LIGNES 3→8 — bloc jaune « À COMPLÉTER OBLIGATOIREMENT »
+  // LIGNES 3→8 — bloc jaune « À COMPLÉTER OBLIGATOIREMENT ». Comme sur le
+  // modèle, le jaune couvre A→G jusqu'à la ligne 7 puis seulement B→G en 8 :
+  // la case A8 reste blanche.
   for (let r = 3; r <= 8; r++) {
-    for (let c = 1; c <= 7; c++) {
+    for (let c = r === 8 ? 2 : 1; c <= 7; c++) {
       worksheet.getCell(r, c).fill = yellowFill;
     }
   }
@@ -157,17 +175,21 @@ const createMedecinWorksheet = async (worksheet, medecin, desiderata, datesList)
   titre.font = { name: 'Calibri', bold: true, size: 22 };
 
   const nb = desiderata?.nombreGardesSouhaitees ?? '';
-  const oa = (v) => (v === true ? 'OUI' : v === false ? 'NON' : 'OUI  NON');
+  // Sans réponse, on laisse le « OUI  NON » à trancher du modèle — dont
+  // l'espacement diffère d'une question à l'autre sur la fiche de référence.
+  const oa = (v, aTrancher) => (v === true ? 'OUI' : v === false ? 'NON' : aTrancher);
+  // Le modèle laisse 28 espaces entre « souhaité : » et « /mois ».
+  const BLANC_NB = ' '.repeat(14);
   const redQ = { name: 'Calibri', bold: true, size: 16, color: { argb: DESID_RED } };
 
   const q1 = worksheet.getCell('A4');
-  q1.value = `1 - Nombre de gardes par mois souhaité :          ${nb}          /mois`;
+  q1.value = `1 - Nombre de gardes par mois souhaité :${BLANC_NB}${nb}${BLANC_NB}/mois`;
   q1.font = redQ;
   const q2 = worksheet.getCell('A5');
-  q2.value = `2 - Gardes groupées  dans un même week-end :   ${oa(desiderata?.gardesGroupees)}`;
+  q2.value = `2 - Gardes groupées  dans un même week-end :   ${oa(desiderata?.gardesGroupees, 'OUI  NON')}`;
   q2.font = redQ;
   const q3 = worksheet.getCell('A6');
-  q3.value = `3 - Les renforts associés  à une garde :  ${oa(desiderata?.renfortsAssocies)}`;
+  q3.value = `3 - Les renforts associés  à une garde :  ${oa(desiderata?.renfortsAssocies, 'OUI   NON')}`;
   q3.font = redQ;
 
   // LÉGENDE (colonne K) — sert aussi de source à la liste déroulante ($K$10:$K$12)
@@ -236,6 +258,16 @@ const createMedecinWorksheet = async (worksheet, medecin, desiderata, datesList)
       cell.border = bordure;
       cell.alignment = { horizontal: 'center', vertical: 'middle' };
 
+      // Police posée même sur les cases VIDES : sur le modèle, une réponse
+      // saisie à la main s'affiche en Calibri 18 gras, et c'est la mise en
+      // forme conditionnelle (plus bas) qui lui donne sa couleur.
+      const pref = dayData?.[creneauId];
+      const couleur = pref ? desidPrefColor(pref) : null;
+      cell.font = {
+        name: 'Calibri', bold: true, size: 18,
+        color: couleur ? { argb: couleur } : undefined,
+      };
+
       if (creneauId === 'RENFORT_1' && !samedi) {
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: DESID_NOIR } };
         return;
@@ -253,16 +285,34 @@ const createMedecinWorksheet = async (worksheet, medecin, desiderata, datesList)
         showErrorMessage: true,
         formulae: ['$K$10:$K$12'],
       };
-      const pref = dayData?.[creneauId];
-      if (pref) {
-        cell.value = pref;
-        const couleur = desidPrefColor(pref);
-        cell.font = { name: 'Calibri', bold: true, size: 14, color: couleur ? { argb: couleur } : undefined };
-      }
+      if (pref) { cell.value = pref; }
     });
 
     currentRow++;
   });
+
+  // MISE EN FORME CONDITIONNELLE du modèle : une réponse saisie se colore
+  // toute seule — vert « Oui », rouge « Non », ambre « Possible ». C'est ce qui
+  // fait vivre une fiche VIERGE remplie à la main, où aucune couleur n'est
+  // posée à l'export. Même ordre de priorité que la fiche de référence.
+  const derniereLigne = currentRow - 1;
+  if (derniereLigne >= 11) {
+    const regleTexte = (texte, argb, priority) => ({
+      type: 'containsText',
+      operator: 'containsText',
+      text: texte,
+      priority,
+      style: { font: { color: { argb } } },
+    });
+    worksheet.addConditionalFormatting({
+      ref: `B11:G${derniereLigne}`,
+      rules: [
+        regleTexte('non', DESID_RED, 1),
+        regleTexte('oui', DESID_GREEN, 2),
+        regleTexte('possible', DESID_AMBER, 3),
+      ],
+    });
+  }
 };
 
 /**

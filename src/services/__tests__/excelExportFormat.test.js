@@ -180,10 +180,10 @@ describe('export Excel de la fiche VIERGE', () => {
 
   it('laisse le nom et les questions à compléter', () => {
     expect(feuille.getCell('A1').value).toBe('NOM et Prénom : ');
-    // Rien entre « souhaité : » et « /mois », et « OUI  NON » à trancher.
+    // Rien entre « souhaité : » et « /mois », et OUI/NON encore à trancher.
     expect(String(feuille.getCell('A4').value)).toMatch(/souhaité :\s+\/mois$/);
-    expect(String(feuille.getCell('A5').value)).toContain('OUI  NON');
-    expect(String(feuille.getCell('A6').value)).toContain('OUI  NON');
+    expect(String(feuille.getCell('A5').value)).toMatch(/OUI\s+NON$/);
+    expect(String(feuille.getCell('A6').value)).toMatch(/OUI\s+NON$/);
   });
 
   it('reprend la mise en forme de la fiche avec toutes les cases vides', () => {
@@ -200,6 +200,54 @@ describe('export Excel de la fiche VIERGE', () => {
         expect(feuille.getCell(`${col}${ligne}`).value).toBeFalsy();
       });
     });
+  });
+
+  it('reproduit les questions du modèle au caractère près', () => {
+    expect(feuille.getCell('A4').value).toBe(
+      '1 - Nombre de gardes par mois souhaité :                            /mois'
+    );
+    expect(feuille.getCell('A5').value).toBe(
+      '2 - Gardes groupées  dans un même week-end :   OUI  NON'
+    );
+    expect(feuille.getCell('A6').value).toBe(
+      '3 - Les renforts associés  à une garde :  OUI   NON'
+    );
+    // Le bloc jaune s'arrête à G7 puis ne couvre que B8→G8 : A8 reste blanche.
+    expect(argbDe(feuille.getCell('G7'))).toBe('FFFFFF00');
+    expect(argbDe(feuille.getCell('B8'))).toBe('FFFFFF00');
+    expect(argbDe(feuille.getCell('A8'))).toBeNull();
+  });
+
+  it('pose la police du modèle sur les cases VIDES (réponse écrite à la main)', () => {
+    // Sans cela, une réponse saisie s'afficherait en Calibri 11 par défaut.
+    ['B', 'C', 'E', 'F', 'G'].forEach((col) => {
+      const police = feuille.getCell(`${col}11`).font;
+      expect(police.name).toBe('Calibri');
+      expect(police.size).toBe(18);
+      expect(police.bold).toBe(true);
+    });
+  });
+
+  it('colore la réponse automatiquement (mise en forme conditionnelle du modèle)', () => {
+    const cf = feuille.conditionalFormattings.find((c) => c.ref === 'B11:G14');
+    expect(cf).toBeTruthy();
+
+    const couleurPour = (texte) => {
+      const regle = cf.rules.find((r) => (r.formulae?.[0] || '').includes(`"${texte}"`));
+      return regle?.style?.font?.color?.argb;
+    };
+    expect(couleurPour('oui')).toBe('FF00B050');       // vert
+    expect(couleurPour('non')).toBe('FFFF0000');       // rouge
+    expect(couleurPour('possible')).toBe('FFFFC000');  // ambre
+    cf.rules.forEach((r) => expect(r.type).toBe('containsText'));
+  });
+
+  it('reprend la mise en page imprimable du modèle', () => {
+    const mep = feuille.pageSetup;
+    expect(mep.paperSize).toBe(9);            // A4
+    expect(mep.orientation).toBe('portrait');
+    expect(mep.fitToHeight).toBe(2);
+    expect(Math.round(mep.margins.left * 1e4)).toBe(3150);
   });
 
   it('garde les listes déroulantes Oui / Possible / Non pour la saisie', () => {
