@@ -65,6 +65,8 @@ function FormulaireDesiderataAdmin() {
     handleQuickFill,
     handleApplyPattern,
     setPreference,
+    tentativeEnvoi,
+    validerPreferences,
     hydrate,
     reset,
     buildPayload,
@@ -180,7 +182,8 @@ function FormulaireDesiderataAdmin() {
       nomLu: lu.nomLu,
       donnees: {
         desiderata: lu.desiderata,
-        nombreGardesSouhaitees: lu.nombreGardesSouhaitees ?? 0,
+        // Une fiche papier sans nombre laisse le champ VIDE : l'admin doit le renseigner.
+        nombreGardesSouhaitees: lu.nombreGardesSouhaitees || '',
         gardesGroupees: lu.gardesGroupees ?? false,
         renfortsAssocies: lu.renfortsAssocies ?? false,
       },
@@ -265,6 +268,8 @@ function FormulaireDesiderataAdmin() {
       toast.warning('Veuillez sélectionner un médecin');
       return;
     }
+    const erreur = validerPreferences();
+    if (erreur) { toast.error(erreur); return; }
     if (profile && !isSaving) {
       setIsSaving(true);
       try {
@@ -462,7 +467,7 @@ function FormulaireDesiderataAdmin() {
         {/* Formulaire (affiché seulement si un médecin est sélectionné) */}
         {selectedMedecinId && periodeSaisie ? (
           <>
-            <DesiderataPreferences preferences={preferences} onChange={setPreference} />
+            <DesiderataPreferences preferences={preferences} onChange={setPreference} tentativeEnvoi={tentativeEnvoi} />
 
             <div className="mb-6 grid gap-4">
               <QuickFill creneaux={creneaux} onApply={handleQuickFill} periodeSaisie={periodeSaisie} />

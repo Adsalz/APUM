@@ -1,9 +1,10 @@
 // src/components/desiderata/DesiderataPreferences.js
 // Carte « Préférences générales » partagée par les deux écrans de saisie.
 import React from 'react';
+import { erreurGardesSouhaitees } from './useDesiderataForm';
 import { Card, FormField, Checkbox } from '../ui';
 
-function DesiderataPreferences({ preferences, onChange }) {
+function DesiderataPreferences({ preferences, onChange, tentativeEnvoi = false }) {
   const {
     nombreGardesSouhaitees,
     nombreGardesMaxParSemaine,
@@ -20,10 +21,18 @@ function DesiderataPreferences({ preferences, onChange }) {
         <FormField
           label="Gardes souhaitées par mois"
           type="number"
-          min="0"
+          min="1"
+          required
           className="mb-0"
           value={nombreGardesSouhaitees}
-          onChange={(e) => onChange({ nombreGardesSouhaitees: parseInt(e.target.value, 10) || 0 })}
+          onChange={(e) => {
+            const n = parseInt(e.target.value, 10);
+            onChange({ nombreGardesSouhaitees: Number.isNaN(n) ? '' : n });
+          }}
+          hint="Obligatoire — au moins 1."
+          error={
+            (nombreGardesSouhaitees !== '' || tentativeEnvoi) ? (erreurGardesSouhaitees(nombreGardesSouhaitees) || '') : ''
+          }
         />
         <FormField
           label="Maximum de gardes par semaine"

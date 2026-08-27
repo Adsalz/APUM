@@ -54,6 +54,8 @@ function FormulaireDesirata() {
     handleQuickFill,
     handleApplyPattern,
     setPreference,
+    tentativeEnvoi,
+    validerPreferences,
     hydrate,
     buildPayload,
   } = useDesiderataForm(periodeSaisie);
@@ -120,6 +122,8 @@ function FormulaireDesirata() {
 
   const handleSubmit = async (e) => {
     if (e) { e.preventDefault(); }
+    const erreur = validerPreferences();
+    if (erreur) { toast.error(erreur); return; }
     if (user && !isSaving) {
       setIsSaving(true);
       try {
@@ -227,7 +231,7 @@ function FormulaireDesirata() {
           </div>
         </div>
 
-        <DesiderataPreferences preferences={preferences} onChange={setPreference} />
+        <DesiderataPreferences preferences={preferences} onChange={setPreference} tentativeEnvoi={tentativeEnvoi} />
 
         <div className="mb-6 grid gap-4">
           <QuickFill creneaux={creneaux} onApply={onQuickFill} periodeSaisie={periodeSaisie} />

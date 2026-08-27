@@ -6,9 +6,39 @@
 // composants appelants.
 import { useState, useCallback } from 'react';
 
+// ── Validation des préférences générales (pure, partagée médecin/admin) ──────
+// « Gardes souhaitées par mois » est OBLIGATOIRE et ≥ 1 (décision du 27/08/2026) :
+// pour le générateur, un 0 signifie « sans limite », ce qu'aucun médecin ne veut
+// dire ; la coordinatrice connaît le vrai nombre de chacun, la fiche doit le porter.
+export const erreurGardesSouhaitees = (valeur) => {
+  const n = Number(valeur);
+  if (valeur === '' || valeur === null || valeur === undefined || Number.isNaN(n)) {
+    return 'Indiquez le nombre de gardes souhaitées par mois.';
+  }
+  if (!Number.isInteger(n) || n < 1) {
+    return 'Au moins 1 garde par mois — 0 n\'est pas accepté.';
+  }
+  return null;
+};
+
+export const erreurMaxParSemaine = (valeur) => {
+  const n = Number(valeur);
+  if (!Number.isInteger(n) || n < 1 || n > 7) {
+    return 'Le maximum de gardes par semaine doit être entre 1 et 7.';
+  }
+  return null;
+};
+
+// Première erreur trouvée, ou null si les préférences sont valides.
+export const erreurPreferences = ({ nombreGardesSouhaitees, nombreGardesMaxParSemaine }) =>
+  erreurGardesSouhaitees(nombreGardesSouhaitees) || erreurMaxParSemaine(nombreGardesMaxParSemaine);
+
 export default function useDesiderataForm(periodeSaisie) {
   const [desiderata, setDesiderata] = useState({});
-  const [nombreGardesSouhaitees, setNombreGardesSouhaitees] = useState(0);
+  // Vide tant que le médecin n'a rien saisi : le champ est obligatoire.
+  const [nombreGardesSouhaitees, setNombreGardesSouhaitees] = useState('');
+  // Passe à true à la première tentative d'envoi : les champs vides s'affichent alors en erreur.
+  const [tentativeEnvoi, setTentativeEnvoi] = useState(false);
   const [nombreGardesMaxParSemaine, setNombreGardesMaxParSemaine] = useState(3);
   const [gardesGroupees, setGardesGroupees] = useState(false);
   const [renfortsAssocies, setRenfortsAssocies] = useState(false);
@@ -107,7 +137,9 @@ export default function useDesiderataForm(periodeSaisie) {
   // (rien à sauvegarder), true pour un import de fichier (à enregistrer).
   const hydrate = useCallback((data, markDirty = false) => {
     setDesiderata(data?.desiderata || {});
-    setNombreGardesSouhaitees(data?.nombreGardesSouhaitees || 0);
+    // Un 0 enregistré autrefois s'affiche vide : il faudra le renseigner pour réenregistrer.
+    setNombreGardesSouhaitees(data?.nombreGardesSouhaitees || '');
+    setTentativeEnvoi(false);
     setNombreGardesMaxParSemaine(data?.nombreGardesMaxParSemaine || 3);
     setGardesGroupees(data?.gardesGroupees || false);
     setRenfortsAssocies(data?.renfortsAssocies || false);
@@ -116,12 +148,18 @@ export default function useDesiderataForm(periodeSaisie) {
 
   const reset = useCallback(() => hydrate(null, false), [hydrate]);
 
+  // Valide les préférences avant envoi ; renvoie le message d'erreur ou null.
+  const validerPreferences = useCallback(() => {
+    setTentativeEnvoi(true);
+    return erreurPreferences({ nombreGardesSouhaitees, nombreGardesMaxParSemaine });
+  }, [nombreGardesSouhaitees, nombreGardesMaxParSemaine]);
+
   const buildPayload = useCallback(
     () => ({
       startDate: periodeSaisie?.startDate,
       endDate: periodeSaisie?.endDate,
       desiderata,
-      nombreGardesSouhaitees,
+      nombreGardesSouhaitees: Number(nombreGardesSouhaitees),
       nombreGardesMaxParSemaine,
       gardesGroupees,
       renfortsAssocies,
@@ -137,6 +175,8 @@ export default function useDesiderataForm(periodeSaisie) {
   return {
     desiderata,
     preferences: { nombreGardesSouhaitees, nombreGardesMaxParSemaine, gardesGroupees, renfortsAssocies },
+    tentativeEnvoi,
+    validerPreferences,
     isDirty,
     setIsDirty,
     filledCount,
