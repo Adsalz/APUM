@@ -9,8 +9,9 @@ import { estJourFerie } from './joursFeries';
 
 // ORDRE CANONIQUE (demande admin, aligné sur la fiche desiderata papier) : le
 // RENFORT 20h/00h vient APRÈS le 4ème quart. Cet ordre pilote l'affichage
-// (écran d'édition) et sert de départage stable dans la passe de remplissage —
-// aucune logique métier ne dépend de la position d'un créneau.
+// (écran d'édition) et sert de départage STABLE dans le moteur — au tirage, entre
+// deux places de même rareté et même date, comme au comblement. Aucune logique
+// métier ne dépend de la position d'un créneau.
 export const creneaux = [
   { id: 'QUART_1', label: '1er QUART (1h - 7h)', medecins: 2 },
   { id: 'QUART_2', label: '2ème QUART (7h - 13h)', medecins: 3 },
@@ -163,8 +164,10 @@ export const buildDesiderataMap = (desiderataData) => {
     if (!desiderata[d.userId]) {
       desiderata[d.userId] = {
         preferences: {},
-        nombreGardesSouhaitees: d.nombreGardesSouhaitees,
-        nombreGardesMaxParSemaine: d.nombreGardesMaxParSemaine || 7,
+        // Normalisés une fois pour toutes : entier ≥ 0 (une chaîne « 0 », une
+        // fraction ou une valeur absente ne doivent jamais changer le comportement).
+        nombreGardesSouhaitees: Math.max(0, Math.floor(Number(d.nombreGardesSouhaitees) || 0)),
+        nombreGardesMaxParSemaine: Math.max(1, Math.floor(Number(d.nombreGardesMaxParSemaine) || 7)),
         gardesGroupees: d.gardesGroupees,
         renfortsAssocies: d.renfortsAssocies
       };
@@ -438,7 +441,7 @@ const remplirJourEnCouverture = (dateString, ordrePriorite, desiderata, planning
   // Quota mensuel STRICT (souhait 0 = flexible) + contraintes dures communes.
   const prefEligible = (id, cid) => {
     if (jour[cid].includes(id)) { return null; }                          // déjà dans ce créneau
-    const pref = desiderata[id].preferences[dateString]?.[cid];
+    const pref = desiderata[id].preferences?.[dateString]?.[cid];
     if (pref !== 'Oui' && pref !== 'Possible') { return null; }
     const souhait = desiderata[id].nombreGardesSouhaitees;
     if (souhait && gardesMois(id) >= souhait) { return null; }            // quota mensuel jamais dépassé
@@ -523,14 +526,17 @@ export const diviserPeriode = (debut, fin) => {
 // Un planning se relit donc la liste sous les yeux : untel a pris ses gardes, puis
 // untel, puis untel.
 //
-// Les réglages ci-dessous ont été LUS dans le planning ASO26 (août→octobre 2026) de
-// la coordinatrice, sur les 34 fiches authentiques (analyse du 27/08/2026) :
+// Les trois premiers réglages (Q1-Q3) ont été LUS dans le planning ASO26 (août→
+// octobre 2026) de la coordinatrice, sur les 34 fiches authentiques (analyse du
+// 27/08/2026). Les deux derniers sont des CHOIX d'implémentation, compatibles avec
+// ce planning mais non déduits de lui — et ils ne sont pas neutres sur le banc.
 export const TIRAGE = {
   // Q1 — Les « Possible » servent à BOUCHER, pas à compléter le quota au tour du
   // médecin : sur 197 gardes posées sur un « Possible », 96 l'ont été alors que le
   // médecin avait encore des « Oui » non pris, et elles tombent sur des places à
   // 0,75 volontaire « Oui » par poste (moyenne 1,20). Donc : tous les « Oui » de
-  // tout le monde d'abord, les « Possible » ensuite (toujours dans l'ordre de la liste).
+  // tout le monde d'abord — dans les DEUX tours —, les « Possible » ensuite (toujours
+  // dans l'ordre de la liste de chaque tour).
   possiblesApresTousLesOui: true,
   // Q2 — Un mois coupé par les deux tours (septembre) est servi AU PRORATA des jours
   // du tour : 51 % des gardes de septembre tombent du 1er au 15, 49 % du 16 au 30,
@@ -544,10 +550,14 @@ export const TIRAGE = {
   // couverture ET meilleure fidélité mesurées) ; 'rarete-declaree' compte les « Oui »
   // des fiches, tels qu'elle les voit ; 'calendrier' = les premiers jours du mois.
   choixDesJours: 'rarete-dynamique',
-  // Équité des nuits (1h-7h) : UNE seule par mois pendant le tirage ; les nuits
-  // restantes sont réparties par le comblement (chacun sa 1re avant qu'un autre en ait 2).
+  // Équité des nuits (1h-7h). Le « une par mois » est lu dans ASO26 (25 médecins sur
+  // 36 à exactement 3 nuits sur le trimestre) ; l'appliquer PENDANT le tirage — les
+  // nuits restantes étant réparties par le comblement, chacun sa 1re avant qu'un
+  // autre en ait 2 — est notre façon de l'obtenir.
   nuitsMaxParMoisPendantTirage: 1,
   // Les médecins sans souhait (0 = flexibles) tirent après ceux qui ont un quota.
+  // Choix d'implémentation (inobservable dans le planning manuel) : un flexible qui
+  // tirerait à son rang prendrait tout ce qu'il peut, avant des médecins à quota.
   flexiblesEnDernier: true,
 };
 
@@ -561,8 +571,10 @@ const listerJours = (debut, fin) => {
 const joursDansLeMois = (mois) => new Date(Date.UTC(Number(mois.slice(0, 4)), Number(mois.slice(5, 7)), 0)).getUTCDate();
 
 // Un tour : chaque médecin de `ordreIds`, à son rang, prend ses gardes voulues sur les
-// jours du tour. Renvoie le nombre de gardes posées.
-const tirerUnTour = (jours, ordreIds, desiderata, planning, gardesAttribuees, gardesParCreneau, options) => {
+// jours du tour, pour les préférences `prefs` (['Oui'], ['Possible'] ou les deux).
+// `periode` : { fin, joursParMois } — fin de la période entière et jours de chaque mois
+// dans la période (pour le prorata). Renvoie le nombre de gardes posées.
+const tirerUnTour = (jours, ordreIds, desiderata, planning, gardesAttribuees, gardesParCreneau, options, prefs, periode) => {
   if (!jours.length) { return 0; }
   const ids = []; const vus = new Set();
   for (const id of ordreIds || []) { if (id && desiderata[id] && !vus.has(id)) { vus.add(id); ids.push(id); } }
@@ -570,16 +582,21 @@ const tirerUnTour = (jours, ordreIds, desiderata, planning, gardesAttribuees, ga
   const ordonnes = options.flexiblesEnDernier ? [...ids.filter(aQuota), ...ids.filter((id) => !aQuota(id))] : ids;
 
   // Quota applicable à un mois pendant CE tour : entier si le mois se termine dans le
-  // tour, au prorata des jours du tour sinon (le reste sera servi au tour suivant).
+  // tour — « se termine » au sens de LA PÉRIODE, pas du mois civil, sinon le dernier
+  // tour d'une période finissant un 29 rendrait le reliquat au comblement — ; au
+  // prorata des jours du tour rapportés aux jours du mois dans la période sinon (le
+  // reste est servi au tour suivant).
   const joursTourParMois = {};
   jours.forEach((d) => { const m = d.slice(0, 7); joursTourParMois[m] = (joursTourParMois[m] || 0) + 1; });
   const dernierJour = jours[jours.length - 1];
   const quotaDuTour = (id, mois) => {
     const q = desiderata[id].nombreGardesSouhaitees;
     if (!q) { return 0; }
-    const finDuMois = `${mois}-${String(joursDansLeMois(mois)).padStart(2, '0')}`;
-    if (dernierJour >= finDuMois || !options.quotaAuProrataDuTour) { return q; }
-    return Math.ceil((q * joursTourParMois[mois]) / joursDansLeMois(mois));
+    if (!options.quotaAuProrataDuTour) { return q; }
+    const finCivile = `${mois}-${String(joursDansLeMois(mois)).padStart(2, '0')}`;
+    const finDansPeriode = periode.fin < finCivile ? periode.fin : finCivile;
+    if (dernierJour >= finDansPeriode) { return q; }
+    return Math.ceil((q * joursTourParMois[mois]) / (periode.joursParMois[mois] || joursTourParMois[mois]));
   };
   const gardesMois = (id, mois) => (gardesAttribuees[id]?.[mois] || 0);
 
@@ -594,9 +611,11 @@ const tirerUnTour = (jours, ordreIds, desiderata, planning, gardesAttribuees, ga
     return !contrainteDureBloque(id, d, cid, desiderata, planning);
   };
 
-  // Rareté d'une place = volontaires par place. 'rarete-declaree' : les « Oui » des
-  // fiches, par place ouverte (ce que la coordinatrice voit) ; 'rarete-dynamique' :
-  // les volontaires (Oui/Possible) qui ont ENCORE du quota, par place LIBRE.
+  // Rareté d'une place = volontaires par place, parmi les médecins DU TOUR (une fiche
+  // d'un médecin absent de la liste ne doit pas peser sur le planning des autres).
+  // 'rarete-declaree' : les « Oui » des fiches, par place ouverte (ce que la
+  // coordinatrice voit) ; 'rarete-dynamique' : les volontaires (Oui/Possible) qui ont
+  // ENCORE du quota, par place LIBRE.
   const cacheDeclaree = {};
   const rarete = (d, cid, dynamique) => {
     const cle = `${d}|${cid}`;
@@ -604,8 +623,9 @@ const tirerUnTour = (jours, ordreIds, desiderata, planning, gardesAttribuees, ga
     const arr = planning[d][cid];
     const places = dynamique ? arr.filter((m) => m === null).length : arr.length;
     let volontaires = 0;
-    for (const [autre, fiche] of Object.entries(desiderata)) {
-      const p = fiche.preferences[d]?.[cid];
+    for (const autre of ids) {
+      const fiche = desiderata[autre];
+      const p = fiche.preferences?.[d]?.[cid];
       if (dynamique) {
         if ((p !== 'Oui' && p !== 'Possible') || arr.includes(autre)) { continue; }
         const q = fiche.nombreGardesSouhaitees;
@@ -623,7 +643,7 @@ const tirerUnTour = (jours, ordreIds, desiderata, planning, gardesAttribuees, ga
     const places = [];
     for (const d of jours) {
       for (const cid of cidsCanon) {
-        if (planning[d][cid] && desiderata[id].preferences[d]?.[cid] === pref) { places.push({ d, cid, r: 0 }); }
+        if (planning[d][cid] && desiderata[id].preferences?.[d]?.[cid] === pref) { places.push({ d, cid, r: 0 }); }
       }
     }
     if (options.choixDesJours !== 'calendrier') {
@@ -639,12 +659,7 @@ const tirerUnTour = (jours, ordreIds, desiderata, planning, gardesAttribuees, ga
   };
 
   let total = 0;
-  if (options.possiblesApresTousLesOui) {
-    for (const id of ordonnes) { total += donner(id, 'Oui'); }
-    for (const id of ordonnes) { total += donner(id, 'Possible'); }
-  } else {
-    for (const id of ordonnes) { total += donner(id, 'Oui'); total += donner(id, 'Possible'); }
-  }
+  for (const pref of prefs) { for (const id of ordonnes) { total += donner(id, pref); } }
   return total;
 };
 
@@ -672,9 +687,18 @@ export const computePriorite = (debut, fin, desiderata, listePriorite, options =
     creneaux.forEach((c) => { const effectif = effectifPour(c.id, d); if (effectif > 0) { planning[d][c.id] = Array(effectif).fill(null); } });
   });
 
-  // 1. TIRAGE : le premier de la liste prend ses gardes, puis le deuxième…
-  const parTirage = tirerUnTour(joursTour1, listePriorite.premierTourIds, desiderata, planning, gardesAttribuees, gardesParCreneau, options)
-    + tirerUnTour(joursTour2, listePriorite.deuxiemeTourIds, desiderata, planning, gardesAttribuees, gardesParCreneau, options);
+  const joursPeriodeParMois = {};
+  [...joursTour1, ...joursTour2].forEach((d) => { const m = d.slice(0, 7); joursPeriodeParMois[m] = (joursPeriodeParMois[m] || 0) + 1; });
+
+  // 1. TIRAGE : le premier de la liste prend ses gardes, puis le deuxième… Quand les
+  // « Possible » passent après TOUS les « Oui », c'est après ceux des DEUX tours : un
+  // « Possible » du 1er tour ne doit pas consommer le quota qu'un « Oui » du 2e attend.
+  const periode = { fin: periodes.deuxiemeTour.fin, joursParMois: joursPeriodeParMois };
+  const tour1 = (prefs) => tirerUnTour(joursTour1, listePriorite.premierTourIds, desiderata, planning, gardesAttribuees, gardesParCreneau, options, prefs, periode);
+  const tour2 = (prefs) => tirerUnTour(joursTour2, listePriorite.deuxiemeTourIds, desiderata, planning, gardesAttribuees, gardesParCreneau, options, prefs, periode);
+  const parTirage = options.possiblesApresTousLesOui
+    ? tour1(['Oui']) + tour2(['Oui']) + tour1(['Possible']) + tour2(['Possible'])
+    : tour1(['Oui', 'Possible']) + tour2(['Oui', 'Possible']);
 
   // 2. COMBLEMENT des places restées vides, jour par jour, avec la liste du tour du jour.
   joursTour1.forEach((d) => remplirJourEnCouverture(d, listePriorite.premierTourIds || [], desiderata, planning, gardesAttribuees, gardesParCreneau));
