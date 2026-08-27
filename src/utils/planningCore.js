@@ -549,6 +549,9 @@ export const TIRAGE = {
   // week-end). 'rarete-dynamique' tient compte des quotas déjà consommés (meilleure
   // couverture ET meilleure fidélité mesurées) ; 'rarete-declaree' compte les « Oui »
   // des fiches, tels qu'elle les voit ; 'calendrier' = les premiers jours du mois.
+  // À rareté égale, le départage est la date croissante : effet mesuré sur ASO26
+  // ≤ 5 points par tranche de mois (15 % des poses). Un départage « espacé » a été
+  // essayé et rejeté : −3 places, pire jour 42 → 33 %, calcul ×8.
   choixDesJours: 'rarete-dynamique',
   // Équité des nuits (1h-7h). Le « une par mois » est lu dans ASO26 (25 médecins sur
   // 36 à exactement 3 nuits sur le trimestre) ; l'appliquer PENDANT le tirage — les
