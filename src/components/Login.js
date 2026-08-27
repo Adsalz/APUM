@@ -4,7 +4,7 @@ import { useNavigate, Navigate } from 'react-router-dom';
 import { Calendar, ArrowLeft } from 'lucide-react';
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { auth } from '../firebase';
-import { loginUser, loginMedecin } from '../services/authService';
+import { loginUser, loginMedecin, logoutUser } from '../services/authService';
 import { getUser } from '../services/userService';
 import { getAnnuaire } from '../services/annuaireService';
 import { getPeriodeSaisie } from '../services/planningService';
@@ -33,9 +33,11 @@ function Login() {
   const { firebaseUser, role, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
-  // 'medecin' = liste déroulante + code à 6 chiffres (parcours par défaut)
-  // 'email'   = email + mot de passe (administrateurs ET repli si l'annuaire
-  //             est indisponible)
+  // 'medecin' = liste déroulante + code à 6 chiffres (parcours des médecins)
+  // 'email'   = email + mot de passe, RÉSERVÉ AUX ADMINISTRATEURS : un médecin
+  //             qui s'y authentifierait (son code EST son mot de passe) est
+  //             déconnecté et renvoyé vers la liste. Un médecin qui a oublié son
+  //             code passe par « Code oublié ? », pas par ici.
   const [mode, setMode] = useState('medecin');
 
   // Annuaire public (liste déroulante)
@@ -207,6 +209,18 @@ function Login() {
       if (!userCredential || !userCredential.user) {
         throw new Error('Échec de l\'authentification');
       }
+      // Verrou de rôle : l'authentification a réussi, mais ce parcours n'est pas
+      // le sien. On le déconnecte immédiatement plutôt que de le laisser dans
+      // une session ouverte par une porte qui ne lui est pas destinée.
+      if (userCredential.role !== 'admin') {
+        await logoutUser();
+        setError(
+          'Cet accès est réservé aux administrateurs. Revenez à la connexion médecin : '
+          + 'choisissez votre nom dans la liste, puis saisissez votre code.'
+        );
+        setIsLoading(false);
+        return;
+      }
       await finishLogin(userCredential.user.uid);
     } catch (err) {
       logger.error('Erreur de connexion (email):', err);
@@ -312,7 +326,7 @@ function Login() {
           <p className="mt-1 text-sm text-primary-100">
             {mode === 'medecin'
               ? 'Choisissez votre nom pour vous connecter'
-              : 'Connexion par email'}
+              : 'Espace administrateur'}
           </p>
         </div>
 
@@ -329,20 +343,16 @@ function Login() {
             {annuaireError ? (
               <Alert kind="error" className="mb-4">
                 Impossible de charger la liste des médecins.
-                <div className="mt-2 flex flex-wrap gap-2">
+                <div className="mt-2">
                   <Button type="button" size="sm" variant="secondary" onClick={loadAnnuaire}>
                     Réessayer
-                  </Button>
-                  <Button type="button" size="sm" variant="ghost" onClick={() => switchMode('email')}>
-                    Se connecter avec mon email
                   </Button>
                 </div>
               </Alert>
             ) : (
               !annuaireLoading && annuaire.length === 0 && (
                 <Alert kind="info" className="mb-4">
-                  Aucun médecin disponible pour le moment. Contactez votre administrateur,
-                  ou connectez-vous par email.
+                  Aucun médecin disponible pour le moment. Contactez votre administrateur.
                 </Alert>
               )
             )}
@@ -426,7 +436,7 @@ function Login() {
               onClick={() => switchMode('email')}
               className="mt-5 block w-full text-center text-xs text-ink-500 hover:text-ink-700 hover:underline"
             >
-              Administrateur ou dépannage&nbsp;? Connexion par email →
+              Vous êtes administrateur&nbsp;? Connexion par email →
             </button>
           </form>
         ) : (
