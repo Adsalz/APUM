@@ -45,10 +45,20 @@ function DesiderataTable({ dates, creneaux, desiderata, onChange }) {
   return (
     <Card className="overflow-hidden p-0">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-ink-100 px-5 py-4">
-        <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-ink-500">
-          <Sparkles size={15} className="text-primary-500" aria-hidden="true" />
-          Disponibilités par créneau
-        </h2>
+        <div>
+          <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-ink-500">
+            <Sparkles size={15} className="text-primary-500" aria-hidden="true" />
+            Disponibilités par créneau
+          </h2>
+          {/* Signalement du 30/08/2026 : sur téléphone, le menu déroulant natif
+              n'affiche que quelques lignes autour de la valeur courante — avec
+              une case vide on voit « — / Oui / Possible » et « Non » reste plus
+              bas, sans rien qui l'indique. D'où ce rappel. */}
+          <p className="mt-1 text-xs text-ink-500">
+            Trois réponses par créneau : <b>Oui</b>, <b>Possible</b>, <b>Non</b> — sur
+            téléphone, faites défiler la liste jusqu'en bas si « Non » n'apparaît pas.
+          </p>
+        </div>
         {/* Légende */}
         <div className="flex items-center gap-3 text-xs font-semibold">
           <span className="inline-flex items-center gap-1.5 text-success-700">
