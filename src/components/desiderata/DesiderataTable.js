@@ -4,19 +4,11 @@
 // courante et un callback de modification.
 import React from 'react';
 import { twMerge } from 'tailwind-merge';
-import { Sparkles, ChevronDown } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 import { Card } from '../ui';
 import { estJourFerie } from '../../utils/joursFeries';
 import { libelleMoisAnnee } from '../../utils/mois';
-import { CHOIX_DISPONIBILITE } from '../../constants/creneaux';
-
-// Habillage coloré du sélecteur de choix selon la valeur.
-const choiceStyles = {
-  Oui: 'border-success-300 bg-success-50 text-success-700 focus:ring-success-500/30',
-  Possible: 'border-warning-300 bg-warning-50 text-warning-700 focus:ring-warning-500/30',
-  Non: 'border-danger-300 bg-danger-50 text-danger-700 focus:ring-danger-500/30',
-  '': 'border-ink-200 bg-white text-ink-500 focus:ring-primary-500/25',
-};
+import ChoixDisponibilite from './ChoixDisponibilite';
 
 const stickyLeft = 'sticky left-0 z-10';
 
@@ -45,10 +37,16 @@ function DesiderataTable({ dates, creneaux, desiderata, onChange }) {
   return (
     <Card className="overflow-hidden p-0">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-ink-100 px-5 py-4">
-        <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-ink-500">
-          <Sparkles size={15} className="text-primary-500" aria-hidden="true" />
-          Disponibilités par créneau
-        </h2>
+        <div>
+          <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-ink-500">
+            <Sparkles size={15} className="text-primary-500" aria-hidden="true" />
+            Disponibilités par créneau
+          </h2>
+          <p className="mt-1 text-xs text-ink-500">
+            Trois choix par case : <b>Oui</b>, <b>Possible</b>, <b>Non</b>. Re-cliquez sur
+            le choix actif pour effacer la case.
+          </p>
+        </div>
         {/* Légende */}
         <div className="flex items-center gap-3 text-xs font-semibold">
           <span className="inline-flex items-center gap-1.5 text-success-700">
@@ -78,7 +76,7 @@ function DesiderataTable({ dates, creneaux, desiderata, onChange }) {
               {creneaux.map((creneau) => (
                 <th
                   key={creneau.id}
-                  className="sticky top-0 z-20 min-w-[150px] border-b border-l border-ink-100 bg-ink-50 px-4 py-3 text-left"
+                  className="sticky top-0 z-20 min-w-[190px] border-b border-l border-ink-100 bg-ink-50 px-4 py-3 text-left"
                 >
                   <div className="font-bold text-ink-800">{creneau.label}</div>
                   <div className="text-xs font-medium text-ink-500">{creneau.hours}</div>
@@ -144,29 +142,11 @@ function DesiderataTable({ dates, creneaux, desiderata, onChange }) {
                         className="border-b border-l border-ink-100 px-3 py-2"
                       >
                         {!disabled ? (
-                          <div className="relative">
-                            <select
-                              value={value}
-                              aria-label={`Disponibilité ${d.day} ${d.num} ${d.month} — ${creneau.label} ${creneau.hours}`}
-                              onChange={(e) => onChange(dateString, creneau.id, e.target.value)}
-                              className={twMerge(
-                                'w-full appearance-none rounded-lg border py-1.5 pl-2.5 pr-7 text-sm font-semibold shadow-sm transition-colors focus:outline-none focus:ring-2',
-                                choiceStyles[value] || choiceStyles['']
-                              )}
-                            >
-                              <option value="">—</option>
-                              {CHOIX_DISPONIBILITE.map((option) => (
-                                <option key={option} value={option}>
-                                  {option}
-                                </option>
-                              ))}
-                            </select>
-                            <ChevronDown
-                              size={14}
-                              aria-hidden="true"
-                              className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 opacity-60"
-                            />
-                          </div>
+                          <ChoixDisponibilite
+                            value={value}
+                            label={`Disponibilité ${d.day} ${d.num} ${d.month} — ${creneau.label} ${creneau.hours}`}
+                            onChange={(v) => onChange(dateString, creneau.id, v)}
+                          />
                         ) : (
                           <span className="block text-center text-xs text-ink-300">—</span>
                         )}

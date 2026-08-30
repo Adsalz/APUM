@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { twMerge } from 'tailwind-merge';
 import { CalendarRange, Copy, ChevronDown, CalendarDays } from 'lucide-react';
 import { Alert, Button } from './ui';
+import ChoixDisponibilite from './desiderata/ChoixDisponibilite';
 
 const jours = [
   { id: '1', label: 'Lundi' },
@@ -13,13 +14,6 @@ const jours = [
   { id: '6', label: 'Samedi' },
   { id: '0', label: 'Dimanche' }
 ];
-
-const choiceStyles = {
-  Oui: 'border-success-300 bg-success-50 text-success-700 focus:ring-success-500/30',
-  Possible: 'border-warning-300 bg-warning-50 text-warning-700 focus:ring-warning-500/30',
-  Non: 'border-danger-300 bg-danger-50 text-danger-700 focus:ring-danger-500/30',
-  '': 'border-ink-200 bg-white text-ink-400 focus:ring-primary-500/25'
-};
 
 function WeeklyPattern({ creneaux, onApplyPattern, periodeSaisie }) {
   const [startDate, setStartDate] = useState('');
@@ -75,7 +69,7 @@ function WeeklyPattern({ creneaux, onApplyPattern, periodeSaisie }) {
           </p>
 
           <div className="overflow-x-auto rounded-xl border border-ink-100">
-            <table className="w-full min-w-[640px] border-collapse text-sm">
+            <table className="w-full min-w-[1040px] border-collapse text-sm">
               <thead>
                 <tr>
                   <th className="border-b border-ink-100 bg-ink-50 px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wide text-ink-500">
@@ -99,23 +93,12 @@ function WeeklyPattern({ creneaux, onApplyPattern, periodeSaisie }) {
                       return (
                         <td key={creneau.id} className="border-b border-l border-ink-100 px-3 py-2">
                           {!disabled ? (
-                            <div className="relative">
-                              <select
-                                value={value}
-                                onChange={(e) => handlePatternChange(jour.id, creneau.id, e.target.value)}
-                                aria-label={`Disponibilité ${jour.label} — ${creneau.label}`}
-                                className={twMerge(
-                                  'w-full appearance-none rounded-lg border py-1.5 pl-2.5 pr-7 text-sm font-semibold shadow-sm transition-colors focus:outline-none focus:ring-2',
-                                  choiceStyles[value] || choiceStyles['']
-                                )}
-                              >
-                                <option value="">—</option>
-                                <option value="Oui">Oui</option>
-                                <option value="Possible">Possible</option>
-                                <option value="Non">Non</option>
-                              </select>
-                              <ChevronDown size={14} aria-hidden="true" className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 opacity-60" />
-                            </div>
+                            <ChoixDisponibilite
+                              value={value}
+                              label={`Disponibilité ${jour.label} — ${creneau.label}`}
+                              onChange={(v) => handlePatternChange(jour.id, creneau.id, v)}
+                              compact
+                            />
                           ) : (
                             <span className="block text-center text-xs text-ink-300">—</span>
                           )}
