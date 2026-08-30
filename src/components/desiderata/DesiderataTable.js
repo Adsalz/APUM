@@ -164,12 +164,18 @@ function DesiderataTable({ dates, creneaux, desiderata, onChange }) {
                                 choiceStyles[value] || choiceStyles['']
                               )}
                             >
-                              <option value="">—</option>
+                              {/* Les trois réponses D'ABORD, « — » (qui ne sert
+                                  qu'à effacer) en dernier : sur téléphone, le
+                                  sélecteur natif n'affiche que quelques lignes
+                                  autour de la valeur courante. Avec « — » en
+                                  tête, « Non » tombait hors cadre et passait
+                                  pour inexistant (signalement du 30/08/2026). */}
                               {CHOIX_DISPONIBILITE.map((option) => (
                                 <option key={option} value={option}>
                                   {option}
                                 </option>
                               ))}
+                              <option value="">—</option>
                             </select>
                             <ChevronDown
                               size={14}

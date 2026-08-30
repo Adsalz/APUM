@@ -109,10 +109,12 @@ function WeeklyPattern({ creneaux, onApplyPattern, periodeSaisie }) {
                                   choiceStyles[value] || choiceStyles['']
                                 )}
                               >
-                                <option value="">—</option>
+                                {/* Réponses d'abord, « — » (effacer) en dernier :
+                                    même raison que dans DesiderataTable. */}
                                 <option value="Oui">Oui</option>
                                 <option value="Possible">Possible</option>
                                 <option value="Non">Non</option>
+                                <option value="">—</option>
                               </select>
                               <ChevronDown size={14} aria-hidden="true" className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 opacity-60" />
                             </div>

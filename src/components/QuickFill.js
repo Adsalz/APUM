@@ -172,7 +172,10 @@ function QuickFill({ creneaux, onApply, periodeSaisie }) {
               onChange={(e) => { setValidationError(''); setSelectedDispo(e.target.value); }}
               className="sm:max-w-xs"
             >
-              <option value="">Sélectionnez une disponibilité</option>
+              {/* Le libellé nomme les trois réponses : ici l'invite doit rester
+                  en tête de liste, donc si le sélecteur du téléphone tronque
+                  l'affichage, cette première ligne annonce quand même « Non ». */}
+              <option value="">Choisissez : Oui, Possible ou Non</option>
               <option value="Oui">Oui</option>
               <option value="Possible">Possible</option>
               <option value="Non">Non</option>
