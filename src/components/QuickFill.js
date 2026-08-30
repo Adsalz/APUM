@@ -2,8 +2,7 @@
 import React, { useState } from 'react';
 import { twMerge } from 'tailwind-merge';
 import { Zap, ChevronDown, CalendarRange, Wand2 } from 'lucide-react';
-import { Alert, Button, Checkbox } from './ui';
-import ChoixDisponibilite from './desiderata/ChoixDisponibilite';
+import { Alert, Button, Checkbox, Select } from './ui';
 
 const jours = [
   { id: '1', label: 'Lundi' },
@@ -166,14 +165,18 @@ function QuickFill({ creneaux, onApply, periodeSaisie }) {
 
           {/* Disponibilité */}
           <div>
-            <span className="mb-1.5 block text-sm font-semibold text-ink-700">Disponibilité à appliquer</span>
-            <div className="sm:max-w-xs">
-              <ChoixDisponibilite
-                value={selectedDispo}
-                label="Disponibilité à appliquer"
-                onChange={(v) => { setValidationError(''); setSelectedDispo(v); }}
-              />
-            </div>
+            <label htmlFor="quickfill-dispo" className="mb-1.5 block text-sm font-semibold text-ink-700">Disponibilité à appliquer</label>
+            <Select
+              id="quickfill-dispo"
+              value={selectedDispo}
+              onChange={(e) => { setValidationError(''); setSelectedDispo(e.target.value); }}
+              className="sm:max-w-xs"
+            >
+              <option value="">Sélectionnez une disponibilité</option>
+              <option value="Oui">Oui</option>
+              <option value="Possible">Possible</option>
+              <option value="Non">Non</option>
+            </Select>
           </div>
 
           {validationError && <Alert kind="warning">{validationError}</Alert>}
