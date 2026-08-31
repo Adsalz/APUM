@@ -39,6 +39,7 @@ function DesiderataPreferences({ preferences, onChange, tentativeEnvoi = false }
           type="number"
           min="1"
           max="7"
+          required
           className="mb-0"
           value={nombreGardesMaxParSemaine}
           // Le champ doit pouvoir rester VIDE le temps de la frappe : avec
@@ -50,7 +51,7 @@ function DesiderataPreferences({ preferences, onChange, tentativeEnvoi = false }
             const n = parseInt(e.target.value, 10);
             onChange({ nombreGardesMaxParSemaine: Number.isNaN(n) ? '' : n });
           }}
-          hint="Entre 1 et 7."
+          hint="Obligatoire — entre 1 et 7."
           error={
             (nombreGardesMaxParSemaine !== '' || tentativeEnvoi)
               ? (erreurMaxParSemaine(nombreGardesMaxParSemaine) || '')

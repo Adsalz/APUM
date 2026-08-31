@@ -21,7 +21,16 @@ export const erreurGardesSouhaitees = (valeur) => {
   return null;
 };
 
+// « Maximum de gardes par semaine » est OBLIGATOIRE et vide au départ
+// (décision du 31/08/2026). Il valait 3 par défaut : le générateur appliquait
+// donc un plafond de 3 gardes/semaine à qui n'avait jamais touché le champ,
+// alors que ce champ n'est relu nulle part (absent de l'export Excel et des
+// écrans admin). Une fiche ne doit pas porter un chiffre que le médecin n'a
+// pas dit — même raison que pour les gardes souhaitées par mois.
 export const erreurMaxParSemaine = (valeur) => {
+  if (valeur === '' || valeur === null || valeur === undefined) {
+    return 'Indiquez le maximum de gardes par semaine.';
+  }
   const n = Number(valeur);
   if (!Number.isInteger(n) || n < 1 || n > 7) {
     return 'Le maximum de gardes par semaine doit être entre 1 et 7.';
@@ -39,7 +48,8 @@ export default function useDesiderataForm(periodeSaisie) {
   const [nombreGardesSouhaitees, setNombreGardesSouhaitees] = useState('');
   // Passe à true à la première tentative d'envoi : les champs vides s'affichent alors en erreur.
   const [tentativeEnvoi, setTentativeEnvoi] = useState(false);
-  const [nombreGardesMaxParSemaine, setNombreGardesMaxParSemaine] = useState(3);
+  // Vide tant que le médecin n'a rien saisi : le champ est obligatoire.
+  const [nombreGardesMaxParSemaine, setNombreGardesMaxParSemaine] = useState('');
   const [gardesGroupees, setGardesGroupees] = useState(false);
   const [renfortsAssocies, setRenfortsAssocies] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
@@ -140,7 +150,9 @@ export default function useDesiderataForm(periodeSaisie) {
     // Un 0 enregistré autrefois s'affiche vide : il faudra le renseigner pour réenregistrer.
     setNombreGardesSouhaitees(data?.nombreGardesSouhaitees || '');
     setTentativeEnvoi(false);
-    setNombreGardesMaxParSemaine(data?.nombreGardesMaxParSemaine || 3);
+    // Une fiche déjà enregistrée garde sa valeur ; une valeur absente ou 0 se
+    // présente vide, à renseigner pour pouvoir réenregistrer.
+    setNombreGardesMaxParSemaine(data?.nombreGardesMaxParSemaine || '');
     setGardesGroupees(data?.gardesGroupees || false);
     setRenfortsAssocies(data?.renfortsAssocies || false);
     setIsDirty(markDirty);

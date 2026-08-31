@@ -29,8 +29,12 @@ describe('validation des préférences générales', () => {
   // Le champ peut rester vide le temps de la frappe (on efface « 1 » avant de
   // taper « 3 ») : c'est la validation qui doit refuser, pas la saisie qui doit
   // réinjecter une valeur — sinon le champ reste bloqué sur 1 (bug du 31/08/2026).
-  it('refuse un maximum hebdomadaire vide', () => {
-    expect(erreurMaxParSemaine('')).toMatch(/entre 1 et 7/);
+  // Il est aussi vide au départ et obligatoire, d'où un message dédié : le
+  // défaut à 3 imposait un plafond que le médecin n'avait pas demandé.
+  it('exige un maximum hebdomadaire renseigné', () => {
+    expect(erreurMaxParSemaine('')).toMatch(/Indiquez/);
+    expect(erreurMaxParSemaine(undefined)).toMatch(/Indiquez/);
+    expect(erreurMaxParSemaine(null)).toMatch(/Indiquez/);
     expect(erreurMaxParSemaine('4')).toBeNull();
   });
 
