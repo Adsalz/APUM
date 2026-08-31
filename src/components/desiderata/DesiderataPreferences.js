@@ -1,7 +1,7 @@
 // src/components/desiderata/DesiderataPreferences.js
 // Carte « Préférences générales » partagée par les deux écrans de saisie.
 import React from 'react';
-import { erreurGardesSouhaitees } from './useDesiderataForm';
+import { erreurGardesSouhaitees, erreurMaxParSemaine } from './useDesiderataForm';
 import { Card, FormField, Checkbox } from '../ui';
 
 function DesiderataPreferences({ preferences, onChange, tentativeEnvoi = false }) {
@@ -41,7 +41,21 @@ function DesiderataPreferences({ preferences, onChange, tentativeEnvoi = false }
           max="7"
           className="mb-0"
           value={nombreGardesMaxParSemaine}
-          onChange={(e) => onChange({ nombreGardesMaxParSemaine: parseInt(e.target.value, 10) || 1 })}
+          // Le champ doit pouvoir rester VIDE le temps de la frappe : avec
+          // l'ancien « parseInt(...) || 1 », effacer le chiffre pour en saisir
+          // un autre réinjectait aussitôt 1, et le champ restait bloqué sur 1
+          // (signalement du 31/08/2026). La valeur est validée à l'envoi par
+          // erreurMaxParSemaine, comme les gardes souhaitées par mois.
+          onChange={(e) => {
+            const n = parseInt(e.target.value, 10);
+            onChange({ nombreGardesMaxParSemaine: Number.isNaN(n) ? '' : n });
+          }}
+          hint="Entre 1 et 7."
+          error={
+            (nombreGardesMaxParSemaine !== '' || tentativeEnvoi)
+              ? (erreurMaxParSemaine(nombreGardesMaxParSemaine) || '')
+              : ''
+          }
         />
         <Checkbox
           checked={gardesGroupees}

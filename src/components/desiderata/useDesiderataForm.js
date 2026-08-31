@@ -160,7 +160,9 @@ export default function useDesiderataForm(periodeSaisie) {
       endDate: periodeSaisie?.endDate,
       desiderata,
       nombreGardesSouhaitees: Number(nombreGardesSouhaitees),
-      nombreGardesMaxParSemaine,
+      // Le champ peut être vide pendant la frappe ; l'envoi est bloqué en amont
+      // par validerPreferences, ce Number() n'est qu'un garde-fou de type.
+      nombreGardesMaxParSemaine: Number(nombreGardesMaxParSemaine),
       gardesGroupees,
       renfortsAssocies,
     }),
