@@ -4,9 +4,12 @@
 //
 //   1. écrit la PÉRIODE DE SAISIE (planning/periode_saisie) — sans supprimer
 //      aucun desiderata, comme basculer-periode-saisie.js ;
-//   2. EFFACE LE CODE DE TOUS LES MÉDECINS : chacun fixera le sien à sa
+//   2. ROUVRE la saisie des desiderata (config/saisie.fermee), que l'admin a
+//      close à la fin du trimestre précédent — changer les dates ne la rouvre
+//      pas, elle vit dans son propre document ;
+//   3. EFFACE LE CODE DE TOUS LES MÉDECINS : chacun fixera le sien à sa
 //      première connexion, et ce code vaudra pour tout le trimestre ;
-//   3. OUVRE la fenêtre d'inscription (config/inscription.open) — sans elle,
+//   4. OUVRE la fenêtre d'inscription (config/inscription.open) — sans elle,
 //      personne ne peut définir son code, donc personne ne peut se connecter.
 //
 // L'ordre compte : la fenêtre est ouverte EN DERNIER, quand tout le reste est
@@ -101,15 +104,18 @@ async function main() {
   const session = await creerSession({ projet: valeur('--projet', null) });
 
   const periode = await session.get('planning/periode_saisie');
+  const cloture = await session.get('config/saisie');
   const conf = await session.get('config/inscription');
   const medecins = (await session.lister('users')).filter((u) => u.role === 'medecin');
 
   const periodeActuelle = periode
     ? `${jourDe(periode.startDate)} → ${jourDe(periode.endDate)}`
     : '(aucune)';
+  const saisieFermee = Boolean(cloture && cloture.fermee === true);
 
   console.log(`\nProjet : ${session.projet}`);
   console.log(`Période de saisie actuelle : ${periodeActuelle}`);
+  console.log(`Saisie des desiderata : ${saisieFermee ? 'close' : 'ouverte'}`);
   console.log(`Fenêtre d'inscription : ${conf && conf.open === true ? 'ouverte' : 'fermée'}`);
   console.log(`Médecins en base : ${medecins.length}`);
 
@@ -130,8 +136,9 @@ async function main() {
       ? `   1. période de saisie : ${periodeActuelle} → ${debut} → ${fin} (aucun desiderata supprimé)`
       : `   1. période de saisie : INCHANGÉE (${periodeActuelle})`
   );
-  console.log(`   2. code effacé pour les ${medecins.length} médecins — chacun fixe le sien à sa première connexion, pour tout le trimestre`);
-  console.log('   3. fenêtre d\'inscription : ouverte');
+  console.log(`   2. saisie des desiderata : ${saisieFermee ? 'rouverte (elle était close)' : 'ouverte (déjà le cas)'}`);
+  console.log(`   3. code effacé pour les ${medecins.length} médecins — chacun fixe le sien à sa première connexion, pour tout le trimestre`);
+  console.log('   4. fenêtre d\'inscription : ouverte');
 
   // Sauvegarde de l'état d'AVANT — utile pour rétablir la période ou savoir qui
   // était en base. Les codes, eux, ne sont pas récupérables.
@@ -141,6 +148,7 @@ async function main() {
     periodeSaisie: periode
       ? { debut: jourDe(periode.startDate), fin: jourDe(periode.endDate) }
       : null,
+    saisieFermee,
     inscriptionOuverte: Boolean(conf && conf.open === true),
     medecins: medecins.map((m) => ({ id: m.id, email: m.email, nom: m.nom, prenom: m.prenom })),
   }, null, 1));
@@ -158,6 +166,11 @@ async function main() {
       endDate: new Date(`${fin}T00:00:00Z`),
     });
     console.log(`\n✓ Période de saisie : ${debut} → ${fin}`);
+  }
+
+  if (saisieFermee) {
+    await session.ecrire('config/saisie', { fermee: false });
+    console.log('✓ Saisie des desiderata rouverte.');
   }
 
   console.log('\n▶ Remise à zéro des codes…');

@@ -19,6 +19,14 @@ service cloud.firestore {
       return isSignedIn() && currentUser().role == 'medecin';
     }
 
+    // Saisie des desiderata close par l'admin (config/saisie.fermee). Document
+    // absent ou champ absent = saisie ouverte : c'était le fonctionnement
+    // d'avant la clôture, il reste celui par défaut.
+    function saisieFermee() {
+      return exists(/databases/$(database)/documents/config/saisie) &&
+        get(/databases/$(database)/documents/config/saisie).data.get('fermee', false) == true;
+    }
+
     // ---------- Utilisateurs ----------
     match /users/{userId} {
       // Lecture : soi-même, les admins, et les médecins (annuaire nécessaire à l'interface)
@@ -37,25 +45,29 @@ service cloud.firestore {
     // ---------- Desiderata ----------
     // Un profil valide (médecin ou admin) est requis pour toute opération :
     // on exige (isMedecin() || isAdmin()) en plus des contrôles de propriété existants.
+    // Une fois la saisie close (saisieFermee()), le médecin ne peut plus que
+    // LIRE sa fiche ; l'admin garde la main pour reporter un changement accordé.
     match /desiderata/{desiderataId} {
       // Lecture : le propriétaire (médecin) ou un admin
       allow read: if (isMedecin() || isAdmin()) &&
         (resource.data.userId == request.auth.uid || isAdmin());
 
-      // Création : un médecin pour lui-même uniquement (ou un admin pour n'importe qui)
+      // Création : un médecin pour lui-même uniquement, saisie ouverte (ou un
+      // admin pour n'importe qui, à tout moment)
       allow create: if (isMedecin() || isAdmin()) &&
         request.resource.data.userId is string &&
-        (request.resource.data.userId == request.auth.uid || isAdmin());
+        (isAdmin() || (request.resource.data.userId == request.auth.uid && !saisieFermee()));
 
-      // Mise à jour : le propriétaire (médecin), sans pouvoir réattribuer le document
-      // à un autre médecin (userId immuable), ou un admin
+      // Mise à jour : le propriétaire (médecin), saisie ouverte, sans pouvoir
+      // réattribuer le document à un autre médecin (userId immuable), ou un admin
       allow update: if isAdmin() ||
         (isMedecin() && resource.data.userId == request.auth.uid &&
-         request.resource.data.userId == resource.data.userId);
+         request.resource.data.userId == resource.data.userId &&
+         !saisieFermee());
 
-      // Suppression : le propriétaire (médecin) ou un admin
+      // Suppression : le propriétaire (médecin) saisie ouverte, ou un admin
       allow delete: if isAdmin() ||
-        (isMedecin() && resource.data.userId == request.auth.uid);
+        (isMedecin() && resource.data.userId == request.auth.uid && !saisieFermee());
     }
 
     // ---------- Planning ----------
@@ -103,6 +115,20 @@ service cloud.firestore {
       allow write: if isAdmin() &&
         request.resource.data.keys().hasOnly(['open']) &&
         request.resource.data.open is bool;
+    }
+
+    // ---------- Config publique : clôture de la saisie des desiderata ----------
+    // config/saisie porte `fermee` (booléen) et, quand la saisie est close,
+    // `fermeeLe` (horodatage serveur). Lu par saisieFermee() ci-dessus pour
+    // refuser toute écriture de desiderata par un médecin. Lecture PUBLIQUE,
+    // comme planning/periode_saisie qu'il accompagne : la page de connexion
+    // l'affiche avant authentification. Écriture admin uniquement.
+    match /config/saisie {
+      allow read: if true;
+      allow write: if isAdmin() &&
+        request.resource.data.keys().hasOnly(['fermee', 'fermeeLe']) &&
+        request.resource.data.fermee is bool &&
+        (!('fermeeLe' in request.resource.data) || request.resource.data.fermeeLe is timestamp);
     }
 
     // ---------- Annuaire public (liste de connexion des médecins) ----------

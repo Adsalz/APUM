@@ -11,8 +11,9 @@ let cbCounter = 0;
  * @param {boolean} checked
  * @param {(checked:boolean)=>void} onChange
  * @param {string} label
+ * @param {boolean} [disabled] coche figée (lecture seule)
  */
-function Checkbox({ checked, onChange, label, description, className = '', id: providedId }) {
+function Checkbox({ checked, onChange, label, description, className = '', id: providedId, disabled = false }) {
   const idRef = useRef(null);
   if (idRef.current === null) {
     cbCounter += 1;
@@ -24,7 +25,8 @@ function Checkbox({ checked, onChange, label, description, className = '', id: p
     <label
       htmlFor={id}
       className={twMerge(
-        'group flex cursor-pointer items-start gap-3 rounded-lg p-1 -m-1',
+        'group flex items-start gap-3 rounded-lg p-1 -m-1',
+        disabled ? 'cursor-default' : 'cursor-pointer',
         className
       )}
     >
@@ -33,13 +35,15 @@ function Checkbox({ checked, onChange, label, description, className = '', id: p
           id={id}
           type="checkbox"
           checked={checked}
+          disabled={disabled}
           onChange={(e) => onChange(e.target.checked)}
           className="peer sr-only"
         />
         <span
           className={twMerge(
             'flex h-5 w-5 items-center justify-center rounded-md border transition-all',
-            'border-ink-300 bg-white group-hover:border-primary-400',
+            'border-ink-300 bg-white',
+            !disabled && 'group-hover:border-primary-400',
             'peer-checked:border-primary-600 peer-checked:bg-primary-600',
             'peer-focus-visible:ring-2 peer-focus-visible:ring-primary-500/30'
           )}

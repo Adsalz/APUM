@@ -80,7 +80,7 @@ src/
 | Collection | Contenu | Accès |
 |---|---|---|
 | `users` | Profils (`nom`, `prenom`, `email`, `role`: admin \| medecin) | lecture : authentifiés · écriture : admin (le rôle n'est **pas** modifiable par son propriétaire) |
-| `desiderata` | Souhaits par médecin (`userId`, période, créneaux…) | propriétaire + admin (`userId` immuable) |
+| `desiderata` | Souhaits par médecin (`userId`, période, créneaux…) | propriétaire + admin (`userId` immuable) ; le propriétaire ne fait plus que lire une fois la saisie close (`config/saisie`) |
 | `planning` | Plannings générés/publiés + doc `periode_saisie` | lecture : authentifiés · écriture : admin |
 | `email_queue` | File d'envoi des emails (extension Trigger Email) | admin |
 
@@ -97,8 +97,10 @@ src/
 1. L'admin définit une **période de saisie**
 2. Les médecins saisissent leurs **desiderata**
 3. L'admin suit l'avancement et envoie des **relances**
-4. L'admin **génère** le planning (algorithme standard ou par priorité)
-5. L'admin ajuste puis **publie** le planning
+4. L'admin **clôt la saisie** : les médecins ne peuvent plus modifier leurs
+   desiderata (l'admin, si)
+5. L'admin **génère** le planning (algorithme standard ou par priorité)
+6. L'admin ajuste puis **publie** le planning
 
 ## Qualité
 

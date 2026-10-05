@@ -95,6 +95,13 @@ function DashboardAdmin() {
                   ).toLocaleDateString('fr-FR')}`
                 : 'Aucune période définie'}
             </p>
+            {periodeSaisie && (
+              <p className={`mt-1 text-xs font-semibold ${periodeSaisie.saisieFermee ? 'text-warning-700' : 'text-ink-500'}`}>
+                {periodeSaisie.saisieFermee
+                  ? 'Saisie close : les médecins ne peuvent plus modifier'
+                  : 'Saisie ouverte aux médecins'}
+              </p>
+            )}
           </StatCard>
 
           <StatCard tone="orange" icon={<Calendar size={22} />} label="Planning">
@@ -127,7 +134,7 @@ function DashboardAdmin() {
               tone="green"
               icon={<ClipboardList size={24} />}
               title="Période de saisie"
-              description="Définir la période de saisie des desiderata"
+              description="Dates du trimestre, clôture de la saisie des desiderata"
               onClick={() => navigate('/gestion-periode-saisie')}
             />
             <ActionCard

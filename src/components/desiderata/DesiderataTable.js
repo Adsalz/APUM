@@ -1,7 +1,8 @@
 // src/components/desiderata/DesiderataTable.js
 // Grille de saisie des disponibilités (dates × créneaux) partagée par les deux
 // écrans. Composant présentiel : reçoit les dates, les créneaux, la valeur
-// courante et un callback de modification.
+// courante et un callback de modification. En `lectureSeule` (saisie close),
+// chaque case affiche la réponse dans la même couleur, sans menu déroulant.
 import React from 'react';
 import { twMerge } from 'tailwind-merge';
 import { Sparkles, ChevronDown } from 'lucide-react';
@@ -36,7 +37,7 @@ function formatDate(date) {
   };
 }
 
-function DesiderataTable({ dates, creneaux, desiderata, onChange }) {
+function DesiderataTable({ dates, creneaux, desiderata, onChange, lectureSeule = false }) {
   // Bandeaux de séparation entre les mois, uniquement si la période de saisie
   // en couvre plusieurs (demande admin).
   const moisKeys = dates.map((date) => date.toISOString().slice(0, 7));
@@ -54,10 +55,12 @@ function DesiderataTable({ dates, creneaux, desiderata, onChange }) {
               n'affiche que quelques lignes autour de la valeur courante — avec
               une case vide on voit « — / Oui / Possible » et « Non » reste plus
               bas, sans rien qui l'indique. D'où ce rappel. */}
-          <p className="mt-1 text-xs text-ink-500">
-            Trois réponses par créneau : <b>Oui</b>, <b>Possible</b>, <b>Non</b> — sur
-            téléphone, faites défiler la liste jusqu'en bas si « Non » n'apparaît pas.
-          </p>
+          {!lectureSeule && (
+            <p className="mt-1 text-xs text-ink-500">
+              Trois réponses par créneau : <b>Oui</b>, <b>Possible</b>, <b>Non</b> — sur
+              téléphone, faites défiler la liste jusqu'en bas si « Non » n'apparaît pas.
+            </p>
+          )}
         </div>
         {/* Légende */}
         <div className="flex items-center gap-3 text-xs font-semibold">
@@ -153,7 +156,16 @@ function DesiderataTable({ dates, creneaux, desiderata, onChange }) {
                         key={`${dateString}-${creneau.id}`}
                         className="border-b border-l border-ink-100 px-3 py-2"
                       >
-                        {!disabled ? (
+                        {!disabled && lectureSeule ? (
+                          <span
+                            className={twMerge(
+                              'block rounded-lg border py-1.5 pl-2.5 pr-7 text-sm font-semibold',
+                              choiceStyles[value] || choiceStyles['']
+                            )}
+                          >
+                            {value || '—'}
+                          </span>
+                        ) : !disabled ? (
                           <div className="relative">
                             <select
                               value={value}

@@ -7,11 +7,14 @@
 //
 //   - trimestre à venir dont le planning n'est pas publié → saisie des desiderata
 //   - dès qu'un planning est publié                       → consultation du planning
+//   - saisie close par l'admin                            → planning publié s'il
+//     y en a un, sinon la fiche (en lecture seule)
 //
 // `periode` est le document planning/periode_saisie : ses bornes sont celles du
 // TRIMESTRE À PLANIFIER, et non d'une fenêtre de saisie (l'admin n'en définit
 // pas). Tant que ce trimestre n'a pas commencé, on est donc en phase de recueil
-// — même convention que le bandeau de la page de connexion.
+// — même convention que le bandeau de la page de connexion. L'admin peut en
+// revanche CLORE la saisie (`periode.saisieFermee`, cf. getPeriodeSaisie).
 
 export const ROUTE_DESIDERATA = '/formulaire-desirata';
 export const ROUTE_PLANNING = '/planning-visualisation';
@@ -34,14 +37,20 @@ export const planningCouvrePeriode = (periode, planning) => {
   return debutPlanning <= finPeriode && finPlanning >= debutPeriode;
 };
 
-// « On est en période de saisie » : le trimestre à planifier n'a pas commencé
-// ET son planning n'est pas encore sorti. La publication ferme la saisie : une
-// fois les gardes attribuées, ressaisir ses desiderata n'a plus d'effet.
-export const saisieOuverte = (periode, planning, now = new Date()) => {
+// « On est en phase de recueil » : le trimestre à planifier n'a pas commencé
+// ET son planning n'est pas encore sorti. La publication y met fin : une fois
+// les gardes attribuées, ressaisir ses desiderata n'a plus d'effet.
+export const recueilEnCours = (periode, planning, now = new Date()) => {
   const debut = toDate(periode?.startDate);
   if (!debut || now >= debut) { return false; }
   return !planningCouvrePeriode(periode, planning);
 };
+
+// « On est en période de saisie » : phase de recueil, et l'admin n'a pas clos
+// la saisie. Close, la fiche reste consultable mais n'est plus l'écran
+// d'actualité du médecin.
+export const saisieOuverte = (periode, planning, now = new Date()) =>
+  recueilEnCours(periode, planning, now) && !periode.saisieFermee;
 
 // Destination de la redirection à la connexion.
 export const accueilMedecin = (periode, planning, now = new Date()) => {

@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { twMerge } from 'tailwind-merge';
 import { getMedecins } from '../services/userService';
 import { getPublishedPlanning, getPeriodeSaisie } from '../services/planningService';
-import { ROUTE_DESIDERATA, saisieOuverte } from '../utils/accueilMedecin';
+import { ROUTE_DESIDERATA, recueilEnCours } from '../utils/accueilMedecin';
 import { Download, SlidersHorizontal, Eye, User, CalendarX, ClipboardList } from 'lucide-react';
 import {
   AppHeader,
@@ -184,10 +184,11 @@ function PlanningVisualisation() {
   // plusieurs (demande admin : « ligne de séparation entre les mois »).
   const multiMois = new Set(filteredDates.map(date => date.slice(0, 7))).size > 1;
 
-  // Le planning affiché est celui du trimestre en cours, mais la saisie du
-  // suivant est déjà ouverte : sans tableau de bord médecin, ce raccourci est
-  // le seul chemin vers le formulaire.
-  const saisieEnCours = role !== 'admin' && saisieOuverte(periodeSaisie, planning);
+  // Le planning affiché est celui du trimestre en cours, mais le recueil du
+  // suivant a commencé : sans tableau de bord médecin, ce raccourci est le seul
+  // chemin vers le formulaire. Il reste là après la clôture de la saisie, pour
+  // consulter sa fiche (alors en lecture seule).
+  const raccourciDesiderata = role !== 'admin' && recueilEnCours(periodeSaisie, planning);
 
   return (
     <div className="min-h-screen bg-ink-100">
@@ -195,13 +196,15 @@ function PlanningVisualisation() {
         backTo={role === 'admin' ? '/dashboard-admin' : undefined}
         actions={
           <>
-            {saisieEnCours && (
+            {raccourciDesiderata && (
               <Button
                 variant="secondary"
                 size="sm"
                 icon={<ClipboardList size={16} />}
                 onClick={() => navigate(ROUTE_DESIDERATA)}
-                title="Saisir mes desiderata pour le trimestre à venir"
+                title={periodeSaisie?.saisieFermee
+                  ? 'Consulter mes desiderata (saisie close)'
+                  : 'Saisir mes desiderata pour le trimestre à venir'}
               >
                 <span className="hidden sm:inline">Mes desiderata</span>
               </Button>

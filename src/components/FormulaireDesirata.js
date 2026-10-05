@@ -16,7 +16,7 @@ import logger from '../utils/logger';
 import { ROUTE_PLANNING } from '../utils/accueilMedecin';
 import { Save, Download, CalendarRange, CalendarDays } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { AppHeader, LoadingScreen, ErrorScreen, Button, Badge, useToast } from './ui';
+import { AppHeader, LoadingScreen, ErrorScreen, Alert, Button, Badge, useToast } from './ui';
 import QuickFill from './QuickFill';
 import WeeklyPattern from './WeeklyPattern';
 import useUnsavedChangesWarning from '../hooks/useUnsavedChangesWarning';
@@ -25,6 +25,16 @@ import { CRENEAUX as creneaux } from '../constants/creneaux';
 import useDesiderataForm from './desiderata/useDesiderataForm';
 import DesiderataPreferences from './desiderata/DesiderataPreferences';
 import DesiderataTable from './desiderata/DesiderataTable';
+
+// Fiche du médecin pour la période : celle dont les dates la chevauchent.
+const chargerFiche = async (userId, periode) => {
+  const userDesiderata = await getDesiderataByUser(userId);
+  return userDesiderata.find(
+    (d) =>
+      new Date(d.startDate) <= new Date(periode.endDate) &&
+      new Date(d.endDate) >= new Date(periode.startDate)
+  ) || null;
+};
 
 function FormulaireDesirata() {
   const [periodeSaisie, setPeriodeSaisie] = useState(null);
@@ -77,13 +87,8 @@ function FormulaireDesirata() {
         if (cancelled) { return; }
         if (periode) {
           setPeriodeSaisie(periode);
-          const userDesiderata = await getDesiderataByUser(profile.id);
+          const relevant = await chargerFiche(profile.id, periode);
           if (cancelled) { return; }
-          const relevant = userDesiderata.find(
-            (d) =>
-              new Date(d.startDate) <= new Date(periode.endDate) &&
-              new Date(d.endDate) >= new Date(periode.startDate)
-          );
           if (relevant) {
             setExistingDesiderataId(relevant.id);
             hydrate(relevant, false);
@@ -120,8 +125,32 @@ function FormulaireDesirata() {
     toast.info('Modèle hebdomadaire appliqué.');
   };
 
+  // Saisie close par l'admin : la fiche reste consultable, plus modifiable.
+  // Ce sont les règles Firestore qui refusent l'écriture ; l'écran l'annonce.
+  // Un admin qui passe par cet écran n'est pas concerné.
+  const lectureSeule = role !== 'admin' && Boolean(periodeSaisie?.saisieFermee);
+
+  // Après un refus d'écriture : si la saisie a été close entre-temps, recharge
+  // la fiche telle qu'elle est enregistrée et passe en lecture seule. Renvoie
+  // true dans ce cas, false si le refus a une autre cause.
+  const basculerSiSaisieClose = async () => {
+    try {
+      const periode = await getPeriodeSaisie();
+      if (!periode?.saisieFermee) { return false; }
+      const fiche = await chargerFiche(user.id, periode);
+      setExistingDesiderataId(fiche ? fiche.id : null);
+      hydrate(fiche, false);
+      setPeriodeSaisie(periode);
+      return true;
+    } catch (err) {
+      logger.error('Relecture de la fiche après refus impossible:', err);
+      return false;
+    }
+  };
+
   const handleSubmit = async (e) => {
     if (e) { e.preventDefault(); }
+    if (lectureSeule) { return; }
     const erreur = validerPreferences();
     if (erreur) { toast.error(erreur); return; }
     if (user && !isSaving) {
@@ -142,7 +171,16 @@ function FormulaireDesirata() {
         setIsDirty(false);
       } catch (err) {
         logger.error('Erreur lors de la soumission des desiderata:', err);
-        toast.error('Erreur lors de l\'enregistrement : ' + err.message);
+        // Saisie close pendant que le médecin remplissait sa fiche : plutôt
+        // qu'un « permission denied » incompréhensible, on montre sa fiche
+        // telle qu'enregistrée, en lecture seule, avec le bandeau qui l'explique.
+        if (err?.code === 'permission-denied' && await basculerSiSaisieClose()) {
+          toast.error(
+            'La saisie des desiderata vient d\'être close : vos dernières modifications n\'ont pas été enregistrées.'
+          );
+        } else {
+          toast.error('Erreur lors de l\'enregistrement : ' + err.message);
+        }
       } finally {
         setIsSaving(false);
       }
@@ -172,6 +210,11 @@ function FormulaireDesirata() {
   }
 
   const dates = generateDates();
+  const fermeeDepuis = periodeSaisie.saisieFermeeLe
+    ? ` depuis le ${new Date(periodeSaisie.saisieFermeeLe).toLocaleString('fr-FR', {
+      day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit',
+    })}`
+    : '';
 
   return (
     <div className="min-h-screen bg-ink-100">
@@ -200,15 +243,17 @@ function FormulaireDesirata() {
             >
               <span className="hidden sm:inline">Excel</span>
             </Button>
-            <Button
-              variant="success"
-              size="sm"
-              onClick={handleSubmit}
-              loading={isSaving}
-              icon={<Save size={16} />}
-            >
-              Enregistrer
-            </Button>
+            {!lectureSeule && (
+              <Button
+                variant="success"
+                size="sm"
+                onClick={handleSubmit}
+                loading={isSaving}
+                icon={<Save size={16} />}
+              >
+                Enregistrer
+              </Button>
+            )}
           </>
         }
       />
@@ -231,31 +276,54 @@ function FormulaireDesirata() {
           </div>
         </div>
 
-        <DesiderataPreferences preferences={preferences} onChange={setPreference} tentativeEnvoi={tentativeEnvoi} />
+        {lectureSeule && (
+          <Alert kind="warning" className="mb-6">
+            {existingDesiderataId
+              ? `La saisie des desiderata est close${fermeeDepuis} : vos réponses ci-dessous ne sont plus modifiables. Pour tout changement, contactez votre administrateur.`
+              : `La saisie des desiderata est close${fermeeDepuis} et vous n'avez pas transmis de desiderata pour cette période. Contactez votre administrateur.`}
+          </Alert>
+        )}
 
-        <div className="mb-6 grid gap-4">
-          <QuickFill creneaux={creneaux} onApply={onQuickFill} periodeSaisie={periodeSaisie} />
-          <WeeklyPattern creneaux={creneaux} onApplyPattern={onApplyPattern} periodeSaisie={periodeSaisie} />
-        </div>
+        {/* Close et sans fiche : rien à montrer, pas même une grille vide. */}
+        {(!lectureSeule || existingDesiderataId) && (
+          <>
+            <DesiderataPreferences
+              preferences={preferences}
+              onChange={setPreference}
+              tentativeEnvoi={tentativeEnvoi}
+              lectureSeule={lectureSeule}
+            />
 
-        <DesiderataTable
-          dates={dates}
-          creneaux={creneaux}
-          desiderata={desiderata}
-          onChange={handleDesiderataChange}
-        />
+            {!lectureSeule && (
+              <div className="mb-6 grid gap-4">
+                <QuickFill creneaux={creneaux} onApply={onQuickFill} periodeSaisie={periodeSaisie} />
+                <WeeklyPattern creneaux={creneaux} onApplyPattern={onApplyPattern} periodeSaisie={periodeSaisie} />
+              </div>
+            )}
 
-        <div className="mt-6 flex justify-end">
-          <Button
-            variant="success"
-            size="lg"
-            onClick={handleSubmit}
-            loading={isSaving}
-            icon={<Save size={18} />}
-          >
-            Enregistrer mes desiderata
-          </Button>
-        </div>
+            <DesiderataTable
+              dates={dates}
+              creneaux={creneaux}
+              desiderata={desiderata}
+              onChange={handleDesiderataChange}
+              lectureSeule={lectureSeule}
+            />
+
+            {!lectureSeule && (
+              <div className="mt-6 flex justify-end">
+                <Button
+                  variant="success"
+                  size="lg"
+                  onClick={handleSubmit}
+                  loading={isSaving}
+                  icon={<Save size={18} />}
+                >
+                  Enregistrer mes desiderata
+                </Button>
+              </div>
+            )}
+          </>
+        )}
       </main>
     </div>
   );

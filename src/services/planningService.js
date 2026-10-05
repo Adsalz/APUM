@@ -14,13 +14,16 @@ import {
   setDoc,
   Timestamp,
   writeBatch,
-  deleteField
+  deleteField,
+  serverTimestamp
 } from 'firebase/firestore';
 import logger from '../utils/logger';
 
 const DESIDERATA_COLLECTION = 'desiderata';
 const PLANNING_COLLECTION = 'planning';
 const PERIODE_SAISIE_DOC = 'periode_saisie';
+const CONFIG_COLLECTION = 'config';
+const CLOTURE_SAISIE_DOC = 'saisie';
 
 const convertToTimestamp = (dateString) => {
   if (dateString instanceof Timestamp) {
@@ -82,19 +85,50 @@ export const setPeriodeSaisie = async (startDate, endDate) => {
 // Faire le ménage est désormais un geste EXPLICITE, hors application :
 // scripts/supprimer-desiderata-periode.js (sauvegarde + confirmation).
 
+// La période est rendue avec l'état de sa saisie : `saisieFermee` (et
+// `saisieFermeeLe`, ISO) quand l'admin l'a close. La clôture vit dans son
+// propre document, config/saisie, et non dans periode_saisie : redéfinir les
+// dates — ce que font aussi les scripts, qui réécrivent periode_saisie en
+// entier — ne peut donc pas rouvrir la saisie par mégarde.
 export const getPeriodeSaisie = async () => {
   try {
-    const periodeDoc = await getDoc(doc(db, PLANNING_COLLECTION, PERIODE_SAISIE_DOC));
+    const [periodeDoc, clotureDoc] = await Promise.all([
+      getDoc(doc(db, PLANNING_COLLECTION, PERIODE_SAISIE_DOC)),
+      getDoc(doc(db, CONFIG_COLLECTION, CLOTURE_SAISIE_DOC)),
+    ]);
     if (periodeDoc.exists()) {
       const data = periodeDoc.data();
+      const cloture = clotureDoc.exists() ? clotureDoc.data() : {};
+      const saisieFermee = cloture.fermee === true;
       return {
         startDate: convertFromTimestamp(data.startDate),
-        endDate: convertFromTimestamp(data.endDate)
+        endDate: convertFromTimestamp(data.endDate),
+        saisieFermee,
+        saisieFermeeLe: saisieFermee && cloture.fermeeLe ? convertFromTimestamp(cloture.fermeeLe) : null
       };
     }
     return null;
   } catch (error) {
     logger.error('Erreur lors de la récupération de la période de saisie:', error);
+    throw error;
+  }
+};
+
+// Clôt (true) ou rouvre (false) la saisie des desiderata. Close, un médecin
+// ne peut plus créer, modifier ni supprimer sa fiche : ce sont les règles
+// Firestore qui le refusent (saisieFermee()), l'écran ne fait que l'annoncer.
+// L'admin garde la main pour reporter un changement accordé.
+// Demande de l'APUM (04/10/2026) : un médecin avait modifié ses desiderata
+// alors que les tableaux de garde étaient déjà faits.
+export const setSaisieFermee = async (fermee) => {
+  try {
+    await setDoc(
+      doc(db, CONFIG_COLLECTION, CLOTURE_SAISIE_DOC),
+      fermee ? { fermee: true, fermeeLe: serverTimestamp() } : { fermee: false }
+    );
+    logger.debug('Saisie des desiderata', fermee ? 'close' : 'rouverte');
+  } catch (error) {
+    logger.error('Erreur lors de la clôture/réouverture de la saisie:', error);
     throw error;
   }
 };

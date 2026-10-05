@@ -14,7 +14,7 @@ import {
 import { importDesiderataFromExcel } from '../services/excelImportService';
 import { nomFicheCorrespond } from '../utils/medecins';
 import logger from '../utils/logger';
-import { Calendar, Save, Upload, CalendarRange, Users } from 'lucide-react';
+import { Calendar, Save, Upload, CalendarRange, Users, Lock } from 'lucide-react';
 import QuickFill from './QuickFill';
 import WeeklyPattern from './WeeklyPattern';
 import {
@@ -419,6 +419,14 @@ function FormulaireDesiderataAdmin() {
               {new Date(periodeSaisie.startDate).toLocaleDateString('fr-FR')} –{' '}
               {new Date(periodeSaisie.endDate).toLocaleDateString('fr-FR')}
             </Badge>
+            {/* Close, la saisie l'est pour les médecins seulement : cet écran
+                reste le moyen de reporter un changement accordé. */}
+            {periodeSaisie.saisieFermee && (
+              <Badge tone="warning">
+                <Lock size={12} aria-hidden="true" />
+                Saisie close aux médecins
+              </Badge>
+            )}
             {selectedMedecin && (
               <>
                 <span>·</span>

@@ -1,6 +1,7 @@
 // Aiguillage du médecin à la connexion : un seul écran, jamais de choix à faire.
 import {
   accueilMedecin,
+  recueilEnCours,
   saisieOuverte,
   planningCouvrePeriode,
   ROUTE_DESIDERATA,
@@ -12,6 +13,8 @@ import {
 const PERIODE = { startDate: '2026-11-01', endDate: '2027-01-31' };
 const PLANNING_DU_TRIMESTRE = { startDate: '2026-11-01', endDate: '2027-01-31' };
 const PLANNING_PRECEDENT = { startDate: '2026-08-01', endDate: '2026-10-31' };
+// Saisie close par l'admin (config/saisie), telle que getPeriodeSaisie la rend.
+const PERIODE_CLOSE = { ...PERIODE, saisieFermee: true };
 
 const AVANT = new Date('2026-09-15');
 const PENDANT = new Date('2026-12-10');
@@ -36,6 +39,24 @@ describe('saisieOuverte', () => {
   it('reste fermée sans période exploitable', () => {
     expect(saisieOuverte(null, null, AVANT)).toBe(false);
     expect(saisieOuverte({ startDate: 'pas une date' }, null, AVANT)).toBe(false);
+  });
+
+  it('se referme dès que l’admin clôt la saisie', () => {
+    expect(saisieOuverte(PERIODE_CLOSE, null, AVANT)).toBe(false);
+    expect(saisieOuverte(PERIODE_CLOSE, PLANNING_PRECEDENT, AVANT)).toBe(false);
+  });
+});
+
+describe('recueilEnCours', () => {
+  // Sert au raccourci « Mes desiderata » : la fiche reste consultable après
+  // la clôture, tant que le trimestre est à venir.
+  it('ignore la clôture de la saisie', () => {
+    expect(recueilEnCours(PERIODE_CLOSE, null, AVANT)).toBe(true);
+  });
+
+  it('prend fin avec la publication ou le début du trimestre', () => {
+    expect(recueilEnCours(PERIODE_CLOSE, PLANNING_DU_TRIMESTRE, AVANT)).toBe(false);
+    expect(recueilEnCours(PERIODE_CLOSE, null, PENDANT)).toBe(false);
   });
 });
 
@@ -72,5 +93,13 @@ describe('accueilMedecin', () => {
   it('se replie sur le formulaire quand il n’y a rien à consulter', () => {
     expect(accueilMedecin(null, null, AVANT)).toBe(ROUTE_DESIDERATA);
     expect(accueilMedecin(PERIODE, null, PENDANT)).toBe(ROUTE_DESIDERATA);
+  });
+
+  it('saisie close : le planning en cours plutôt qu’une fiche figée', () => {
+    expect(accueilMedecin(PERIODE_CLOSE, PLANNING_PRECEDENT, AVANT)).toBe(ROUTE_PLANNING);
+  });
+
+  it('saisie close sans planning publié : la fiche, en lecture seule', () => {
+    expect(accueilMedecin(PERIODE_CLOSE, null, AVANT)).toBe(ROUTE_DESIDERATA);
   });
 });

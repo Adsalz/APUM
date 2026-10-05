@@ -1,10 +1,11 @@
 // src/components/desiderata/DesiderataPreferences.js
 // Carte « Préférences générales » partagée par les deux écrans de saisie.
+// En `lectureSeule` (saisie close), les valeurs restent lisibles mais figées.
 import React from 'react';
 import { erreurGardesSouhaitees, erreurMaxParSemaine } from './useDesiderataForm';
 import { Card, FormField, Checkbox } from '../ui';
 
-function DesiderataPreferences({ preferences, onChange, tentativeEnvoi = false }) {
+function DesiderataPreferences({ preferences, onChange, tentativeEnvoi = false, lectureSeule = false }) {
   const {
     nombreGardesSouhaitees,
     nombreGardesMaxParSemaine,
@@ -23,13 +24,14 @@ function DesiderataPreferences({ preferences, onChange, tentativeEnvoi = false }
           type="number"
           min="1"
           required
+          readOnly={lectureSeule}
           className="mb-0"
           value={nombreGardesSouhaitees}
           onChange={(e) => {
             const n = parseInt(e.target.value, 10);
             onChange({ nombreGardesSouhaitees: Number.isNaN(n) ? '' : n });
           }}
-          hint="Obligatoire — au moins 1."
+          hint={lectureSeule ? '' : 'Obligatoire — au moins 1.'}
           error={
             (nombreGardesSouhaitees !== '' || tentativeEnvoi) ? (erreurGardesSouhaitees(nombreGardesSouhaitees) || '') : ''
           }
@@ -40,6 +42,7 @@ function DesiderataPreferences({ preferences, onChange, tentativeEnvoi = false }
           min="1"
           max="7"
           required
+          readOnly={lectureSeule}
           className="mb-0"
           value={nombreGardesMaxParSemaine}
           // Le champ doit pouvoir rester VIDE le temps de la frappe : avec
@@ -51,7 +54,7 @@ function DesiderataPreferences({ preferences, onChange, tentativeEnvoi = false }
             const n = parseInt(e.target.value, 10);
             onChange({ nombreGardesMaxParSemaine: Number.isNaN(n) ? '' : n });
           }}
-          hint="Obligatoire — entre 1 et 7."
+          hint={lectureSeule ? '' : 'Obligatoire — entre 1 et 7.'}
           error={
             (nombreGardesMaxParSemaine !== '' || tentativeEnvoi)
               ? (erreurMaxParSemaine(nombreGardesMaxParSemaine) || '')
@@ -60,11 +63,13 @@ function DesiderataPreferences({ preferences, onChange, tentativeEnvoi = false }
         />
         <Checkbox
           checked={gardesGroupees}
+          disabled={lectureSeule}
           onChange={(v) => onChange({ gardesGroupees: v })}
           label="Gardes groupées dans un même week-end"
         />
         <Checkbox
           checked={renfortsAssocies}
+          disabled={lectureSeule}
           onChange={(v) => onChange({ renfortsAssocies: v })}
           label="Renforts associés à une garde"
         />

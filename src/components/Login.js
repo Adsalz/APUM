@@ -120,7 +120,9 @@ function Login() {
       d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
     return {
       kind: 'info',
-      text: `Desiderata pour la période du ${fmt(start)} au ${fmt(end)}.`,
+      text: periode.saisieFermee
+        ? `Saisie des desiderata close pour la période du ${fmt(start)} au ${fmt(end)}.`
+        : `Desiderata pour la période du ${fmt(start)} au ${fmt(end)}.`,
     };
   }, [periode]);
 
