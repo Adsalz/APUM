@@ -13,6 +13,7 @@ import {
 } from '../services/planningService';
 import { importDesiderataFromExcel } from '../services/excelImportService';
 import { nomFicheCorrespond } from '../utils/medecins';
+import { libelleModification } from '../utils/modificationDesiderata';
 import logger from '../utils/logger';
 import { Calendar, Save, Upload, CalendarRange, Users, Lock } from 'lucide-react';
 import QuickFill from './QuickFill';
@@ -44,6 +45,7 @@ function FormulaireDesiderataAdmin() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [existingDesiderataId, setExistingDesiderataId] = useState(null);
+  const [modificationExistante, setModificationExistante] = useState(null);
   const [isSaving, setIsSaving] = useState(false);
   const [pendingImport, setPendingImport] = useState(null);
   // Médecin vers lequel basculer, en attente de confirmation d'abandon.
@@ -113,6 +115,7 @@ function FormulaireDesiderataAdmin() {
       if (!selectedMedecinId || !periodeSaisie) {
         reset();
         setExistingDesiderataId(null);
+        setModificationExistante(null);
         return;
       }
       try {
@@ -125,9 +128,11 @@ function FormulaireDesiderataAdmin() {
         );
         if (relevant) {
           setExistingDesiderataId(relevant.id);
+          setModificationExistante(libelleModification(relevant));
           hydrate(relevant, false);
         } else {
           setExistingDesiderataId(null);
+          setModificationExistante(null);
           reset();
         }
       } catch (err) {
@@ -462,7 +467,9 @@ function FormulaireDesiderataAdmin() {
             <div className="mt-4 space-y-2">
               <Alert kind={existingDesiderataId ? 'success' : 'info'}>
                 {existingDesiderataId
-                  ? 'Ce médecin a déjà saisi des desiderata. Vous pouvez les modifier.'
+                  ? `Ce médecin a déjà saisi des desiderata${
+                    modificationExistante ? ` (dernière modification ${modificationExistante})` : ''
+                  }. Vous pouvez les modifier.`
                   : 'Aucun desiderata existant pour ce médecin.'}
               </Alert>
               <p className="text-xs text-ink-500">

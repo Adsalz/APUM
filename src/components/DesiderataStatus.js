@@ -2,6 +2,7 @@ import React from 'react';
 import { Check, X, AlertCircle } from 'lucide-react';
 import { twMerge } from 'tailwind-merge';
 import { Card, Badge } from './ui';
+import { libelleModification } from '../utils/modificationDesiderata';
 
 const DesiderataStatus = ({ medecins, desiderata }) => {
   const getStatusInfo = (medecinId) => {
@@ -38,6 +39,7 @@ const DesiderataStatus = ({ medecins, desiderata }) => {
     <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
       {medecins.map(medecin => {
         const { tone, text, Icon, iconClass } = getStatusInfo(medecin.id);
+        const modification = libelleModification(desiderata.find(d => d.userId === medecin.id));
 
         return (
           <Card key={medecin.id} className="flex items-center gap-4 p-4">
@@ -56,6 +58,9 @@ const DesiderataStatus = ({ medecins, desiderata }) => {
               <Badge tone={tone} dot className="mt-1.5">
                 {text}
               </Badge>
+              {modification && (
+                <div className="mt-1 text-xs text-ink-500">Modifiée {modification}</div>
+              )}
             </div>
           </Card>
         );

@@ -157,6 +157,22 @@ export const getDesiderataStatus = async () => {
   }
 };
 
+// Date de la dernière écriture d'une fiche, et son auteur : l'admin la voit
+// dans le suivi des desiderata (demande de l'APUM, 08/10/2026). `modifiePar`
+// distingue une fiche reportée par l'admin d'une saisie du médecin — après la
+// clôture, seul l'admin peut encore écrire. Horloge du serveur, pas du poste.
+// Les fiches d'avant cette date ont été datées après coup avec l'heure de
+// leur dernière écriture connue de Firestore (sans auteur).
+const horodatageModification = () => ({
+  modifieLe: serverTimestamp(),
+  modifiePar: auth.currentUser ? auth.currentUser.uid : null
+});
+
+const lireHorodatage = (data) => ({
+  modifieLe: data.modifieLe ? convertFromTimestamp(data.modifieLe) : null,
+  modifiePar: data.modifiePar || null
+});
+
 export const addDesiderata = async (userId, desiderata) => {
   try {
     const user = auth.currentUser;
@@ -172,7 +188,8 @@ export const addDesiderata = async (userId, desiderata) => {
       nombreGardesSouhaitees: desiderata.nombreGardesSouhaitees,
       nombreGardesMaxParSemaine: desiderata.nombreGardesMaxParSemaine,
       gardesGroupees: desiderata.gardesGroupees,
-      renfortsAssocies: desiderata.renfortsAssocies
+      renfortsAssocies: desiderata.renfortsAssocies,
+      ...horodatageModification()
     });
     return docRef.id;
   } catch (error) {
@@ -191,7 +208,8 @@ export const updateDesiderata = async (desiderataId, desiderata) => {
       nombreGardesSouhaitees: desiderata.nombreGardesSouhaitees,
       nombreGardesMaxParSemaine: desiderata.nombreGardesMaxParSemaine,
       gardesGroupees: desiderata.gardesGroupees,
-      renfortsAssocies: desiderata.renfortsAssocies
+      renfortsAssocies: desiderata.renfortsAssocies,
+      ...horodatageModification()
     });
     logger.debug('Desiderata mis à jour avec succès');
   } catch (error) {
@@ -214,7 +232,8 @@ export const getDesiderataByUser = async (userId) => {
         id: doc.id, 
         ...data,
         startDate: convertFromTimestamp(data.startDate),
-        endDate: convertFromTimestamp(data.endDate)
+        endDate: convertFromTimestamp(data.endDate),
+        ...lireHorodatage(data)
       };
     });
   } catch (error) {
@@ -250,7 +269,8 @@ export const getDesiderataForPeriod = async (debut, fin) => {
         nombreGardesSouhaitees: data.nombreGardesSouhaitees,
         nombreGardesMaxParSemaine: data.nombreGardesMaxParSemaine,
         gardesGroupees: data.gardesGroupees,
-        renfortsAssocies: data.renfortsAssocies
+        renfortsAssocies: data.renfortsAssocies,
+        ...lireHorodatage(data)
       };
     });
   } catch (error) {
