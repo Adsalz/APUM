@@ -46,16 +46,6 @@ const desiderataUniforme = (ids, debut, fin, choix, opts = {}) => {
   return desiderata;
 };
 
-// Récupère l'ensemble des jours (YYYY-MM-DD) où un médecin a au moins une garde.
-const joursTravailles = (planning, medecinId) => {
-  const jours = new Set();
-  for (const date in planning) {
-    const present = Object.values(planning[date]).some((m) => m.includes(medecinId));
-    if (present) { jours.add(date); }
-  }
-  return jours;
-};
-
 const tousLesMedecinsAffectes = (planning) => {
   const ids = new Set();
   Object.values(planning).forEach((jour) =>
