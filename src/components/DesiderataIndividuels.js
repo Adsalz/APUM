@@ -286,7 +286,8 @@ function DesiderataIndividuels() {
                   <tbody>
                     {dates.map((date, index) => {
                       const dateKey = date.toISOString().split('T')[0];
-                      const jour = date.getDay();
+                      // UTC (comme generateDatesList) : indépendant du fuseau horaire du lecteur.
+                      const jour = date.getUTCDay();
                       const samedi = jour === 6;
                       const weekendOuFerie = jour === 0 || samedi || estJourFerie(dateKey);
                       const nouveauMois = index > 0 &&

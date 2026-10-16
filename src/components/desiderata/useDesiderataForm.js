@@ -54,17 +54,22 @@ export default function useDesiderataForm(periodeSaisie) {
   const [renfortsAssocies, setRenfortsAssocies] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
 
-  // Liste des jours de la période (heure fixée à midi pour éviter les décalages).
+  // Liste des jours de la période — calée en UTC de bout en bout (et non en heure
+  // locale) : periodeSaisie.startDate est un horodatage UTC (minuit), et le
+  // convertir en heure locale avant de fixer midi peut faire tomber la date sur
+  // la veille pour un médecin dont l'appareil n'est pas à l'heure de Paris (vu
+  // en prod le 10/09/2026 : toute la grille d'un médecin décalée d'un jour). En
+  // UTC, aucun fuseau ni changement d'heure ne peut plus faire dériver le jour.
   const generateDates = useCallback(() => {
     if (!periodeSaisie) { return []; }
     const dates = [];
     const currentDate = new Date(periodeSaisie.startDate);
-    currentDate.setHours(12, 0, 0, 0);
+    currentDate.setUTCHours(12, 0, 0, 0);
     const end = new Date(periodeSaisie.endDate);
-    end.setHours(12, 0, 0, 0);
+    end.setUTCHours(12, 0, 0, 0);
     while (currentDate <= end) {
       dates.push(new Date(currentDate));
-      currentDate.setDate(currentDate.getDate() + 1);
+      currentDate.setUTCDate(currentDate.getUTCDate() + 1);
     }
     return dates;
   }, [periodeSaisie]);
@@ -83,23 +88,23 @@ export default function useDesiderataForm(periodeSaisie) {
     ({ creneaux: selectedCreneaux, jours: selectedJours, disponibilite, startDate, endDate }) => {
       setIsDirty(true);
       const start = new Date(startDate);
-      start.setHours(12, 0, 0, 0);
+      start.setUTCHours(12, 0, 0, 0);
       const end = new Date(endDate);
-      end.setHours(12, 0, 0, 0);
+      end.setUTCHours(12, 0, 0, 0);
 
       setDesiderata((prev) => {
         const next = { ...prev };
         const dates = generateDates().filter((date) => {
-          date.setHours(12, 0, 0, 0);
+          date.setUTCHours(12, 0, 0, 0);
           return date >= start && date <= end;
         });
         dates.forEach((date) => {
-          const dayOfWeek = date.getDay().toString();
+          const dayOfWeek = date.getUTCDay().toString();
           if (selectedJours.includes(dayOfWeek)) {
             const dateString = date.toISOString().split('T')[0];
             if (!next[dateString]) { next[dateString] = {}; }
             selectedCreneaux.forEach((creneauId) => {
-              if (creneauId !== 'RENFORT_1' || date.getDay() === 6) {
+              if (creneauId !== 'RENFORT_1' || date.getUTCDay() === 6) {
                 next[dateString][creneauId] = disponibilite;
               }
             });
@@ -113,22 +118,22 @@ export default function useDesiderataForm(periodeSaisie) {
 
   const handleApplyPattern = useCallback((pattern, startDate, endDate) => {
     setIsDirty(true);
-    // Heure fixée à midi (comme generateDates) : neutralise le passage heure
-    // d'été↔hiver quand la date devient une clé 'YYYY-MM-DD' via toISOString.
+    // UTC de bout en bout (comme generateDates) : neutralise à la fois le
+    // passage heure d'été↔hiver et le fuseau horaire de l'appareil du médecin.
     const start = new Date(startDate);
-    start.setHours(12, 0, 0, 0);
+    start.setUTCHours(12, 0, 0, 0);
     const end = new Date(endDate);
-    end.setHours(12, 0, 0, 0);
+    end.setUTCHours(12, 0, 0, 0);
     setDesiderata((prev) => {
       const next = { ...prev };
       const currentDate = new Date(start);
       while (currentDate <= end) {
-        const dayOfWeek = currentDate.getDay().toString();
+        const dayOfWeek = currentDate.getUTCDay().toString();
         const dateString = currentDate.toISOString().split('T')[0];
         if (pattern[dayOfWeek]) {
           next[dateString] = { ...pattern[dayOfWeek] };
         }
-        currentDate.setDate(currentDate.getDate() + 1);
+        currentDate.setUTCDate(currentDate.getUTCDate() + 1);
       }
       return next;
     });

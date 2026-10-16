@@ -21,8 +21,11 @@ const choiceStyles = {
 
 const stickyLeft = 'sticky left-0 z-10';
 
+// Toujours en UTC : les dates viennent de generateDates() (useDesiderataForm),
+// calées en UTC pour rester indépendantes du fuseau horaire de l'appareil du
+// médecin — un getDay()/getDate()/getMonth() local romprait cette garantie.
 function isWeekendOrHoliday(date) {
-  const day = date.getDay();
+  const day = date.getUTCDay();
   const formattedDate = date.toISOString().split('T')[0];
   return day === 0 || day === 6 || estJourFerie(formattedDate);
 }
@@ -31,9 +34,9 @@ function formatDate(date) {
   const days = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
   const months = ['jan', 'fév', 'mar', 'avr', 'mai', 'juin', 'juil', 'août', 'sep', 'oct', 'nov', 'déc'];
   return {
-    day: days[date.getDay()],
-    num: date.getDate().toString().padStart(2, '0'),
-    month: months[date.getMonth()],
+    day: days[date.getUTCDay()],
+    num: date.getUTCDate().toString().padStart(2, '0'),
+    month: months[date.getUTCMonth()],
   };
 }
 
@@ -150,7 +153,7 @@ function DesiderataTable({ dates, creneaux, desiderata, onChange, lectureSeule =
                     // Le renfort 10h/13h n'existe que le SAMEDI, et jamais un jour
                     // férié (un samedi férié suit les effectifs d'un dimanche) →
                     // cohérent avec effectifPour côté génération.
-                    const disabled = creneau.samediOnly && (date.getDay() !== 6 || estJourFerie(dateString));
+                    const disabled = creneau.samediOnly && (date.getUTCDay() !== 6 || estJourFerie(dateString));
                     return (
                       <td
                         key={`${dateString}-${creneau.id}`}

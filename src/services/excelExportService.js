@@ -275,8 +275,8 @@ const createMedecinWorksheet = async (worksheet, medecin, desiderata, datesList)
   datesList.forEach((date) => {
     worksheet.getRow(currentRow).height = 32.1;
 
-    const nouveauMois = moisPrecedent !== null && date.getMonth() !== moisPrecedent;
-    moisPrecedent = date.getMonth();
+    const nouveauMois = moisPrecedent !== null && date.getUTCMonth() !== moisPrecedent;
+    moisPrecedent = date.getUTCMonth();
     const bordure = nouveauMois ? { ...THIN, top: { style: 'medium' } } : THIN;
 
     // Colonne A — date réelle, rouge gras, format long français
@@ -289,9 +289,10 @@ const createMedecinWorksheet = async (worksheet, medecin, desiderata, datesList)
 
     const dateKey = date.toISOString().split('T')[0];
     const dayData = desiderata?.desiderata?.[dateKey];
-    // Dates générées à MIDI local → getDay() rend le jour local correct.
-    const samedi = date.getDay() === 6;
-    const weekendOuFerie = date.getDay() === 0 || samedi || estJourFerie(dateKey);
+    // Dates générées en UTC (generateDatesList) → getUTCDay() reste correct quel
+    // que soit le fuseau horaire de la machine qui génère l'export.
+    const samedi = date.getUTCDay() === 6;
+    const weekendOuFerie = date.getUTCDay() === 0 || samedi || estJourFerie(dateKey);
 
     // Colonnes B→G — préférence par créneau (liste déroulante + couleur légende).
     // Fonds repris du modèle : lignes week-end/férié grisées, colonne RENFORT
@@ -374,19 +375,21 @@ export const generateDatesList = (periode) => {
     return dates;
   }
 
-  // Heure fixée à MIDI (local) : neutralise les décalages de fuseau et le passage
-  // heure d'été↔hiver quand la date est reformatée en clé 'YYYY-MM-DD' via
-  // toISOString (à midi, on ne peut jamais basculer sur le jour voisin).
+  // UTC de bout en bout (et non heure locale) : periode.startDate est un
+  // horodatage UTC — le convertir en heure locale avant de fixer midi peut
+  // faire tomber la date sur la veille si la machine qui exporte n'est pas à
+  // l'heure de Paris. En UTC, ni le fuseau ni un changement d'heure ne peuvent
+  // plus décaler la date.
   const startDate = new Date(periode.startDate);
-  startDate.setHours(12, 0, 0, 0);
+  startDate.setUTCHours(12, 0, 0, 0);
   const endDate = new Date(periode.endDate);
-  endDate.setHours(12, 0, 0, 0);
+  endDate.setUTCHours(12, 0, 0, 0);
 
   const currentDate = new Date(startDate);
 
   while (currentDate <= endDate) {
     dates.push(new Date(currentDate));
-    currentDate.setDate(currentDate.getDate() + 1);
+    currentDate.setUTCDate(currentDate.getUTCDate() + 1);
   }
 
   return dates;
