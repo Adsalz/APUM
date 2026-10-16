@@ -3,6 +3,7 @@ import { getMedecins } from '../services/userService';
 import { getDesiderataStatus, getPeriodeSaisie } from '../services/planningService';
 import { Search, Mail, Download, FileSpreadsheet } from 'lucide-react';
 import DesiderataStatus from './DesiderataStatus';
+import DesiderataGauge from './DesiderataGauge';
 import RelanceEmailModal from './RelanceEmailModal';
 import { getMedecinsSansDesiderata } from '../services/emailService';
 import { exportDesiderataToExcel, exportFicheViergeToExcel } from '../services/excelExportService';
@@ -190,6 +191,9 @@ function GestionDesiderata() {
             </Button>
           </div>
         </div>
+
+        {/* Synthèse : part des médecins ayant complété leurs desiderata */}
+        <DesiderataGauge medecins={medecins} desiderata={desiderataStatus || []} />
 
         {/* Filtres et recherche */}
         <Card className="mb-5 p-4">
