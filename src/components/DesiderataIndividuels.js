@@ -303,8 +303,9 @@ function DesiderataIndividuels() {
                           </td>
                           {FICHE_COLONNES.map((col) => {
                             // Renfort samedi : case NOIRE (condamnée) hors samedi,
-                            // fond orange foncé le samedi — comme la fiche.
-                            const condamnee = col.id === 'RENFORT_1' && !samedi;
+                            // fond orange foncé le samedi — comme la fiche. Un
+                            // samedi férié compte comme un dimanche : condamnée.
+                            const condamnee = col.id === 'RENFORT_1' && (!samedi || estJourFerie(dateKey));
                             const fond = condamnee
                               ? 'bg-black'
                               : col.id === 'RENFORT_1'

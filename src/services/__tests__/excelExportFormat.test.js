@@ -134,15 +134,18 @@ describe('export Excel du planning (feuille de garde)', () => {
     expect(argbDe(feuille.getCell('P7'))).toBe(PINK);
   });
 
-  it('garde les deux renforts roses d\'un férié tombant un samedi', async () => {
-    // 15/08/2026 est un samedi : les tableaux de l'APUM le présentent comme un
-    // samedi (renforts 10h/13h et 20H/00H roses).
-    await exportPlanningToExcel({ planning: { '2026-08-15': {} } }, []);
+  it('traite un samedi férié comme un dimanche : ni renfort 10h/13h, ni rose le soir', async () => {
+    // 15/08/2026 (samedi férié) face au samedi 22/08/2026 : décision de l'admin
+    // du 16/10/2026, un samedi férié compte comme un dimanche.
+    await exportPlanningToExcel({ planning: { '2026-08-15': {}, '2026-08-22': {} } }, []);
     const workbook = await lireClasseurCapture();
     const aout = workbook.getWorksheet('AOÛT');
-    expect(argbDe(aout.getCell('H3'))).toBe(PINK);
-    expect(argbDe(aout.getCell('P3'))).toBe(PINK);
+    expect(argbDe(aout.getCell('H3'))).toBeNull();
+    expect(argbDe(aout.getCell('P3'))).toBe(GRIS);
+    expect(argbDe(aout.getCell('G3'))).toBe(JAUNE_CLAIR);     // effectifs du dimanche
     expect(aout.getCell('A3').font?.color?.argb).toBe('FFFF0000');
+    expect(argbDe(aout.getCell('H4'))).toBe(PINK);            // samedi ordinaire
+    expect(argbDe(aout.getCell('P4'))).toBe(PINK);
   });
 
   it('écrit la date du BON jour (minuit UTC, pas de décalage de fuseau)', () => {
@@ -196,6 +199,24 @@ describe('export Excel des desiderata', () => {
     // Les cases condamnées n'offrent pas la liste déroulante, les autres si.
     expect(feuille.getCell('B11').dataValidation).toBeTruthy();
     expect(feuille.getCell('D11').dataValidation).toBeFalsy();
+  });
+
+  it('condamne le renfort samedi d\'un samedi férié, comme un dimanche', async () => {
+    // Ven 14/08 (l.11), sam 15/08 férié (l.12), dim 16/08 (l.13). Décision de
+    // l'admin du 16/10/2026 ; le formulaire de saisie bloque déjà cette case.
+    await exportDesiderataToExcel(
+      [{ id: 'm1', nom: 'Durand', prenom: 'Anne' }],
+      [{ userId: 'm1', desiderata: { '2026-08-15': { RENFORT_1: 'Oui', QUART_1: 'Oui' } } }],
+      { startDate: '2026-08-14', endDate: '2026-08-16' }
+    );
+    const workbook = await lireClasseurCapture();
+    const feuille = workbook.getWorksheet('Durand Anne');
+    expect(argbDe(feuille.getCell('D12'))).toBe('FF000000');
+    expect(feuille.getCell('D12').dataValidation).toBeFalsy();
+    expect(feuille.getCell('D12').value).toBeNull();
+    // Le reste de la ligne reste une ligne de week-end ordinaire.
+    expect(argbDe(feuille.getCell('B12'))).toBe('FFD0CECE');
+    expect(feuille.getCell('B12').value).toBe('Oui');
   });
 });
 

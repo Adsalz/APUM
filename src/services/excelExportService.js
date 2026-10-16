@@ -296,7 +296,10 @@ const createMedecinWorksheet = async (worksheet, medecin, desiderata, datesList)
     // Colonnes B→G — préférence par créneau (liste déroulante + couleur légende).
     // Fonds repris du modèle : lignes week-end/férié grisées, colonne RENFORT
     // SAMEDI orange foncé le samedi et NOIRE (condamnée, sans liste déroulante)
-    // les autres jours.
+    // les autres jours. Un samedi FÉRIÉ compte comme un dimanche (décision de
+    // l'admin, 16/10/2026) : renfort condamné, comme dans le formulaire de
+    // saisie — la fiche papier de la coordinatrice le laissait ouvert.
+    const renfortSamediOuvert = samedi && !estJourFerie(dateKey);
     DESID_COLONNES.forEach(({ col, creneauId }) => {
       const cell = worksheet.getCell(currentRow, col);
       cell.border = bordure;
@@ -312,7 +315,7 @@ const createMedecinWorksheet = async (worksheet, medecin, desiderata, datesList)
         color: couleur ? { argb: couleur } : undefined,
       };
 
-      if (creneauId === 'RENFORT_1' && !samedi) {
+      if (creneauId === 'RENFORT_1' && !renfortSamediOuvert) {
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: DESID_NOIR } };
         return;
       }
@@ -768,7 +771,6 @@ const buildMonthWorksheet = (worksheet, monthKey, dates, planningData, medecins)
   let rowIdx = 3;
   dates.forEach((dateKey) => {
     const dateObj = parseDateKey(dateKey);
-    const samedi = dateObj.getUTCDay() === 6; // minuit UTC → jour en UTC
     const ferie = estJourFerie(dateKey);
     const typeJour = typeDeJour(dateKey);
     const dayData = planningData[dateKey] || {};
@@ -795,17 +797,19 @@ const buildMonthWorksheet = (worksheet, monthKey, dates, planningData, medecins)
       // Couleurs des places, comme les tableaux de l'APUM : rose des renforts
       // (10h/13h le samedi, 20H/00H tous les jours), teinte du quart selon le
       // type de jour pour les autres.
-      // Un FÉRIÉ hors samedi grise la case du renfort 20H/00H comme le 4ème
-      // quart : ainsi sont présentés les 15 fériés de semaine ou de dimanche de
-      // tous les tableaux de 2025 à NDJ26, sans exception. Un férié qui tombe un
-      // samedi garde ses deux renforts roses, comme un samedi (01/11/2025,
-      // 15/08/2026).
-      const renfortSoirGris = colDef.creneauId === 'RENFORT_2' && ferie && !samedi;
-      const pink = (colDef.creneauId === 'RENFORT_2' && !renfortSoirGris)
-        || (colDef.creneauId === 'RENFORT_1' && samedi);
+      // Un FÉRIÉ grise la case du renfort 20H/00H comme le 4ème quart : ainsi
+      // sont présentés les 15 fériés de semaine ou de dimanche de tous les
+      // tableaux de 2025 à NDJ26, sans exception. Un samedi férié compte comme
+      // un dimanche (décision de l'admin, 16/10/2026) : pas de renfort 10h/13h
+      // (typeJour vaut alors 'dimanche'), renfort du soir gris comme tout férié.
+      // La coordinatrice les avait laissés roses (01/11/2025, 15/08/2026).
       let fillArgb = SLOT_FILLS[colDef.creneauId]?.[typeJour]?.[colDef.slot] || null;
-      if (pink) { fillArgb = RENFORT_PINK; }
-      if (renfortSoirGris) { fillArgb = PLANNING_FILLS.gris; }
+      if (colDef.creneauId === 'RENFORT_1' && typeJour === 'samedi') {
+        fillArgb = RENFORT_PINK;
+      }
+      if (colDef.creneauId === 'RENFORT_2') {
+        fillArgb = ferie ? PLANNING_FILLS.gris : RENFORT_PINK;
+      }
       if (fillArgb) {
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fillArgb } };
       }
