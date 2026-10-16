@@ -70,6 +70,7 @@ describe('export Excel du planning (feuille de garde)', () => {
         '2026-07-04': { RENFORT_1: ['m1'] },       // samedi
         '2026-07-05': {},                          // dimanche
         '2026-07-14': {},                          // férié en semaine (= dimanche)
+        '2026-07-15': {},                          // lendemain, jour ordinaire
       },
     };
     await exportPlanningToExcel(planning, [{ id: 'm1', nom: 'Durand', prenom: 'Anne' }]);
@@ -120,6 +121,28 @@ describe('export Excel du planning (feuille de garde)', () => {
     // 2026-07-14 (férié) = ligne 6 : suit les effectifs d'un dimanche, date en rouge
     expect(argbDe(feuille.getCell('G6'))).toBe(JAUNE_CLAIR);
     expect(feuille.getCell('A6').font?.color?.argb).toBe('FFFF0000');
+  });
+
+  it('grise le renfort 20h/00h d\'un férié comme le 4ème quart, pas le dimanche', () => {
+    // Présentation constante des tableaux de l'APUM : le férié (l.6) n'a pas de
+    // case rose le soir ; le dimanche (l.5), le samedi (l.4) et le lendemain du
+    // férié (l.7) gardent leur renfort rose.
+    expect(argbDe(feuille.getCell('P6'))).toBe(GRIS);
+    expect(argbDe(feuille.getCell('H6'))).toBeNull();
+    expect(argbDe(feuille.getCell('P5'))).toBe(PINK);
+    expect(argbDe(feuille.getCell('P4'))).toBe(PINK);
+    expect(argbDe(feuille.getCell('P7'))).toBe(PINK);
+  });
+
+  it('garde les deux renforts roses d\'un férié tombant un samedi', async () => {
+    // 15/08/2026 est un samedi : les tableaux de l'APUM le présentent comme un
+    // samedi (renforts 10h/13h et 20H/00H roses).
+    await exportPlanningToExcel({ planning: { '2026-08-15': {} } }, []);
+    const workbook = await lireClasseurCapture();
+    const aout = workbook.getWorksheet('AOÛT');
+    expect(argbDe(aout.getCell('H3'))).toBe(PINK);
+    expect(argbDe(aout.getCell('P3'))).toBe(PINK);
+    expect(aout.getCell('A3').font?.color?.argb).toBe('FFFF0000');
   });
 
   it('écrit la date du BON jour (minuit UTC, pas de décalage de fuseau)', () => {

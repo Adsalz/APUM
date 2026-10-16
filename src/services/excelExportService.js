@@ -792,14 +792,20 @@ const buildMonthWorksheet = (worksheet, monthKey, dates, planningData, medecins)
       cell.font = { name: 'Calibri', bold: true, size: 24 };
       cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
 
-      // Couleurs des places, comme la feuille de référence : rose des renforts
-      // (20H/00H tous les jours, 10h/13h les samedis, fériés compris), teinte du
-      // quart selon le type de jour pour les autres.
-      const pink = colDef.creneauId === 'RENFORT_2'
+      // Couleurs des places, comme les tableaux de l'APUM : rose des renforts
+      // (10h/13h le samedi, 20H/00H tous les jours), teinte du quart selon le
+      // type de jour pour les autres.
+      // Un FÉRIÉ hors samedi grise la case du renfort 20H/00H comme le 4ème
+      // quart : ainsi sont présentés les 15 fériés de semaine ou de dimanche de
+      // tous les tableaux de 2025 à NDJ26, sans exception. Un férié qui tombe un
+      // samedi garde ses deux renforts roses, comme un samedi (01/11/2025,
+      // 15/08/2026).
+      const renfortSoirGris = colDef.creneauId === 'RENFORT_2' && ferie && !samedi;
+      const pink = (colDef.creneauId === 'RENFORT_2' && !renfortSoirGris)
         || (colDef.creneauId === 'RENFORT_1' && samedi);
-      const fillArgb = pink
-        ? RENFORT_PINK
-        : SLOT_FILLS[colDef.creneauId]?.[typeJour]?.[colDef.slot] || null;
+      let fillArgb = SLOT_FILLS[colDef.creneauId]?.[typeJour]?.[colDef.slot] || null;
+      if (pink) { fillArgb = RENFORT_PINK; }
+      if (renfortSoirGris) { fillArgb = PLANNING_FILLS.gris; }
       if (fillArgb) {
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: fillArgb } };
       }
