@@ -1,7 +1,7 @@
 // src/components/GestionUtilisateurs.js
 import React, { useState, useEffect } from 'react';
 import { getAllUsers, createUser, deleteUser } from '../services/userService';
-import { registerUser } from '../services/authService';
+import { registerUser, registerCompteMedecin } from '../services/authService';
 import { syncAnnuaire } from '../services/annuaireService';
 import {
   getInscriptionOuverte,
@@ -141,21 +141,29 @@ function GestionUtilisateurs() {
         throw new Error('Vous n\'avez pas les permissions nécessaires pour ajouter un utilisateur.');
       }
 
-      // Créer l'utilisateur dans Firebase Auth
-      const userCredential = await registerUser(newUser.email);
+      // Créer le compte de connexion. Un MÉDECIN reçoit un alias opaque comme
+      // identifiant : il figurera dans l'annuaire public, où une adresse réelle
+      // serait lisible par n'importe qui. Un ADMIN garde la sienne — il n'est
+      // pas dans l'annuaire et a besoin de la réinitialisation par email.
+      const medecin = newUser.role === 'medecin';
+      const { uid, emailConnexion } = medecin
+        ? await registerCompteMedecin()
+        : await registerUser(newUser.email).then((c) => ({ uid: c.user.uid, emailConnexion: null }));
 
-      // Créer le document utilisateur dans Firestore
-      await createUser(userCredential.user.uid, {
+      // Créer le document utilisateur dans Firestore. `email` reste l'adresse
+      // réelle (pour écrire au médecin), `emailConnexion` est l'identifiant.
+      await createUser(uid, {
         nom: newUser.nom,
         prenom: newUser.prenom,
         email: newUser.email,
-        role: newUser.role
+        role: newUser.role,
+        ...(emailConnexion ? { emailConnexion } : {})
       });
 
       // Reconstruire l'annuaire public de connexion (labels recalculés pour
       // gérer les homonymes + réconciliation). Non bloquant : si la synchro
-      // échoue, l'utilisateur est créé et pourra se connecter via le repli
-      // email ; l'admin relancera « Synchroniser l'annuaire ».
+      // échoue, le compte existe mais n'apparaît pas encore dans la liste de
+      // connexion ; l'admin relancera « Synchroniser l'annuaire ».
       try {
         await syncAnnuaire();
       } catch (syncError) {

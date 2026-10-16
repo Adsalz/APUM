@@ -191,6 +191,12 @@ async function creerSession({ projet } = {}) {
       return (d.users && d.users[0]) ? d.users[0].localId : null;
     },
 
+    // Compte Auth par identifiant : renvoie { localId, email, ... } ou null.
+    async lireCompte(localId) {
+      const d = await postAuth('/accounts:lookup', { localId: [localId] });
+      return (d.users && d.users[0]) ? d.users[0] : null;
+    },
+
     async creerCompte(email, motDePasse) {
       const d = await postAuth('/accounts', { email, password: motDePasse });
       return d.localId;

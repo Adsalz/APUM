@@ -8,12 +8,17 @@
 // contenant le strict minimum : un `label` d'affichage minimisé (« Prénom N. »)
 // et l'`email` de connexion (résolu en coulisse pour signInWithEmailAndPassword).
 //
+// Cet `email` est un ALIAS opaque (voir utils/aliasConnexion), jamais l'adresse
+// réelle du médecin : la collection étant publique, y écrire une vraie adresse
+// revient à la publier sur Internet.
+//
 // Écriture réservée aux admins (règles Firestore). La source de vérité reste
 // `users` : cet annuaire en est une projection reconstructible à volonté via
 // syncAnnuaire().
 import { db } from '../firebase';
 import { collection, getDocs, writeBatch, doc } from 'firebase/firestore';
 import { getMedecins } from './userService';
+import { estAliasConnexion } from '../utils/aliasConnexion';
 import logger from '../utils/logger';
 
 const ANNUAIRE_COLLECTION = 'annuaire';
@@ -122,14 +127,19 @@ export const syncAnnuaire = async () => {
   const existingSnapshot = await getDocs(collection(db, ANNUAIRE_COLLECTION));
 
   const ops = [];
+  const sansAlias = [];
   medecins.forEach((m) => {
-    if (!m.email) {
-      // Un médecin sans email ne peut pas se connecter : on l'exclut de
-      // l'annuaire plutôt que d'écrire une entrée qui casserait le login.
-      logger.warn('Médecin sans email, exclu de l\'annuaire', { id: m.id });
+    // `emailConnexion` est l'alias opaque posé à la création du compte (ou par
+    // scripts/migrer-alias-connexion.js). En son absence, on EXCLUT le médecin
+    // plutôt que de publier son adresse réelle : l'annuaire est public, mieux
+    // vaut une liste incomplète — que l'admin voit et corrige — qu'une fuite.
+    const alias = m.emailConnexion;
+    if (!estAliasConnexion(alias)) {
+      logger.warn('Médecin sans alias de connexion, exclu de l\'annuaire', { id: m.id });
+      sansAlias.push(m.id);
       return;
     }
-    ops.push({ type: 'set', id: m.id, data: { label: labels[m.id], email: m.email } });
+    ops.push({ type: 'set', id: m.id, data: { label: labels[m.id], email: alias } });
   });
   existingSnapshot.forEach((d) => {
     if (!validIds.has(d.id)) {
@@ -150,6 +160,6 @@ export const syncAnnuaire = async () => {
 
   const synced = ops.filter((o) => o.type === 'set').length;
   const removed = ops.filter((o) => o.type === 'delete').length;
-  logger.debug('Annuaire synchronisé', { synced, removed });
-  return { synced, removed };
+  logger.debug('Annuaire synchronisé', { synced, removed, sansAlias: sansAlias.length });
+  return { synced, removed, sansAlias };
 };

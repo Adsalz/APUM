@@ -51,6 +51,7 @@
 const path = require('path');
 const { cleEmail, nomComplet: nom, chargerListe, rapprocher, trierACreer } = require('./lib/rapprochement');
 const { creerSession } = require('./lib/session-cli');
+const { aliasConnexion, aliasConnexionAleatoire } = require('./lib/alias');
 
 // ⚠️ DOIT correspondre EXACTEMENT à CODE_A_RECLAMER de src/constants/claim.js
 // (même contrainte que reinitialiser-comptes-a-reclamer.js).
@@ -119,14 +120,25 @@ async function main() {
   for (const p of vraimentACreer) {
     const email = cleEmail(p.email);
     try {
+      // L'IDENTIFIANT du compte est un alias opaque, jamais l'adresse réelle :
+      // il finit dans l'annuaire public (voir lib/alias.js). L'adresse réelle
+      // n'est conservée que dans users/{uid}.email.
       // Un compte Auth peut préexister (document supprimé sans le compte de
       // connexion) : on le raccroche au lieu d'échouer, sans toucher son code.
+      // Recherche par l'adresse réelle : elle ne retrouve que les comptes
+      // d'AVANT la migration vers les alias — c'est précisément le cas visé.
       // eslint-disable-next-line no-await-in-loop
       let uid = await session.chercherParEmail(email);
       const orphelin = Boolean(uid);
-      if (!uid) {
+      let emailConnexion;
+      if (uid) {
+        emailConnexion = aliasConnexion(uid);
         // eslint-disable-next-line no-await-in-loop
-        uid = await session.creerCompte(email, CODE_A_RECLAMER);
+        await session.majEmail(uid, emailConnexion);
+      } else {
+        emailConnexion = aliasConnexionAleatoire();
+        // eslint-disable-next-line no-await-in-loop
+        uid = await session.creerCompte(emailConnexion, CODE_A_RECLAMER);
       }
 
       // eslint-disable-next-line no-await-in-loop
@@ -134,6 +146,7 @@ async function main() {
         nom: (p.nom || '').trim(),
         prenom: (p.prenom || '').trim(),
         email,
+        emailConnexion,
         role: 'medecin',
       });
 

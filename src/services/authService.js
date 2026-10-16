@@ -8,6 +8,7 @@ import {
 } from 'firebase/auth';
 import { getUser } from './userService';
 import { CODE_A_RECLAMER } from '../constants/claim';
+import { aliasConnexionAleatoire } from '../utils/aliasConnexion';
 import logger from '../utils/logger';
 
 // Traduit les erreurs de l'API REST Firebase Identity Toolkit en Error dont le
@@ -40,6 +41,12 @@ const mapFirebaseSignUpError = (data) => {
 // de réclamation partagé (CODE_A_RECLAMER). Aucun email n'est envoyé — le
 // médecin choisira son code à 6 chiffres à sa première connexion via
 // loginMedecin (« premier code = le sien »).
+//
+// `email` est l'IDENTIFIANT du compte, pas une boîte aux lettres :
+//  - médecin : un alias opaque (voir registerCompteMedecin), car il finira dans
+//    l'annuaire public ;
+//  - admin   : sa vraie adresse, dont il a besoin pour la réinitialisation par
+//    email — un admin ne figure pas dans l'annuaire.
 export const registerUser = async (email) => {
   try {
     const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${import.meta.env.REACT_APP_FIREBASE_API_KEY}`, {
@@ -71,6 +78,17 @@ export const registerUser = async (email) => {
     logger.error('Erreur lors de l\'enregistrement:', error);
     throw error;
   }
+};
+
+// Crée le compte de connexion d'un MÉDECIN. Son identifiant est un alias tiré
+// au hasard : l'adresse réelle du médecin ne doit pas se retrouver dans
+// l'annuaire public (voir utils/aliasConnexion). L'appelant doit conserver
+// l'alias renvoyé dans `users/{uid}.emailConnexion` — c'est lui qui fait le
+// lien entre la liste déroulante de connexion et le compte.
+export const registerCompteMedecin = async () => {
+  const emailConnexion = aliasConnexionAleatoire();
+  const { user } = await registerUser(emailConnexion);
+  return { uid: user.uid, emailConnexion };
 };
 
 // Connexion classique par email + mot de passe (espace administrateur).

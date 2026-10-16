@@ -121,15 +121,21 @@ service cloud.firestore {
       allow read: if true;
 
       // Écriture réservée aux admins, avec validation stricte des champs
-      // (uniquement label + email, tous deux des chaînes non vides). Empêche
-      // tout médecin d'empoisonner l'annuaire (redirection de login d'un
-      // confrère vers un autre email, labels trompeurs).
+      // (uniquement label + email). Empêche tout médecin d'empoisonner
+      // l'annuaire (redirection de login d'un confrère vers un autre email,
+      // labels trompeurs).
+      //
+      // `email` DOIT être un alias de connexion « ...@apum-login.invalid » (voir
+      // src/utils/aliasConnexion.js) : cette collection étant lisible par tout
+      // le monde, y écrire une adresse réelle revient à la publier. La règle
+      // est le dernier rempart — un bug de synchronisation ne peut plus
+      // reconstituer la fuite corrigée le 16/10/2026.
       allow create, update: if isAdmin() &&
         request.resource.data.keys().hasOnly(['label', 'email']) &&
         request.resource.data.label is string &&
         request.resource.data.label.size() > 0 &&
         request.resource.data.email is string &&
-        request.resource.data.email.size() > 0;
+        request.resource.data.email.matches('^[a-z0-9._%+-]+@apum-login[.]invalid$');
 
       allow delete: if isAdmin();
     }

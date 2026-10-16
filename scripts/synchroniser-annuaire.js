@@ -13,6 +13,10 @@
 // pour chaque médecin, et SUPPRIME toute entrée orpheline (uid qui n'est plus
 // médecin — compte révoqué, promu admin, etc.).
 //
+// ⚠️ L'`email` écrit ici est l'ALIAS de connexion (users/{uid}.emailConnexion),
+// JAMAIS l'adresse réelle : cette collection est en lecture publique. Un
+// médecin sans alias est exclu — voir migrer-alias-connexion.js.
+//
 // ── Prérequis (identiques à supprimer-compte-auth.js) ────────────────────────
 // 1. Clé de compte de service : Console Firebase → Paramètres du projet →
 //    Comptes de service → « Générer une nouvelle clé privée » (fichier JSON).
@@ -29,6 +33,7 @@ const admin = require('firebase-admin');
 
 // Algorithme des libellés : miroir partagé dans lib/labels.js (voir son en-tête).
 const { computeAnnuaireLabels } = require('./lib/labels');
+const { estAliasConnexion } = require('./lib/alias');
 
 async function main() {
   const dryRun = process.argv.includes('--dry-run');
@@ -53,11 +58,14 @@ async function main() {
 
   const ops = [];
   medecins.forEach((m) => {
-    if (!m.email) {
-      console.warn(`⚠️  Médecin sans email, exclu de l'annuaire : ${m.id} (${m.prenom} ${m.nom})`);
+    if (!estAliasConnexion(m.emailConnexion)) {
+      console.warn(
+        `⚠️  Médecin sans alias de connexion, exclu de l'annuaire : ${m.id} (${m.prenom} ${m.nom})` +
+        '\n     → lancez d\'abord : node migrer-alias-connexion.js --go'
+      );
       return;
     }
-    ops.push({ type: 'set', id: m.id, data: { label: labels[m.id], email: m.email } });
+    ops.push({ type: 'set', id: m.id, data: { label: labels[m.id], email: m.emailConnexion } });
   });
   annuaireSnap.forEach((d) => {
     if (!validIds.has(d.id)) ops.push({ type: 'delete', id: d.id });
