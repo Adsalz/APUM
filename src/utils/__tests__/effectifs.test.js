@@ -1,6 +1,6 @@
 // Tests des effectifs par type de jour (déduits de la feuille de garde APUM).
 // planningCore est PUR (pas de Firebase) : importable directement, sans mock.
-import { typeDeJour, effectifPour, computePriorite } from '../planningCore';
+import { typeDeJour, effectifPour, computePriorite, NIVEAUX_PLACES, niveauDePlace } from '../planningCore';
 
 // Rendre getDay() déterministe quel que soit le fuseau de la machine.
 process.env.TZ = 'UTC';
@@ -87,5 +87,31 @@ describe('génération — tailles des créneaux selon le type de jour', () => {
     expect(jour.QUART_2).toHaveLength(4);
     expect(jour.QUART_4).toHaveLength(3);
     expect(jour.RENFORT_1).toBeUndefined();
+  });
+});
+
+describe('NIVEAUX_PLACES (ordre de remplissage des places)', () => {
+  // Un jour de chaque type : semaine, samedi, dimanche, férié en semaine.
+  const jours = ['2026-07-01', '2026-07-04', '2026-07-05', '2026-07-14'];
+
+  it('décrit exactement les places ouvertes par les effectifs', () => {
+    jours.forEach((d) => Object.keys(NIVEAUX_PLACES).forEach((cid) => {
+      expect(NIVEAUX_PLACES[cid][typeDeJour(d)]).toHaveLength(effectifPour(cid, d));
+    }));
+  });
+
+  it('ne fait jamais passer une place avant une place de rang inférieur', () => {
+    jours.forEach((d) => Object.keys(NIVEAUX_PLACES).forEach((cid) => {
+      const niveaux = NIVEAUX_PLACES[cid][typeDeJour(d)];
+      niveaux.forEach((n, i) => { if (i > 0) { expect(n).toBeGreaterThanOrEqual(niveaux[i - 1]); } });
+    }));
+  });
+
+  it('la 1re place de chaque créneau est indispensable, le renfort du samedi soir passe en dernier', () => {
+    jours.forEach((d) => Object.keys(NIVEAUX_PLACES).forEach((cid) => {
+      if (effectifPour(cid, d) > 0 && cid !== 'RENFORT_2') { expect(niveauDePlace(cid, d, 0)).toBe(1); }
+    }));
+    expect(niveauDePlace('RENFORT_2', '2026-07-04', 0)).toBe(3);
+    expect(niveauDePlace('QUART_2', '2026-07-05', 3)).toBe(3); // 4e place du dimanche
   });
 });

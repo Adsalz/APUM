@@ -72,6 +72,27 @@ const EFFECTIFS_PAR_TYPE_JOUR = {
   RENFORT_2: { semaine: 1, samedi: 1, dimanche: 1 },
 };
 
+// NIVEAUX DES PLACES — l'ordre dans lequel les places d'un créneau sont remplies,
+// une entrée par place (même longueur que l'effectif du type de jour). Lu dans le
+// tableau qu'Isabelle construit à la main avant le jour des choix (NDJ26, 863
+// gardes) : la 1re place de chaque créneau est remplie TOUS les jours (jamais une
+// nuit vide), la 2e presque toujours, les places « en plus » en dernier — 3e place
+// en semaine, 4e le dimanche, renfort 20h-00h du samedi —, qu'elle laisse pour le
+// jour des choix. Toutes à égalité, le générateur donnait le quota d'un médecin à
+// une 4e place du dimanche et laissait des nuits vides (18 sur NDJ26).
+// computePriorite ouvre les places niveau par niveau sur toute la période : les
+// quotas vont d'abord aux places de niveau 1, puis 2, puis 3.
+export const NIVEAUX_PLACES = {
+  //             semaine        samedi            dimanche (= férié)
+  QUART_1:   { semaine: [1, 2], samedi: [1, 2], dimanche: [1, 2] },
+  QUART_2:   { semaine: [1, 2, 3], samedi: [1, 2, 3], dimanche: [1, 2, 2, 3] },
+  RENFORT_1: { semaine: [], samedi: [1], dimanche: [] },
+  QUART_3:   { semaine: [1, 2, 3], samedi: [1, 2, 3, 3], dimanche: [1, 2, 2, 3] },
+  QUART_4:   { semaine: [1, 2, 3], samedi: [1, 2, 3], dimanche: [1, 2, 3] },
+  RENFORT_2: { semaine: [2], samedi: [3], dimanche: [2] },
+};
+const NIVEAU_PAR_DEFAUT = 3; // une place absente du tableau passe en dernier
+
 // Type de jour pour les effectifs : 'samedi' | 'dimanche' | 'semaine'.
 // Les jours fériés sont assimilés aux dimanches.
 export const typeDeJour = (dateString) => {
@@ -91,6 +112,10 @@ export const effectifPour = (creneauId, dateString) => {
   const parType = EFFECTIFS_PAR_TYPE_JOUR[creneauId];
   return parType ? (parType[typeDeJour(dateString)] || 0) : 0;
 };
+
+// Niveau (1, 2, 3…) de la place n° `index` d'un créneau à une date donnée.
+export const niveauDePlace = (creneauId, dateString, index) =>
+  NIVEAUX_PLACES[creneauId]?.[typeDeJour(dateString)]?.[index] ?? NIVEAU_PAR_DEFAUT;
 
 // Créneaux qui se recouvrent DANS LA MÊME JOURNÉE — un médecin ne peut pas tenir
 // les deux à la fois.
@@ -562,6 +587,44 @@ export const TIRAGE = {
   // Choix d'implémentation (inobservable dans le planning manuel) : un flexible qui
   // tirerait à son rang prendrait tout ce qu'il peut, avant des médecins à quota.
   flexiblesEnDernier: true,
+  // Les places sont ouvertes NIVEAU par NIVEAU (voir NIVEAUX_PLACES) : tirage et
+  // comblement sur les places indispensables de toute la période, puis sur les
+  // suivantes. Lu dans le tableau d'Isabelle (NDJ26) ; mesuré sur ce trimestre :
+  // 0 nuit vide au lieu de 18, 29 créneaux sans personne au lieu de 60. false
+  // redonne l'ancien comportement (toutes les places à égalité).
+  placesParNiveau: true,
+  // Dans quel ordre les médecins se servent. 'ordre-de-choix' (défaut) : la liste
+  // du trimestre, 1er tour puis 2e tour inversé — la règle que les médecins
+  // connaissent. 'moins-disponibles-d-abord' : mode activable par l'admin, qui
+  // reproduit la façon dont Isabelle bâtit son tableau avant le jour des choix —
+  // sur une place disputée elle retient le médecin qui a le MOINS d'options sur sa
+  // fiche (55 % de ses choix, contre 24 % pour l'ordre de choix et 22 % au
+  // hasard) ; l'ordre de choix ne départage plus qu'à égalité.
+  ordreDesMedecins: 'ordre-de-choix',
+};
+
+// Mode « moins disponibles d'abord » : chaque tour de la liste est retrié par
+// nombre d'options (« Oui » + « Possible ») sur la période, croissant ; à égalité,
+// le rang dans le tour est conservé.
+const ordonnerMedecins = (listePriorite, desiderata, debut, fin, mode) => {
+  if (mode !== 'moins-disponibles-d-abord') { return listePriorite; }
+  const options = {};
+  Object.entries(desiderata).forEach(([id, fiche]) => {
+    options[id] = Object.entries(fiche.preferences || {}).reduce((n, [d, jour]) => (
+      d >= debut && d <= fin
+        ? n + Object.values(jour).filter((p) => p === 'Oui' || p === 'Possible').length
+        : n
+    ), 0);
+  });
+  const trier = (ids = []) => ids
+    .map((id, rang) => ({ id, rang }))
+    .sort((a, b) => ((options[a.id] ?? Infinity) - (options[b.id] ?? Infinity)) || (a.rang - b.rang))
+    .map(({ id }) => id);
+  return {
+    ...listePriorite,
+    premierTourIds: trier(listePriorite.premierTourIds),
+    deuxiemeTourIds: trier(listePriorite.deuxiemeTourIds),
+  };
 };
 
 const listerJours = (debut, fin) => {
@@ -672,40 +735,64 @@ const compterPourvues = (planning) => {
   return { pourvues, total };
 };
 
-// Entrée pure : TIRAGE (deux tours) puis COMBLEMENT.
+// Entrée pure : places ouvertes NIVEAU par NIVEAU (voir NIVEAUX_PLACES) et, à
+// chaque niveau, TIRAGE (deux tours) puis COMBLEMENT. `options` complète TIRAGE.
 export const computePriorite = (debut, fin, desiderata, listePriorite, options = TIRAGE) => {
+  const opt = { ...TIRAGE, ...options };
   const periodes = diviserPeriode(debut, fin);
+  const liste = ordonnerMedecins(listePriorite, desiderata, periodes.premierTour.debut, periodes.deuxiemeTour.fin, opt.ordreDesMedecins);
 
   // Compteurs PARTAGÉS par toutes les passes, indexés par médecin PUIS par mois : le
   // quota « gardes souhaitées par mois » et l'équité des nuits se raisonnent sur le
-  // mois réel, quelle que soit la passe ou le tour qui a posé la garde.
+  // mois réel, quelle que soit la passe, le tour ou le niveau qui a posé la garde.
   const gardesAttribuees = {};
   const gardesParCreneau = {};
   const planning = {};
   const joursTour1 = listerJours(periodes.premierTour.debut, periodes.premierTour.fin);
   const joursTour2 = listerJours(periodes.deuxiemeTour.debut, periodes.deuxiemeTour.fin);
-  [...joursTour1, ...joursTour2].forEach((d) => {
+  const tousLesJours = [...joursTour1, ...joursTour2];
+  tousLesJours.forEach((d) => {
     planning[d] = {};
     // Créneaux ouverts ce jour (effectif variable par type de jour : semaine / samedi / dimanche / férié).
-    creneaux.forEach((c) => { const effectif = effectifPour(c.id, d); if (effectif > 0) { planning[d][c.id] = Array(effectif).fill(null); } });
+    creneaux.forEach((c) => { if (effectifPour(c.id, d) > 0) { planning[d][c.id] = []; } });
   });
 
+  // Ajoute les places vides jusqu'au niveau `niveau` inclus (Infinity : l'effectif
+  // entier). Les niveaux croissent avec le rang de la place : la 1re place libre
+  // d'un créneau est toujours la plus prioritaire.
+  const ouvrirJusquAu = (niveau) => tousLesJours.forEach((d) => Object.keys(planning[d]).forEach((cid) => {
+    const effectif = effectifPour(cid, d);
+    const cible = niveau === Infinity
+      ? effectif
+      : [...Array(effectif).keys()].filter((i) => niveauDePlace(cid, d, i) <= niveau).length;
+    while (planning[d][cid].length < cible) { planning[d][cid].push(null); }
+  }));
+  const niveaux = opt.placesParNiveau
+    ? [...new Set(tousLesJours.flatMap((d) => Object.keys(planning[d]).flatMap((cid) =>
+      [...Array(effectifPour(cid, d)).keys()].map((i) => niveauDePlace(cid, d, i)))))].sort((a, b) => a - b)
+    : [Infinity];
+
   const joursPeriodeParMois = {};
-  [...joursTour1, ...joursTour2].forEach((d) => { const m = d.slice(0, 7); joursPeriodeParMois[m] = (joursPeriodeParMois[m] || 0) + 1; });
-
-  // 1. TIRAGE : le premier de la liste prend ses gardes, puis le deuxième… Quand les
-  // « Possible » passent après TOUS les « Oui », c'est après ceux des DEUX tours : un
-  // « Possible » du 1er tour ne doit pas consommer le quota qu'un « Oui » du 2e attend.
+  tousLesJours.forEach((d) => { const m = d.slice(0, 7); joursPeriodeParMois[m] = (joursPeriodeParMois[m] || 0) + 1; });
   const periode = { fin: periodes.deuxiemeTour.fin, joursParMois: joursPeriodeParMois };
-  const tour1 = (prefs) => tirerUnTour(joursTour1, listePriorite.premierTourIds, desiderata, planning, gardesAttribuees, gardesParCreneau, options, prefs, periode);
-  const tour2 = (prefs) => tirerUnTour(joursTour2, listePriorite.deuxiemeTourIds, desiderata, planning, gardesAttribuees, gardesParCreneau, options, prefs, periode);
-  const parTirage = options.possiblesApresTousLesOui
-    ? tour1(['Oui']) + tour2(['Oui']) + tour1(['Possible']) + tour2(['Possible'])
-    : tour1(['Oui', 'Possible']) + tour2(['Oui', 'Possible']);
+  const tour1 = (prefs) => tirerUnTour(joursTour1, liste.premierTourIds, desiderata, planning, gardesAttribuees, gardesParCreneau, opt, prefs, periode);
+  const tour2 = (prefs) => tirerUnTour(joursTour2, liste.deuxiemeTourIds, desiderata, planning, gardesAttribuees, gardesParCreneau, opt, prefs, periode);
 
-  // 2. COMBLEMENT des places restées vides, jour par jour, avec la liste du tour du jour.
-  joursTour1.forEach((d) => remplirJourEnCouverture(d, listePriorite.premierTourIds || [], desiderata, planning, gardesAttribuees, gardesParCreneau));
-  joursTour2.forEach((d) => remplirJourEnCouverture(d, listePriorite.deuxiemeTourIds || [], desiderata, planning, gardesAttribuees, gardesParCreneau));
+  let parTirage = 0;
+  niveaux.forEach((niveau) => {
+    ouvrirJusquAu(niveau);
+    // 1. TIRAGE : le premier de la liste prend ses gardes, puis le deuxième… Quand les
+    // « Possible » passent après TOUS les « Oui », c'est après ceux des DEUX tours : un
+    // « Possible » du 1er tour ne doit pas consommer le quota qu'un « Oui » du 2e attend.
+    parTirage += opt.possiblesApresTousLesOui
+      ? tour1(['Oui']) + tour2(['Oui']) + tour1(['Possible']) + tour2(['Possible'])
+      : tour1(['Oui', 'Possible']) + tour2(['Oui', 'Possible']);
+
+    // 2. COMBLEMENT des places restées vides, jour par jour, avec la liste du tour du jour.
+    joursTour1.forEach((d) => remplirJourEnCouverture(d, liste.premierTourIds || [], desiderata, planning, gardesAttribuees, gardesParCreneau));
+    joursTour2.forEach((d) => remplirJourEnCouverture(d, liste.deuxiemeTourIds || [], desiderata, planning, gardesAttribuees, gardesParCreneau));
+  });
+  ouvrirJusquAu(Infinity); // toujours l'effectif complet en sortie
 
   // Filet de sécurité : le planning généré DOIT satisfaire les contraintes dures
   // (max hebdo, pas de chevauchement). Tripwire de non-

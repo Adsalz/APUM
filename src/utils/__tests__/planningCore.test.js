@@ -271,8 +271,10 @@ describe('planningCore — 1er quart : équité mensuelle et pas deux nuits d\'a
     const desiderata = desiderataUniforme(['a', 'b', 'c'], '2026-06-01', '2026-06-30', 'Oui');
     const planning = computePriorite('2026-06-01', '2026-06-30', desiderata, listePriorite);
     const nuits = ['a', 'b', 'c'].map((id) => nuitsDe(planning, id));
-    // Écart maximal d'une nuit entre le plus et le moins servi.
-    expect(Math.max(...nuits) - Math.min(...nuits)).toBeLessThanOrEqual(1);
+    // Chacun a ses nuits. Les dernières vont à qui reste disponible : les trois
+    // médecins, volontaires partout, butent sur leur maximum de 7 gardes par semaine.
+    expect(Math.min(...nuits)).toBeGreaterThanOrEqual(1);
+    expect(Math.max(...nuits) - Math.min(...nuits)).toBeLessThanOrEqual(2);
   });
 
   it('ne place JAMAIS deux nuits consécutives, quitte à laisser la place vide', () => {
@@ -354,14 +356,15 @@ describe('planningCore — tirage (le premier de la liste prend ses gardes)', ()
   });
 
   it('pose chaque médecin là où il est le plus utile : le seul volontaire d\'un jour y est envoyé', () => {
-    // a est volontaire le 10 (disputé avec b) et le 20 (seul), quota 1 : a va le 20, b prend le 10.
+    // a est volontaire le 10 (disputé avec b) et le 17 (seul), quota 1 : a va le 17, b prend le 10.
     // Dans l'ordre du calendrier, a prendrait le 10 et b ne serait pas servi.
+    // (Deux mercredis : même niveau de place, voir le test des niveaux plus bas.)
     const desiderata = {
-      a: fiche({ '2026-06-10': { RENFORT_2: 'Oui' }, '2026-06-20': { RENFORT_2: 'Oui' } }),
+      a: fiche({ '2026-06-10': { RENFORT_2: 'Oui' }, '2026-06-17': { RENFORT_2: 'Oui' } }),
       b: fiche({ '2026-06-10': { RENFORT_2: 'Oui' } }),
     };
     const planning = computePriorite(DEBUT, FIN, desiderata, liste(['a', 'b']));
-    expect(planning['2026-06-20'].RENFORT_2).toEqual(['a']);
+    expect(planning['2026-06-17'].RENFORT_2).toEqual(['a']);
     expect(planning['2026-06-10'].RENFORT_2).toEqual(['b']);
   });
 
@@ -408,11 +411,11 @@ describe('planningCore — tirage (le premier de la liste prend ses gardes)', ()
   });
 
   it('un « Possible » du 1er tour ne consomme pas le quota qu\'un « Oui » du 2e tour attend', () => {
-    // Juin seul (1er tour 1-15, 2e tour 16-30). a, quota 1 : « Possible » le 10, « Oui » le 20.
-    // Les « Oui » des deux tours passent avant les « Possible » : a doit être le 20, pas le 10.
-    const desiderata = { a: fiche({ '2026-06-10': { RENFORT_2: 'Possible' }, '2026-06-20': { RENFORT_2: 'Oui' } }, 1) };
+    // Juin seul (1er tour 1-15, 2e tour 16-30). a, quota 1 : « Possible » le 10, « Oui » le 24.
+    // Les « Oui » des deux tours passent avant les « Possible » : a doit être le 24, pas le 10.
+    const desiderata = { a: fiche({ '2026-06-10': { RENFORT_2: 'Possible' }, '2026-06-24': { RENFORT_2: 'Oui' } }, 1) };
     const planning = computePriorite('2026-06-01', '2026-06-30', desiderata, liste(['a']));
-    expect(planning['2026-06-20'].RENFORT_2).toEqual(['a']);
+    expect(planning['2026-06-24'].RENFORT_2).toEqual(['a']);
     expect(planning['2026-06-10'].RENFORT_2).toEqual([null]);
   });
 
@@ -444,6 +447,39 @@ describe('planningCore — tirage (le premier de la liste prend ses gardes)', ()
     const avecFantome = computePriorite(DEBUT, FIN, fantome, liste(['a', 'b']));
     expect(avecFantome).toEqual(reference);
     expect(gardesDe(avecFantome, 'z')).toEqual([]);
+  });
+
+  it('une place indispensable passe avant une place « en plus », même plus rare', () => {
+    // n (1er de la liste, quota 1) : 3e quart du mercredi 3, disputé (4 volontaires
+    // pour 3 places), ou renfort 20h du samedi 6, où il est seul. Le renfort du
+    // samedi est une place de dernier niveau : n prend le 3e quart, le renfort
+    // reste pour le jour des choix — comme dans le tableau d'Isabelle.
+    const desiderata = {
+      n: fiche({ '2026-06-03': { QUART_3: 'Oui' }, '2026-06-06': { RENFORT_2: 'Oui' } }),
+      p: fiche({ '2026-06-03': { QUART_3: 'Oui' } }),
+      q: fiche({ '2026-06-03': { QUART_3: 'Oui' } }),
+      r: fiche({ '2026-06-03': { QUART_3: 'Oui' } }),
+    };
+    const ordre = liste(['n', 'p', 'q', 'r']);
+    const planning = computePriorite(DEBUT, FIN, desiderata, ordre);
+    expect(planning['2026-06-03'].QUART_3).toContain('n');
+    expect(planning['2026-06-06'].RENFORT_2).toEqual([null]);
+    // Toutes les places à égalité (ancien comportement) : n part au samedi, plus rare.
+    const sansNiveaux = computePriorite(DEBUT, FIN, desiderata, ordre, { ...TIRAGE, placesParNiveau: false });
+    expect(sansNiveaux['2026-06-06'].RENFORT_2).toEqual(['n']);
+  });
+
+  it('mode « moins disponibles d\'abord » : sur une place disputée, le moins disponible passe avant le mieux classé', () => {
+    // a (1er de la liste) et b veulent le même renfort ; a propose aussi beaucoup
+    // d'autres soirs (« Possible », même niveau de place), b n'a que celui-là.
+    const desiderata = {
+      a: fiche({ ...tousLesJours('2026-06', 'RENFORT_2', 'Possible'), '2026-06-10': { RENFORT_2: 'Oui' } }),
+      b: fiche({ '2026-06-10': { RENFORT_2: 'Oui' } }),
+    };
+    const ordre = liste(['a', 'b']);
+    expect(computePriorite(DEBUT, FIN, desiderata, ordre)['2026-06-10'].RENFORT_2).toEqual(['a']);
+    const mode = computePriorite(DEBUT, FIN, desiderata, ordre, { ordreDesMedecins: 'moins-disponibles-d-abord' });
+    expect(mode['2026-06-10'].RENFORT_2).toEqual(['b']);
   });
 
   it('le réglage « calendrier » redonne l\'ancien comportement : le premier de la liste prend les premiers jours', () => {

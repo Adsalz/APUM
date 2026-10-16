@@ -10,9 +10,11 @@ import { creneaux, diviserPeriode, buildDesiderataMap } from './planningCore';
 // médecins. Il n'y a plus de table nom → id à construire ici : l'ordre de choix
 // stocke directement les identifiants, donc renommer une fiche ne peut plus
 // faire disparaître quelqu'un du tour de garde.
-const genererPlanningPriorite = async (debut, fin, listePriorite) => {
+// reglages : réglages choisis par l'admin, qui complètent TIRAGE (planningCore),
+// ex. { ordreDesMedecins: 'moins-disponibles-d-abord' }.
+const genererPlanningPriorite = async (debut, fin, listePriorite, reglages = {}) => {
   try {
-    logger.info('Génération du planning par ordre de priorité', { debut, fin, listePriorite });
+    logger.info('Génération du planning par ordre de priorité', { debut, fin, listePriorite, reglages });
 
     if (!listePriorite?.premierTourIds?.length || !listePriorite?.deuxiemeTourIds?.length) {
       throw new Error('Ordre de choix invalide : identifiants des deux tours attendus');
@@ -28,6 +30,7 @@ const genererPlanningPriorite = async (debut, fin, listePriorite) => {
       fin,
       desiderata,
       listePriorite,
+      reglages,
     });
 
     logger.info('Planning généré avec succès', {

@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, CheckCircle2, Lock } from 'lucide-react';
 import GenerateurTrimestre from '../../GenerateurTrimestre';
-import { Modal, Button, Alert } from '../../ui';
+import { Modal, Button, Alert, Checkbox } from '../../ui';
 import { idPeriode as calculerIdPeriode, libellePeriode } from '../../../utils/periodeId';
 import { getOrdreChoixPeriode } from '../../../services/ordreChoixService';
 import { idsDeLOrdre } from '../../../utils/ordreChoix';
@@ -19,6 +19,13 @@ const GeneratePlanningModal = ({
   const [listePriorite, setListePriorite] = useState(null);
   const [showGenerator, setShowGenerator] = useState(false);
   const [ordreFige, setOrdreFige] = useState(false);
+  // Mode « les moins disponibles d'abord » : repris du dernier planning généré.
+  const [moinsDisponiblesDAbord, setMoinsDisponiblesDAbord] = useState(false);
+  useEffect(() => {
+    if (isOpen) {
+      setMoinsDisponiblesDAbord(planning?.reglages?.ordreDesMedecins === 'moins-disponibles-d-abord');
+    }
+  }, [isOpen, planning]);
 
   const idPeriode = calculerIdPeriode(periodeSaisie);
   const libelle = libellePeriode(periodeSaisie);
@@ -50,7 +57,9 @@ const GeneratePlanningModal = ({
   }, [isOpen, idPeriode, medecins]);
 
   const handleConfirm = () => {
-    onConfirm(listePriorite);
+    onConfirm(listePriorite, {
+      ordreDesMedecins: moinsDisponiblesDAbord ? 'moins-disponibles-d-abord' : 'ordre-de-choix',
+    });
   };
 
   // Le générateur ne remonte la liste qu'une fois celle-ci figée pour le trimestre.
@@ -113,7 +122,9 @@ const GeneratePlanningModal = ({
             </label>
             <p className="mb-3 text-sm text-ink-500">
               Le planning est généré en attribuant les gardes séquentiellement selon la liste
-              d&apos;ordre de choix trimestrielle (deux tours).
+              d&apos;ordre de choix trimestrielle (deux tours). Les places indispensables — la
+              première de chaque créneau, nuits comprises — sont pourvues avant les places
+              « en plus », laissées pour le jour des choix.
             </p>
 
             <div className="rounded-xl bg-ink-50 p-4">
@@ -154,6 +165,15 @@ const GeneratePlanningModal = ({
                 </div>
               )}
             </div>
+          </div>
+
+          <div className="rounded-xl border border-ink-200 p-4">
+            <Checkbox
+              checked={moinsDisponiblesDAbord}
+              onChange={setMoinsDisponiblesDAbord}
+              label="Placer d'abord les médecins les moins disponibles"
+              description="Sur une place disputée, le médecin qui a le moins de disponibilités sur sa fiche passe en premier ; l'ordre de choix ne sert plus qu'à départager. C'est ainsi qu'est construit à la main le tableau d'avant le jour des choix."
+            />
           </div>
         </div>
       )}

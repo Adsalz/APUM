@@ -167,30 +167,34 @@ function GestionPlanning() {
   }, []);
 
   // --- Actions principales ---
-  const handleGeneratePlanning = async (listePriorite = null) => {
+  // reglages : réglages choisis dans la modale de génération (mode « moins
+  // disponibles d'abord »…), enregistrés avec le planning pour savoir comment il a
+  // été produit et pour les reproposer à la génération suivante.
+  const handleGeneratePlanning = async (listePriorite = null, reglages = {}) => {
     setLoading(true);
     try {
       if (!periodeSaisie) { throw new Error('Période de saisie non définie'); }
       if (!listePriorite) { throw new Error("Liste d'ordre de choix manquante"); }
 
       const { startDate, endDate } = periodeSaisie;
-      const newPlanningData = await genererPlanningPriorite(startDate, endDate, listePriorite);
-      logger.info('Planning généré par ordre de priorité', { listePriorite });
+      const newPlanningData = await genererPlanningPriorite(startDate, endDate, listePriorite, reglages);
+      logger.info('Planning généré par ordre de priorité', { listePriorite, reglages });
 
       let nouveau;
       if (planning && planning.id) {
         // La génération porte TOUJOURS sur la période de saisie active : on recale
         // aussi les bornes du document, sinon un planning issu d'une période
         // antérieure garderait des dates qui ne décrivent plus son contenu.
-        nouveau = { ...planning, planning: newPlanningData, startDate, endDate };
+        nouveau = { ...planning, planning: newPlanningData, startDate, endDate, reglages };
         await updatePlanning(planning.id, nouveau);
       } else {
         const savedPlanningId = await savePlanning({
           planning: newPlanningData,
           startDate,
-          endDate
+          endDate,
+          reglages
         });
-        nouveau = { id: savedPlanningId, planning: newPlanningData, startDate, endDate };
+        nouveau = { id: savedPlanningId, planning: newPlanningData, startDate, endDate, reglages };
       }
       dispatch({ type: 'remplacer', planning: nouveau });
       dernierVideRef.current = null;
