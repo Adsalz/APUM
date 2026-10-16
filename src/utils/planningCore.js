@@ -393,6 +393,24 @@ export const creeraitCreneauxConsecutifs = (medecinId, dateString, creneauId, pl
   return aLeCreneau(-1) || aLeCreneau(1);
 };
 
+// Pas de garde de JOUR (matin, renfort 10h-13h, après-midi) le même jour qu'une
+// nuit (1h-7h) : nuit puis matin, c'est 12 h d'affilée à partir d'1h du matin.
+// Isabelle ne le fait jamais (NDJ26) et les tableaux réels de l'APUM rarement (28
+// nuit + matin et 7 nuit + après-midi en 16 mois, surtout chez quelques
+// habitués) ; le générateur, qui ne surveillait que les chevauchements, le
+// faisait 23 fois sur NDJ26. Interdit au générateur, signalé « à vérifier » dans
+// l'écran d'édition (une pose à la main reste possible). Décision du 16/10/2026,
+// sans coût mesuré sur NDJ26 : 2 gardes de moins sur 866, toutes les nuits
+// pourvues. Le 4ème quart de la VEILLE suivi de la nuit (19h→7h) reste permis.
+export const CRENEAUX_JOUR_APRES_NUIT = ['QUART_2', 'RENFORT_1', 'QUART_3'];
+
+export const creeraitJourApresNuit = (medecinId, dateString, creneauId, planning) => {
+  const jour = planning[dateString] || {};
+  if (CRENEAUX_JOUR_APRES_NUIT.includes(creneauId)) { return Boolean(jour.QUART_1?.includes(medecinId)); }
+  if (creneauId === 'QUART_1') { return CRENEAUX_JOUR_APRES_NUIT.some((cid) => Boolean(jour[cid]?.includes(medecinId))); }
+  return false;
+};
+
 // Trois jours de garde d'affilée : ÉVITÉS au tirage, AUTORISÉS au comblement (dernier
 // recours). Décision du 27/08/2026 : la coordinatrice le fait 76 fois sur le trimestre
 // ASO26, sans le réserver aux places rares — ce n'est pas un interdit chez elle.
@@ -413,6 +431,7 @@ const contrainteDureBloque = (id, dateString, cid, desiderata, planning, troisJo
   const jour = planning[dateString];
   if (Object.values(jour).reduce((n, arr) => n + (arr.includes(id) ? 1 : 0), 0) >= MAX_CRENEAUX_PAR_JOUR) { return true; }
   if (aCreneauxChevauchants(id, dateString, cid, planning)) { return true; }
+  if (creeraitJourApresNuit(id, dateString, cid, planning)) { return true; }
   if (creeraitCreneauxConsecutifs(id, dateString, cid, planning)) { return true; }
   if (!troisJoursAutorises && creeraitTroisJoursConsecutifs(id, dateString, planning)) { return true; }
   return false;

@@ -40,9 +40,11 @@ const desiderataDocs = [
   }
 ];
 
+// m1 : nuit (1h-7h) et soir (19h-1h) le 03, à son quota de 2 — sans problème. Nuit
+// et MATIN le même jour serait signalé (voir « nuit et garde de jour » plus bas).
 const planningDoc = {
   planning: {
-    [D1]: { QUART_1: ['m1', null], QUART_2: ['m1', null, null] },
+    [D1]: { QUART_1: ['m1', null], QUART_4: ['m1', null, null] },
     [D2]: { QUART_1: [null, null] }
   }
 };
@@ -165,6 +167,30 @@ describe('planningEdition — détection des problèmes', () => {
     const codes = problemesCandidat('m1', D2, 'QUART_3', jours,
       indexerPlanning({ planning: jours }), idx).map((p) => p.code);
     expect(codes).not.toContain('nuitsConsecutives');
+  });
+
+  it('signale une nuit et une garde de jour le même jour (niveau fort, pas dur)', () => {
+    const jours = { [D1]: { QUART_1: ['m1'], QUART_2: ['m1'] } };
+    const idxP = indexerPlanning({ planning: jours });
+    ['QUART_1', 'QUART_2'].forEach((cid) => {
+      const pb = problemesAffectation('m1', D1, cid, jours, idxP, idx).find((p) => p.code === 'jourApresNuit');
+      expect(pb).toBeDefined();
+      expect(pb.niveau).toBe(NIVEAUX.FORT);
+    });
+    // Le sélecteur prévient AVANT la pose, dans les deux sens.
+    const apresNuit = { [D1]: { QUART_1: ['m1'], QUART_3: [null] } };
+    expect(problemesCandidat('m1', D1, 'QUART_3', apresNuit, indexerPlanning({ planning: apresNuit }), idx)
+      .map((p) => p.code)).toContain('jourApresNuit');
+    const avantNuit = { [D1]: { QUART_1: [null], QUART_2: ['m1'] } };
+    expect(problemesCandidat('m1', D1, 'QUART_1', avantNuit, indexerPlanning({ planning: avantNuit }), idx)
+      .map((p) => p.code)).toContain('jourApresNuit');
+  });
+
+  it('ne signale ni la nuit suivie du soir, ni le soir de la veille suivi de la nuit', () => {
+    const jours = { [D1]: { QUART_4: ['m1'] }, [D2]: { QUART_1: ['m1'], QUART_4: ['m1'] } };
+    const idxP = indexerPlanning({ planning: jours });
+    expect(problemesAffectation('m1', D2, 'QUART_1', jours, idxP, idx).map((p) => p.code)).not.toContain('jourApresNuit');
+    expect(problemesAffectation('m1', D2, 'QUART_4', jours, idxP, idx).map((p) => p.code)).not.toContain('jourApresNuit');
   });
 
   it('problemesCandidat anticipe le quota AVANT affectation', () => {

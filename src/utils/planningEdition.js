@@ -16,6 +16,7 @@ import {
   aCreneauxChevauchants,
   creeraitTroisJoursConsecutifs,
   creeraitCreneauxConsecutifs,
+  creeraitJourApresNuit,
   MAX_CRENEAUX_PAR_JOUR
 } from './planningCore';
 
@@ -114,6 +115,7 @@ const PROBLEMES = {
   chevauchement: { niveau: NIVEAUX.DUR, libelle: 'Créneaux qui se chevauchent' },
   troisJours: { niveau: NIVEAUX.FORT, libelle: '3 jours de garde consécutifs (dernier recours)' },
   nuitsConsecutives: { niveau: NIVEAUX.DUR, libelle: 'Deux nuits (1h-7h) d\'affilée' },
+  jourApresNuit: { niveau: NIVEAUX.FORT, libelle: 'Nuit et garde de jour le même jour' },
   maxSemaine: { niveau: NIVEAUX.DUR, libelle: 'Max/semaine dépassé' },
   indisponible: { niveau: NIVEAUX.FORT, libelle: 'A répondu « Non »' },
   nonRenseigne: { niveau: NIVEAUX.INFO, libelle: 'Pas de réponse' },
@@ -147,6 +149,9 @@ export const problemesAffectation = (medecinId, date, creneauId, planningJours, 
   }
   if (creeraitCreneauxConsecutifs(medecinId, date, creneauId, planningJours)) {
     out.push(probleme('nuitsConsecutives'));
+  }
+  if (creeraitJourApresNuit(medecinId, date, creneauId, planningJours)) {
+    out.push(probleme('jourApresNuit'));
   }
 
   const semaine = cleSemaineISO(date);
@@ -187,6 +192,9 @@ export const problemesCandidat = (medecinId, date, creneauId, planningJours, idx
   }
   if (creeraitCreneauxConsecutifs(medecinId, date, creneauId, planningJours)) {
     out.push(probleme('nuitsConsecutives'));
+  }
+  if (creeraitJourApresNuit(medecinId, date, creneauId, planningJours)) {
+    out.push(probleme('jourApresNuit'));
   }
 
   const semaine = cleSemaineISO(date);

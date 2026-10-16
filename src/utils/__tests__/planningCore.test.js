@@ -5,6 +5,7 @@ import {
   evaluerPlanning,
   computePriorite,
   creeraitCreneauxConsecutifs,
+  creeraitJourApresNuit,
   TIRAGE,
 } from '../planningCore';
 
@@ -306,6 +307,31 @@ describe('planningCore — 1er quart : équité mensuelle et pas deux nuits d\'a
     const nuits2 = planning['2026-06-02'].QUART_1.filter(Boolean);
     expect(nuits1).toContain('a');
     expect(nuits2).toEqual([]); // vide : « a » a déjà fait la veille
+  });
+
+  it('ne met jamais un médecin de jour le même jour qu\'une nuit, quitte à laisser la place vide', () => {
+    // « a » est le seul volontaire, pour la nuit ET le matin du 1er juin.
+    const desiderata = {
+      a: {
+        nombreGardesSouhaitees: 10,
+        nombreGardesMaxParSemaine: 7,
+        preferences: { '2026-06-01': { QUART_1: 'Oui', QUART_2: 'Oui', QUART_3: 'Oui', QUART_4: 'Oui' } },
+      },
+    };
+    const planning = computePriorite('2026-06-01', '2026-06-01', desiderata, { premierTourIds: ['a'], deuxiemeTourIds: ['a'] });
+    const jour = planning['2026-06-01'];
+    const surLeJour = ['QUART_2', 'QUART_3'].some((cid) => jour[cid].includes('a'));
+    expect(jour.QUART_1.includes('a') && surLeJour).toBe(false);
+  });
+
+  it('creeraitJourApresNuit : matin, renfort 10h-13h et après-midi, dans les deux sens ; pas le soir', () => {
+    const planning = { '2026-06-06': { QUART_1: ['a'], QUART_2: ['b'] } };
+    ['QUART_2', 'RENFORT_1', 'QUART_3'].forEach((cid) => {
+      expect(creeraitJourApresNuit('a', '2026-06-06', cid, planning)).toBe(true);
+    });
+    expect(creeraitJourApresNuit('a', '2026-06-06', 'QUART_4', planning)).toBe(false);
+    expect(creeraitJourApresNuit('b', '2026-06-06', 'QUART_1', planning)).toBe(true);
+    expect(creeraitJourApresNuit('b', '2026-06-07', 'QUART_1', planning)).toBe(false);
   });
 
   it('creeraitCreneauxConsecutifs ne s\'applique qu\'au 1er quart', () => {
