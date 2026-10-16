@@ -438,3 +438,94 @@ Vérifié : **lint OK, 64 tests, build OK**.
   aurait exigé une Cloud Function, donc le plan Blaze (cf. encadré vague 5). La
   remise à zéro de tous les codes reste `scripts/nouveaux-choix.js`, exécuté
   depuis un poste.
+
+---
+
+## Vague 9 — octobre 2026 : audit de sécurité et correctifs
+
+Audit demandé le 16/10/2026, vérifié contre la production par requêtes
+anonymes. Quatre correctifs retenus, tous déployés le jour même.
+
+### 🔴 L'annuaire public exposait 53 adresses email réelles
+
+`annuaire` est en `allow read: if true` — la liste déroulante de connexion doit
+être peuplée avant toute authentification. Elle contenait l'adresse de
+connexion, donc l'adresse **réelle** de chaque médecin : une requête REST
+anonyme, sans aucun compte, rendait 53 adresses complètes (26 gmail, 7
+hotmail.fr, 6 wanadoo, 3 yahoo…). Le `label` avait pourtant été minimisé en
+« Prénom N. » : l'email en clair annulait cette précaution. Risque principal :
+un hameçonnage « APUM — votre planning » adressé aux 53 médecins.
+
+**Correctif — alias de connexion** (`src/utils/aliasConnexion.js`, miroir
+CommonJS dans `scripts/lib/alias.js`) : l'identifiant d'un compte médecin est
+désormais `<uid>@apum-login.invalid`, opaque et sans valeur personnelle
+(`.invalid` est réservé par la RFC 2606, aucun message ne peut y partir).
+L'adresse réelle ne vit plus que dans `users.email`, fermé aux non-authentifiés
+(403 vérifié). `users.emailConnexion` porte l'alias et devient la seule source
+de l'annuaire.
+
+- Migration : `scripts/migrer-alias-connexion.js` — aperçu par défaut, `--go`
+  pour exécuter, `--restaurer <fichier>` pour revenir en arrière. 53/53 migrés,
+  les 53 alias publiés vérifiés comme résolvant vers le bon compte. Les codes à
+  6 chiffres n'ont pas été touchés.
+- Les **admins gardent leur adresse réelle** comme identifiant : ils ne sont pas
+  dans l'annuaire et ont besoin de la réinitialisation par email.
+- Garde-fou : les règles Firestore n'acceptent plus dans `annuaire.email` qu'une
+  adresse `…@apum-login.invalid`. Un bug de synchronisation ne peut plus
+  reconstituer la fuite.
+- **Contrepartie assumée** : « Code oublié ? » (parcours médecin) ne peut plus
+  envoyer d'email — Firebase n'a plus d'adresse où écrire. La modale renvoie
+  vers l'administrateur, qui remet le code (`scripts/reinitialiser-code.js`).
+  Cela annule le libre-service de la vague 7 d'août 2026.
+
+### 🔴 La fenêtre d'inscription était restée ouverte
+
+`config/inscription.open` valait `true`. Avec le code de réclamation partagé
+public dans le bundle (risque assumé, cf. `constants/claim.js`) et l'annuaire
+lisible, un tiers pouvait s'emparer de tout compte non encore réclamé.
+**L'aliasing ne protège en rien de cela** : l'alias est précisément
+l'identifiant publié. Seule la fermeture de la fenêtre y répond.
+
+- Fenêtre fermée (aucun compte non réclamé : les 53 médecins s'étaient déjà
+  connectés au moins une fois).
+- **Clore la saisie ferme désormais aussi la fenêtre** (`setSaisieFermee`) : les
+  deux gestes vont ensemble, saisie close = plus aucune raison de réclamer. La
+  réciproque est volontairement fausse — rouvrir la saisie ne rouvre pas les
+  inscriptions, qui restent un geste délibéré depuis l'écran Utilisateurs.
+
+### 🟠 Aucune sauvegarde des données
+
+Les exports Firestore planifiés exigent Blaze ; il n'existait aucune copie.
+`scripts/sauvegarder-firestore.js` écrit un JSON par collection dans
+`~/Sauvegardes APUM`, avec rotation et `--restaurer`. Les documents sont
+enregistrés **tels que l'API les rend**, donc réécrivables à l'identique.
+
+> Au passage, `scripts/lib/session-cli.js` ne savait pas décoder les cartes
+> imbriquées (`mapValue`) : la grille d'une fiche revenait brute, et un
+> `versValeur` sur un objet aurait écrit `[object Object]`. Corrigé des deux
+> côtés, aller-retour vérifié.
+
+### 🟠 Le médecin perdait sa saisie en cas d'interruption
+
+90 jours × 6 créneaux, et rien n'était conservé avant le clic sur
+« Enregistrer » : un onglet tué par le téléphone et tout était à refaire.
+`src/utils/brouillonDesiderata.js` garde une copie locale à chaque changement
+(temporisée à 800 ms), restaurée à la réouverture avec un bandeau explicite
+« pas encore enregistrée » et un bouton d'abandon. La copie ne quitte jamais
+l'appareil et disparaît à l'enregistrement.
+
+### Signalé, non traité
+
+- **CRA abandonné** : 124 vulnérabilités npm, mais presque toutes dans la chaîne
+  de build (jamais livrées au navigateur) ; `undici`/`@grpc` viennent de
+  Firebase mais sont ses chemins Node. Le vrai problème est l'outil non
+  maintenu. *(Migration vers Vite en cours par ailleurs.)*
+- **Aucune trace en production** : `logger.error` remplace l'erreur réelle par
+  un message générique renvoyant vers des « logs serveur » qui n'existent pas.
+- **Les règles Firestore ne sont pas testées** alors qu'elles sont la seule
+  barrière ; `authService.js` reste le plus gros module sans test.
+- Pas de `Content-Security-Policy` (les autres en-têtes sont corrects : HSTS,
+  nosniff, frame-deny, vérifiés en production).
+- Le filtre de l'écran Suivi ne propose toujours pas « Incomplet ».
+
+Vérifié : **lint OK, 302 tests, build OK**, fuite refermée par requête anonyme.
