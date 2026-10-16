@@ -89,8 +89,12 @@ function GestionDesiderata() {
     return filtered;
   };
 
-  const handleRelanceSuccess = (resultats) => {
-    toast.success(`${resultats.succes} email(s) de relance envoyé(s) avec succès !`);
+  const handleRelanceSuccess = ({ destinataires }) => {
+    // L'app prépare le message, l'envoi reste à faire dans la messagerie :
+    // on ne peut pas annoncer un envoi réussi.
+    toast.success(
+      `Relance préparée pour ${destinataires} médecin(s) — vérifiez l'envoi dans votre messagerie.`
+    );
   };
 
   const medecinsSansDesiderata = getMedecinsSansDesiderata(medecins, desiderataStatus || []);
@@ -187,7 +191,7 @@ function GestionDesiderata() {
               icon={<Mail size={16} />}
               disabled={medecinsSansDesiderata.length === 0}
               onClick={() => setShowRelanceModal(true)}
-              title={medecinsSansDesiderata.length === 0 ? 'Tous les médecins ont saisi leurs desiderata' : 'Envoyer des relances par email'}
+              title={medecinsSansDesiderata.length === 0 ? 'Tous les médecins ont saisi leurs desiderata' : 'Préparer un email de relance dans votre messagerie'}
             >
               Relancer par email ({medecinsSansDesiderata.length})
             </Button>

@@ -12,7 +12,7 @@ les administrateurs génèrent, ajustent et publient les **plannings**.
 |---|---|
 | Frontend | React 17 · React Router 5 · TailwindCSS 3 |
 | Backend | Firebase (Firestore + Authentication) |
-| Emails | Extension Firebase « Trigger Email » (collection `email_queue`) |
+| Emails | Brouillon `mailto:` ouvert dans la messagerie de l'admin (relances) · Firebase Auth (réinitialisation de mot de passe) |
 | Exports | ExcelJS (Excel) · jsPDF (PDF) · ics (calendrier) |
 | Hébergement | Firebase Hosting |
 | Build | Vite 8 · tests Vitest · lint ESLint 10 (Node 20.19+ ou 22.12+) |
@@ -85,14 +85,14 @@ src/
 | `users` | Profils (`nom`, `prenom`, `email`, `role`: admin \| medecin) | lecture : authentifiés · écriture : admin (le rôle n'est **pas** modifiable par son propriétaire) |
 | `desiderata` | Souhaits par médecin (`userId`, période, créneaux…) | propriétaire + admin (`userId` immuable) ; le propriétaire ne fait plus que lire une fois la saisie close (`config/saisie`) |
 | `planning` | Plannings générés/publiés + doc `periode_saisie` | lecture : authentifiés · écriture : admin |
-| `email_queue` | File d'envoi des emails (extension Trigger Email) | admin |
 
 ## Rôles
 
 - **Médecin** : saisie des desiderata, consultation du planning publié,
   changement de mot de passe.
 - **Admin** : gestion des utilisateurs, période de saisie, génération
-  (2 algorithmes : standard et par priorité), publication, relances email,
+  (2 algorithmes : standard et par priorité), publication, relances email
+  (brouillon préparé dans sa messagerie),
   exports Excel.
 
 ## Flux de travail
