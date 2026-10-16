@@ -14,7 +14,7 @@ import {
 import { exportMedecinDesiderataToExcel } from '../services/excelExportService';
 import logger from '../utils/logger';
 import { ROUTE_PLANNING } from '../utils/accueilMedecin';
-import { Save, Download, CalendarRange, CalendarDays } from 'lucide-react';
+import { Save, Download, CalendarRange, CalendarDays, RotateCcw } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { AppHeader, LoadingScreen, ErrorScreen, Alert, Button, Badge, useToast } from './ui';
 import QuickFill from './QuickFill';
@@ -23,6 +23,13 @@ import useUnsavedChangesWarning from '../hooks/useUnsavedChangesWarning';
 import useBlockNavigation from '../hooks/useBlockNavigation';
 import { CRENEAUX as creneaux } from '../constants/creneaux';
 import useDesiderataForm from './desiderata/useDesiderataForm';
+import {
+  lireBrouillon,
+  ecrireBrouillon,
+  effacerBrouillon,
+  brouillonDiffere,
+  libelleBrouillon,
+} from '../utils/brouillonDesiderata';
 import DesiderataPreferences from './desiderata/DesiderataPreferences';
 import DesiderataTable from './desiderata/DesiderataTable';
 
@@ -47,6 +54,11 @@ function FormulaireDesirata() {
   // rebondir : sans ce raccourci dans l'en-tête, le planning du trimestre en
   // cours devient inatteignable pendant la saisie du trimestre suivant.
   const [planningPublie, setPlanningPublie] = useState(false);
+  // Fiche telle qu'elle est enregistrée côté serveur : sert de point de retour
+  // si le médecin veut abandonner le brouillon local restauré.
+  const [ficheEnregistree, setFicheEnregistree] = useState(null);
+  // Date du brouillon repris à l'ouverture (null = aucun brouillon restauré).
+  const [brouillonRepris, setBrouillonRepris] = useState(null);
 
   const { profile, role } = useAuth();
   const user = profile;
@@ -89,9 +101,21 @@ function FormulaireDesirata() {
           setPeriodeSaisie(periode);
           const relevant = await chargerFiche(profile.id, periode);
           if (cancelled) { return; }
+          setFicheEnregistree(relevant);
           if (relevant) {
             setExistingDesiderataId(relevant.id);
             hydrate(relevant, false);
+          }
+          // Brouillon laissé par une session interrompue : on le reprend tel
+          // quel (il est forcément plus récent que la fiche enregistrée) et on
+          // le signale. Inutile si la saisie a été close entre-temps : plus
+          // rien ne peut être enregistré.
+          if (!periode.saisieFermee) {
+            const brouillon = lireBrouillon(profile.id, periode);
+            if (brouillon && brouillonDiffere(brouillon.payload, relevant)) {
+              hydrate(brouillon.payload, true);
+              setBrouillonRepris(brouillon.enregistreLe);
+            }
           }
           // Best-effort : un échec ne prive que du raccourci vers le planning.
           const publie = await getPublishedPlanning().catch((err) => {
@@ -130,6 +154,29 @@ function FormulaireDesirata() {
   // Un admin qui passe par cet écran n'est pas concerné.
   const lectureSeule = role !== 'admin' && Boolean(periodeSaisie?.saisieFermee);
 
+  // Sauvegarde continue du brouillon, tant que la fiche n'est pas enregistrée.
+  // Temporisé : la grille change à chaque menu déroulant, inutile de sérialiser
+  // 90 jours à chaque clic.
+  useEffect(() => {
+    if (loading || lectureSeule || !isDirty || !user || !periodeSaisie) { return undefined; }
+    const minuteur = setTimeout(() => {
+      ecrireBrouillon(user.id, periodeSaisie, { desiderata, ...preferences });
+    }, 800);
+    return () => clearTimeout(minuteur);
+  }, [desiderata, preferences, isDirty, loading, lectureSeule, user, periodeSaisie]);
+
+  // Abandon du brouillon : on revient à la fiche enregistrée (ou à une grille
+  // vierge si le médecin n'a jamais rien enregistré).
+  const abandonnerBrouillon = () => {
+    hydrate(ficheEnregistree, false);
+    effacerBrouillon(user.id, periodeSaisie);
+    setBrouillonRepris(null);
+    toast.info(ficheEnregistree
+      ? 'Brouillon abandonné : vous retrouvez votre fiche enregistrée.'
+      : 'Brouillon abandonné : la grille est de nouveau vierge.');
+  };
+
+
   // Après un refus d'écriture : si la saisie a été close entre-temps, recharge
   // la fiche telle qu'elle est enregistrée et passe en lecture seule. Renvoie
   // true dans ce cas, false si le refus a une autre cause.
@@ -139,8 +186,13 @@ function FormulaireDesirata() {
       if (!periode?.saisieFermee) { return false; }
       const fiche = await chargerFiche(user.id, periode);
       setExistingDesiderataId(fiche ? fiche.id : null);
+      setFicheEnregistree(fiche);
       hydrate(fiche, false);
       setPeriodeSaisie(periode);
+      // Saisie close : le brouillon ne pourra plus jamais être enregistré,
+      // le garder ne ferait que ressortir un bandeau trompeur.
+      effacerBrouillon(user.id, periode);
+      setBrouillonRepris(null);
       return true;
     } catch (err) {
       logger.error('Relecture de la fiche après refus impossible:', err);
@@ -169,6 +221,10 @@ function FormulaireDesirata() {
           toast.success('Desiderata enregistrés avec succès !');
         }
         setIsDirty(false);
+        // La fiche est en base : le filet local n'a plus lieu d'être.
+        setFicheEnregistree({ ...payload, id: existingDesiderataId });
+        effacerBrouillon(user.id, periodeSaisie);
+        setBrouillonRepris(null);
       } catch (err) {
         logger.error('Erreur lors de la soumission des desiderata:', err);
         // Saisie close pendant que le médecin remplissait sa fiche : plutôt
@@ -275,6 +331,30 @@ function FormulaireDesirata() {
             </span>
           </div>
         </div>
+
+        {/* Brouillon repris après une session interrompue : il faut le dire,
+            sinon le médecin croit sa fiche enregistrée alors qu'elle ne l'est
+            pas encore. */}
+        {brouillonRepris && !lectureSeule && (
+          <Alert kind="info" className="mb-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <span>
+                Nous avons retrouvé votre saisie en cours, interrompue{' '}
+                {libelleBrouillon(brouillonRepris)}. <strong className="font-semibold">
+                Elle n'est pas encore enregistrée</strong> : vérifiez-la puis cliquez sur
+                « Enregistrer ».
+              </span>
+              <Button
+                variant="secondary"
+                size="sm"
+                icon={<RotateCcw size={16} />}
+                onClick={abandonnerBrouillon}
+              >
+                Abandonner cette saisie
+              </Button>
+            </div>
+          </Alert>
+        )}
 
         {lectureSeule && (
           <Alert kind="warning" className="mb-6">
