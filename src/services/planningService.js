@@ -18,6 +18,7 @@ import {
   serverTimestamp
 } from 'firebase/firestore';
 import logger from '../utils/logger';
+import { setInscriptionOuverte } from './inscriptionService';
 
 const DESIDERATA_COLLECTION = 'desiderata';
 const PLANNING_COLLECTION = 'planning';
@@ -120,6 +121,18 @@ export const getPeriodeSaisie = async () => {
 // L'admin garde la main pour reporter un changement accordé.
 // Demande de l'APUM (04/10/2026) : un médecin avait modifié ses desiderata
 // alors que les tableaux de garde étaient déjà faits.
+//
+// Clore la saisie ferme AUSSI la fenêtre de réclamation des comptes
+// (config/inscription) : la saisie close, plus personne n'a de raison de
+// réclamer un compte, et une fenêtre laissée ouverte permettrait à un tiers de
+// s'emparer d'un compte encore non réclamé (le code de réclamation partagé est
+// public, voir constants/claim.js). L'inverse n'est pas vrai : rouvrir la
+// saisie NE rouvre PAS les inscriptions — c'est un geste délibéré, qui se fait
+// depuis l'écran Utilisateurs.
+//
+// Renvoie { inscriptionsFermees } : false si la saisie a bien été close mais
+// que la fermeture des inscriptions a échoué (l'admin doit alors la fermer à la
+// main). La clôture elle-même, si elle échoue, lève.
 export const setSaisieFermee = async (fermee) => {
   try {
     await setDoc(
@@ -130,6 +143,20 @@ export const setSaisieFermee = async (fermee) => {
   } catch (error) {
     logger.error('Erreur lors de la clôture/réouverture de la saisie:', error);
     throw error;
+  }
+
+  if (!fermee) {
+    return { inscriptionsFermees: false };
+  }
+
+  try {
+    await setInscriptionOuverte(false);
+    return { inscriptionsFermees: true };
+  } catch (error) {
+    // La saisie EST close : on ne rejoue pas l'échec en erreur globale, on le
+    // remonte pour que l'écran dise quoi finir à la main.
+    logger.error('Clôture : la fenêtre d\'inscription n\'a pas pu être fermée:', error);
+    return { inscriptionsFermees: false };
   }
 };
 

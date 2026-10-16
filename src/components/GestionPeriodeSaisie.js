@@ -70,12 +70,18 @@ function GestionPeriodeSaisie() {
     const next = !saisieFermee;
     setClotureBusy(true);
     try {
-      await saveSaisieFermee(next);
+      const { inscriptionsFermees } = await saveSaisieFermee(next);
       setSaisieFermee(next);
       setFermeeLe(next ? new Date().toISOString() : null);
-      toast.success(next
-        ? 'Saisie close : les médecins ne peuvent plus modifier leurs desiderata.'
-        : 'Saisie rouverte : les médecins peuvent de nouveau modifier leurs desiderata.');
+      if (!next) {
+        toast.success('Saisie rouverte : les médecins peuvent de nouveau modifier leurs desiderata.');
+      } else if (inscriptionsFermees) {
+        toast.success('Saisie close et fenêtre d\'inscription fermée : plus aucune fiche ne change, plus aucun compte ne peut être réclamé.');
+      } else {
+        // La saisie est close, mais la fenêtre est restée ouverte : il faut le
+        // dire, c'est elle qui expose les comptes non réclamés.
+        toast.error('Saisie close, mais la fenêtre d\'inscription n\'a pas pu être fermée — fermez-la depuis « Gestion des utilisateurs ».');
+      }
     } catch (error) {
       logger.error('Erreur lors de la clôture/réouverture de la saisie:', error);
       toast.error(next ? 'La saisie n\'a pas pu être close.' : 'La saisie n\'a pas pu être rouverte.');
@@ -140,8 +146,8 @@ function GestionPeriodeSaisie() {
               </p>
               <p className="mt-0.5 max-w-xl text-xs text-ink-500">
                 {saisieFermee
-                  ? `${fermeeLe ? `Close le ${formatDateHeure(fermeeLe)}. ` : ''}Les médecins voient leur fiche sans pouvoir la modifier ; vous pouvez toujours la corriger depuis « Remplir desiderata ». Changer les dates ne rouvre pas la saisie.`
-                  : 'Les médecins peuvent saisir et modifier leurs desiderata. Pensez à la clore avant de faire les tableaux : plus aucune fiche ne pourra alors changer sans vous.'}
+                  ? `${fermeeLe ? `Close le ${formatDateHeure(fermeeLe)}. ` : ''}Les médecins voient leur fiche sans pouvoir la modifier ; vous pouvez toujours la corriger depuis « Remplir desiderata ». Changer les dates ne rouvre pas la saisie, et la rouvrir ne rouvre pas la fenêtre d'inscription.`
+                  : 'Les médecins peuvent saisir et modifier leurs desiderata. Pensez à la clore avant de faire les tableaux : plus aucune fiche ne pourra alors changer sans vous, et la fenêtre d\'inscription se fermera en même temps.'}
               </p>
             </div>
           </div>

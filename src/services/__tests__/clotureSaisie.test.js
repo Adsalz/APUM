@@ -97,6 +97,29 @@ describe('setSaisieFermee', () => {
     expect(mockSetDoc).toHaveBeenCalledWith('config/saisie', { fermee: false });
   });
 
+  // Un compte encore « à réclamer » se prend avec un code public tant que la
+  // fenêtre est ouverte : la clôture doit la refermer dans le même geste.
+  it('clore ferme aussi la fenêtre d\'inscription', async () => {
+    const resultat = await setSaisieFermee(true);
+    expect(mockSetDoc).toHaveBeenCalledWith('config/inscription', { open: false });
+    expect(resultat).toEqual({ inscriptionsFermees: true });
+  });
+
+  it('rouvrir la saisie ne rouvre PAS la fenêtre d\'inscription', async () => {
+    const resultat = await setSaisieFermee(false);
+    expect(mockSetDoc).toHaveBeenCalledTimes(1);
+    expect(mockSetDoc.mock.calls[0][0]).toBe('config/saisie');
+    expect(resultat).toEqual({ inscriptionsFermees: false });
+  });
+
+  it('une saisie close reste close même si la fenêtre résiste', async () => {
+    mockSetDoc.mockImplementation((chemin) => {
+      if (chemin === 'config/inscription') { return Promise.reject(new Error('refus')); }
+      return Promise.resolve();
+    });
+    await expect(setSaisieFermee(true)).resolves.toEqual({ inscriptionsFermees: false });
+  });
+
   it('redéfinir la période ne touche pas à la clôture', async () => {
     await setPeriodeSaisie('2026-11-01', '2027-01-31');
     expect(mockSetDoc).toHaveBeenCalledTimes(1);
