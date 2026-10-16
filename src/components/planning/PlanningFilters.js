@@ -1,8 +1,8 @@
 // src/components/planning/PlanningFilters.js
 import React from 'react';
 import { Filter, ChevronDown, ChevronUp } from 'lucide-react';
-import MedecinSearchSelect from './components/MedecinSearchSelect';
-import { Card, Select } from '../ui';
+
+import { Card, MedecinCombobox, Select } from '../ui';
 
 const inputClass =
   'w-full rounded-lg border border-ink-200 bg-white px-3 py-2 text-sm text-ink-800 shadow-sm ' +
@@ -85,11 +85,13 @@ const PlanningFilters = ({
               <label className="mb-2 block text-sm font-semibold text-ink-700">
                 Médecin
               </label>
-              <MedecinSearchSelect
+              <MedecinCombobox
                 medecins={medecins}
                 value={selectedMedecin}
                 onChange={onMedecinFilterChange}
-                placeholder="Rechercher un médecin..."
+                optionTous={{ value: 'all', label: 'Tous les médecins' }}
+                ariaLabel="Filtrer par médecin"
+                placeholder="Taper un nom ou choisir dans la liste…"
               />
             </div>
           </div>

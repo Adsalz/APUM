@@ -35,6 +35,7 @@ import {
   EmptyState,
   useToast,
 } from './ui';
+import { trierMedecinsParNom, sansAccents } from '../utils/medecins';
 import logger from '../utils/logger';
 
 function GestionUtilisateurs() {
@@ -105,18 +106,18 @@ function GestionUtilisateurs() {
     }
   };
 
-  // Gestion des filtres et de la recherche
-  const filteredUsers = users.filter(user => {
-    const matchesSearch = (
-      user.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.prenom.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    user.email.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+  // Gestion des filtres et de la recherche. La recherche ignore les accents et
+  // accepte plusieurs mots ; la liste est rendue par ordre alphabétique de nom
+  // (l'ordre Firestore est arbitraire).
+  const motsRecherche = sansAccents(searchTerm).trim().split(/\s+/).filter(Boolean);
+  const filteredUsers = trierMedecinsParNom(users.filter(user => {
+    const cible = `${sansAccents(user.nom)} ${sansAccents(user.prenom)} ${sansAccents(user.email)}`;
+    const matchesSearch = motsRecherche.every((mot) => cible.includes(mot));
 
     const matchesRole = roleFilter === 'all' || user.role === roleFilter;
 
     return matchesSearch && matchesRole;
-  });
+  }));
 
   // Pagination
   const indexOfLastUser = currentPage * usersPerPage;
@@ -489,7 +490,8 @@ function GestionUtilisateurs() {
                   <div className="mb-4 flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <h3 className="mb-0.5 truncate text-lg font-bold text-ink-900">
-                        {user.prenom} {user.nom}
+                        {(user.nom || '').toUpperCase()}{' '}
+                        <span className="font-semibold text-ink-600">{user.prenom}</span>
                       </h3>
                       <div className="flex items-center gap-2 text-sm text-ink-500">
                         <Mail size={16} className="flex-shrink-0 text-ink-400" aria-hidden="true" />
@@ -632,7 +634,7 @@ function GestionUtilisateurs() {
         <p className="text-sm text-ink-600">
           Êtes-vous sûr de vouloir supprimer l'utilisateur{' '}
           <span className="font-semibold text-ink-900">
-            {userToDelete?.prenom} {userToDelete?.nom}
+            {(userToDelete?.nom || '').toUpperCase()} {userToDelete?.prenom}
           </span>
           {' '}? Cette action est irréversible.
         </p>

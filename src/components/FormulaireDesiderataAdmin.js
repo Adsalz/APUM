@@ -27,7 +27,7 @@ import {
   Card,
   Modal,
   Badge,
-  Select,
+  MedecinCombobox,
   useToast,
 } from './ui';
 import { useAuth } from '../contexts/AuthContext';
@@ -254,8 +254,7 @@ function FormulaireDesiderataAdmin() {
   const handleCancelImport = () => setPendingImport(null);
 
   // Changement de médecin : confirmer si des modifications ne sont pas enregistrées.
-  const handleMedecinSelectChange = (e) => {
-    const newId = e.target.value;
+  const handleMedecinSelectChange = (newId) => {
     if (isDirty && selectedMedecinId && newId !== selectedMedecinId) {
       setPendingMedecinId(newId);
       return;
@@ -436,7 +435,7 @@ function FormulaireDesiderataAdmin() {
               <>
                 <span>·</span>
                 <span>
-                  Dr {selectedMedecin.prenom} {selectedMedecin.nom} · {dates.length} jours ·{' '}
+                  {(selectedMedecin.nom || '').toUpperCase()} {selectedMedecin.prenom} · {dates.length} jours ·{' '}
                   {filledCount} choix renseignés
                 </span>
               </>
@@ -450,19 +449,15 @@ function FormulaireDesiderataAdmin() {
             <Users size={15} className="text-primary-500" aria-hidden="true" />
             Sélectionner un médecin
           </h2>
-          <Select
-            value={selectedMedecinId}
-            onChange={handleMedecinSelectChange}
-            aria-label="Sélectionner un médecin"
-            className="sm:max-w-md"
-          >
-            <option value="">— Choisir un médecin —</option>
-            {medecins.map((medecin) => (
-              <option key={medecin.id} value={medecin.id}>
-                Dr {medecin.prenom} {medecin.nom}
-              </option>
-            ))}
-          </Select>
+          <div className="sm:max-w-md">
+            <MedecinCombobox
+              medecins={medecins}
+              value={selectedMedecinId}
+              onChange={handleMedecinSelectChange}
+              ariaLabel="Sélectionner un médecin"
+              placeholder="Taper un nom ou choisir dans la liste…"
+            />
+          </div>
           {selectedMedecin && (
             <div className="mt-4 space-y-2">
               <Alert kind={existingDesiderataId ? 'success' : 'info'}>

@@ -23,7 +23,7 @@ import {
   reclamationEnCours,
 } from '../constants/claim';
 import { useAuth } from '../contexts/AuthContext';
-import { Alert, Button, Card, CodePad, FormField, Modal, Select } from './ui';
+import { Alert, Button, Card, CodePad, FormField, MedecinCombobox, Modal } from './ui';
 import logger from '../utils/logger';
 
 // Message générique volontairement identique pour code erroné / compte
@@ -186,7 +186,7 @@ function Login() {
     }
   }, [mode]);
 
-  // Focus du <select> médecin une fois l'annuaire chargé ET le contrôle activé.
+  // Focus du champ « Votre nom » une fois l'annuaire chargé ET le contrôle activé.
   useEffect(() => {
     if (mode === 'medecin' && !annuaireLoading && !annuaireError && annuaire.length > 0) {
       selectRef.current?.focus();
@@ -527,26 +527,20 @@ function Login() {
               >
                 Votre nom
               </label>
-              <Select
+              <MedecinCombobox
                 id="medecin-select"
                 ref={selectRef}
+                medecins={annuaire}
                 value={selectedUid}
-                onChange={(e) => {
-                  setSelectedUid(e.target.value);
+                onChange={(uid) => {
+                  setSelectedUid(uid);
                   setError('');
                 }}
-                disabled={annuaireLoading || annuaireError || annuaire.length === 0}
-                required
-              >
-                <option value="" disabled>
-                  {annuaireLoading ? 'Chargement des médecins…' : 'Sélectionnez votre nom'}
-                </option>
-                {annuaire.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.label}
-                  </option>
-                ))}
-              </Select>
+                disabled={Boolean(annuaireLoading || annuaireError || annuaire.length === 0)}
+                ariaLabel="Votre nom"
+                placeholder={annuaireLoading ? 'Chargement des médecins…' : 'Tapez votre nom ou choisissez dans la liste…'}
+                emptyLabel="Aucun nom ne correspond"
+              />
             </div>
 
             {/* Pavé numérique cliquable (souris/doigt) + saisie clavier,

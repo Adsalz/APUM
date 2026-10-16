@@ -13,7 +13,7 @@ export const trierMedecinsParNom = (medecins) =>
 // d'importer, on vérifie seulement que le nom de famille du médecin choisi y
 // figure — assez pour attraper la fiche de quelqu'un d'autre, assez tolérant
 // pour ne pas crier sur une graphie inhabituelle.
-const sansAccents = (texte) =>
+export const sansAccents = (texte) =>
   (texte || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
 export const nomFicheCorrespond = (nomLu, medecin) => {

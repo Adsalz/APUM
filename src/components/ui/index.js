@@ -11,6 +11,7 @@ export { default as EmptyState } from './EmptyState';
 export { default as ErrorScreen } from './ErrorScreen';
 export { default as FormField } from './FormField';
 export { default as LoadingScreen } from './LoadingScreen';
+export { default as MedecinCombobox } from './MedecinCombobox';
 export { default as Modal } from './Modal';
 export { default as Select } from './Select';
 export { default as SegmentedControl } from './SegmentedControl';

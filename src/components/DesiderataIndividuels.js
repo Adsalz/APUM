@@ -12,7 +12,7 @@ import {
   ErrorScreen,
   Card,
   Button,
-  Select,
+  MedecinCombobox,
   EmptyState
 } from './ui';
 import { getMedecins } from '../services/userService';
@@ -167,14 +167,12 @@ function DesiderataIndividuels() {
             </p>
           </div>
           <div className="w-full sm:w-80">
-            <Select value={selectedId} onChange={(e) => changerMedecin(e.target.value)}>
-              <option value="">— Choisir un médecin —</option>
-              {medecins.map((m) => (
-                <option key={m.id} value={m.id}>
-                  Dr {m.prenom} {m.nom}
-                </option>
-              ))}
-            </Select>
+            <MedecinCombobox
+              medecins={medecins}
+              value={selectedId}
+              onChange={changerMedecin}
+              placeholder="Taper un nom ou choisir dans la liste…"
+            />
           </div>
         </div>
 
@@ -238,7 +236,8 @@ function DesiderataIndividuels() {
               <div className="flex flex-wrap items-baseline gap-x-2 border-b border-ink-100 px-5 py-3">
                 <span className="text-xs font-bold uppercase tracking-wide text-ink-400">Nom et prénom</span>
                 <span className="text-base font-extrabold text-ink-900">
-                  Dr {medecinSelectionne?.prenom} {(medecinSelectionne?.nom || '').toUpperCase()}
+                  {(medecinSelectionne?.nom || '').toUpperCase()}{' '}
+                  <span className="font-semibold text-ink-600">{medecinSelectionne?.prenom}</span>
                 </span>
               </div>
               <div className="relative bg-[#FFFF00]/20 px-5 py-4 pl-6">

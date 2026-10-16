@@ -3,7 +3,7 @@ import { X, Download, Search } from 'lucide-react';
 import { Modal, Button, Checkbox, useToast } from './ui';
 import { exportDesiderataToExcel } from '../services/excelExportService';
 import { getPeriodeSaisie } from '../services/planningService';
-import { trierMedecinsParNom } from '../utils/medecins';
+import { trierMedecinsParNom, sansAccents } from '../utils/medecins';
 import logger from '../utils/logger';
 
 // Exporte les desiderata des médecins SÉLECTIONNÉS au format Excel de la fiche
@@ -22,10 +22,14 @@ function ExportDesiderataModal({
   const [isExporting, setIsExporting] = useState(false);
   const toast = useToast();
 
-  const filteredMedecins = trierMedecinsParNom(medecins.filter(medecin =>
-    medecin.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    medecin.prenom.toLowerCase().includes(searchTerm.toLowerCase())
-  ));
+  // Recherche insensible aux accents et multi-mots (même règle que les listes
+  // déroulantes de médecins).
+  const motsRecherche = sansAccents(searchTerm).trim().split(/\s+/).filter(Boolean);
+  const filteredMedecins = trierMedecinsParNom(medecins.filter((medecin) => {
+    if (motsRecherche.length === 0) { return true; }
+    const cible = `${sansAccents(medecin.nom)} ${sansAccents(medecin.prenom)}`;
+    return motsRecherche.every((mot) => cible.includes(mot));
+  }));
 
   const toggleSelectAll = () => {
     const newState = !selectAll;
@@ -136,7 +140,7 @@ function ExportDesiderataModal({
               key={medecin.id}
               checked={selectedMedecins[medecin.id] || false}
               onChange={() => toggleMedecin(medecin.id)}
-              label={`Dr. ${medecin.prenom} ${medecin.nom}`}
+              label={`${(medecin.nom || '').toUpperCase()} ${medecin.prenom}`}
               className="m-0 rounded-lg px-2.5 py-2 hover:bg-ink-50"
             />
           ))

@@ -155,10 +155,12 @@ function PlanningVisualisation() {
     return date.getDay() === 0 || date.getDay() === 6;
   };
 
+  // Nom de famille d'abord, comme partout ailleurs dans l'application.
+  const nomComplet = (m) => `${(m?.nom || '').toUpperCase()} ${m?.prenom || ''}`.trim();
   const getMedecinName = (medecinId) => {
-    if (medecinId === profile.id) {return `Dr ${profile.prenom} ${profile.nom}`;}
+    if (medecinId === profile.id) {return nomComplet(profile);}
     const medecin = medecins.find(m => m.id === medecinId);
-    return medecin ? `Dr ${medecin.prenom} ${medecin.nom}` : 'Médecin inconnu';
+    return medecin ? nomComplet(medecin) : 'Médecin inconnu';
   };
 
   if (loading) {return <LoadingScreen message="Chargement du planning…" />;}

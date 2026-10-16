@@ -16,6 +16,7 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Search, X, ChevronDown, ChevronUp, Plus, AlertTriangle } from 'lucide-react';
+import { sansAccents } from '../../../utils/medecins';
 import {
   preferencePour,
   souhaitMensuelDe,
@@ -129,11 +130,14 @@ const MedecinSlotSelect = ({
   const { medecins, idxDesiderata, idxPlanning, planningJours, selectedMedecin } = ctx.current;
   const candidats = useMemo(() => {
     if (!isOpen) { return []; }
-    const terme = searchTerm.trim().toLowerCase();
+    // Recherche insensible aux accents et multi-mots, comme MedecinCombobox.
+    const mots = sansAccents(searchTerm).trim().split(/\s+/).filter(Boolean);
     return medecins
-      .filter((m) => !terme
-        || m.nom.toLowerCase().includes(terme)
-        || m.prenom.toLowerCase().includes(terme))
+      .filter((m) => {
+        if (mots.length === 0) { return true; }
+        const cible = `${sansAccents(m.nom)} ${sansAccents(m.prenom)}`;
+        return mots.every((mot) => cible.includes(mot));
+      })
       .map((m) => {
         const problemes = problemesCandidat(
           m.id, date, creneauId, planningJours, idxPlanning, idxDesiderata

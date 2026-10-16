@@ -7,7 +7,7 @@ import DesiderataGauge from './DesiderataGauge';
 import RelanceEmailModal from './RelanceEmailModal';
 import { getMedecinsSansDesiderata } from '../services/emailService';
 import { exportDesiderataToExcel, exportFicheViergeToExcel } from '../services/excelExportService';
-import { trierMedecinsParNom } from '../utils/medecins';
+import { trierMedecinsParNom, sansAccents } from '../utils/medecins';
 import {
   AppHeader,
   LoadingScreen,
@@ -60,12 +60,14 @@ function GestionDesiderata() {
 
     let filtered = medecins;
 
-    // Filtre par recherche
-    if (searchTerm) {
-      const search = searchTerm.toLowerCase();
-      filtered = filtered.filter(medecin =>
-        `${medecin.prenom} ${medecin.nom}`.toLowerCase().includes(search)
-      );
+    // Filtre par recherche : accents ignorés, plusieurs mots acceptés dans
+    // n'importe quel ordre (même règle que les listes déroulantes de médecins).
+    const mots = sansAccents(searchTerm).trim().split(/\s+/).filter(Boolean);
+    if (mots.length > 0) {
+      filtered = filtered.filter((medecin) => {
+        const cible = `${sansAccents(medecin.nom)} ${sansAccents(medecin.prenom)}`;
+        return mots.every((mot) => cible.includes(mot));
+      });
     }
 
     // Filtre par statut
