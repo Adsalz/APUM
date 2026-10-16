@@ -53,6 +53,9 @@ const versValeur = (v) => {
   if (typeof v === 'number') return { doubleValue: v };
   if (v instanceof Date) return { timestampValue: v.toISOString() };
   if (Array.isArray(v)) return { arrayValue: { values: v.map(versValeur) } };
+  // Carte imbriquée (la grille d'une fiche : date → créneau → réponse). Sans
+  // ce cas, String(objet) écrivait « [object Object] » dans Firestore.
+  if (typeof v === 'object') return { mapValue: { fields: versChamps(v) } };
   return { stringValue: String(v) };
 };
 
@@ -71,6 +74,7 @@ const depuisValeur = (v) => {
   if ('nullValue' in v) return null;
   if ('timestampValue' in v) return v.timestampValue;
   if ('arrayValue' in v) return (v.arrayValue.values || []).map(depuisValeur);
+  if ('mapValue' in v) return depuisChamps(v.mapValue.fields);
   return v;
 };
 
@@ -122,6 +126,36 @@ async function creerSession({ projet } = {}) {
         pageToken = page.nextPageToken;
       } while (pageToken);
       return out;
+    },
+
+    // Documents BRUTS, tels que l'API REST les rend ({ id, fields }). Une
+    // sauvegarde doit pouvoir être réécrite à l'identique : on ne passe pas par
+    // la conversion en objets JS, qui ne distingue pas entier et décimal.
+    async listerBrut(collection) {
+      const out = [];
+      let pageToken;
+      do {
+        const url = `${baseFs}/${collection}?pageSize=300${pageToken ? `&pageToken=${pageToken}` : ''}`;
+        // eslint-disable-next-line no-await-in-loop
+        const r = await fetch(url, { headers: entetes });
+        if (!r.ok) throw new Error(`LIST ${collection} → ${r.status} ${await r.text()}`);
+        // eslint-disable-next-line no-await-in-loop
+        const page = await r.json();
+        (page.documents || []).forEach((d) =>
+          out.push({ id: d.name.split('/').pop(), fields: d.fields || {} })
+        );
+        pageToken = page.nextPageToken;
+      } while (pageToken);
+      return out;
+    },
+
+    // Réécrit un document à partir de ses champs BRUTS (restauration).
+    async ecrireBrut(chemin, fields) {
+      const r = await fetch(`${baseFs}/${chemin}`, {
+        method: 'PATCH', headers: entetes, body: JSON.stringify({ fields }),
+      });
+      if (!r.ok) throw new Error(`SET ${chemin} → ${r.status} ${await r.text()}`);
+      return r.json();
     },
 
     async get(chemin) {
@@ -176,4 +210,6 @@ async function creerSession({ projet } = {}) {
   };
 }
 
-module.exports = { creerSession, projetParDefaut };
+// versChamps / depuisChamps sont exportés pour pouvoir être vérifiés hors
+// session (les scripts ne passent pas par Jest, qui ne regarde que src/).
+module.exports = { creerSession, projetParDefaut, versChamps, depuisChamps };

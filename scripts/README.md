@@ -384,3 +384,65 @@ Options : `--projet <id>`, `--periode <AAAA-MM>` (un seul trimestre).
 
 Les documents déjà en identifiants sont détectés et laissés tels quels : le
 script est rejouable sans risque.
+
+## `sauvegarder-firestore.js` — sauvegarde complète de la base
+
+Le plan gratuit n'a **aucune sauvegarde** : les exports Firestore planifiés de
+Google exigent le plan Blaze. Une mauvaise manipulation (script d'admin,
+console Firebase) effacerait les desiderata et les plannings de l'année sans
+recours. Ce script est la parade : il écrit un JSON par collection dans un
+dossier horodaté, et sait les réécrire.
+
+```bash
+cd scripts
+npm run sauvegarder                 # sauvegarde + rotation
+node sauvegarder-firestore.js --lister
+```
+
+Les documents sont enregistrés **tels que l'API les rend**, ce qui permet de les
+réécrire à l'identique :
+
+```bash
+node sauvegarder-firestore.js --restaurer "~/Sauvegardes APUM/apum-2026-10-16T14-56-49"        # aperçu
+node sauvegarder-firestore.js --restaurer "~/Sauvegardes APUM/apum-2026-10-16T14-56-49" --go   # réécrit
+```
+
+La restauration **réécrit** les documents sauvegardés par-dessus ceux en place ;
+elle ne supprime rien, un document créé depuis la sauvegarde survit.
+
+Options : `--dossier <chemin>` (défaut `~/Sauvegardes APUM`), `--conserver <n>`
+(défaut 12), `--projet <id>`, `--lister`, `--restaurer <dossier>`, `--go`.
+
+> ⚠️ **RGPD** — la sauvegarde contient des données nominatives (noms, emails,
+> disponibilités). Elle est écrite **hors du dépôt git**, dans le dossier
+> personnel. Ne la déposez pas sur un service partagé non maîtrisé.
+
+### Sauvegarde hebdomadaire automatique (macOS)
+
+Enregistrez ceci dans `~/Library/LaunchAgents/fr.apum.sauvegarde.plist`, en
+remplaçant le chemin du dépôt, puis
+`launchctl load ~/Library/LaunchAgents/fr.apum.sauvegarde.plist` :
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>fr.apum.sauvegarde</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/env</string>
+    <string>node</string>
+    <string>/Users/VOUS/Documents/APUM/scripts/sauvegarder-firestore.js</string>
+  </array>
+  <key>StartCalendarInterval</key>
+  <dict><key>Weekday</key><integer>1</integer><key>Hour</key><integer>9</integer></dict>
+  <key>StandardErrorPath</key><string>/tmp/apum-sauvegarde.log</string>
+  <key>StandardOutPath</key><string>/tmp/apum-sauvegarde.log</string>
+</dict>
+</plist>
+```
+
+L'ordinateur doit être allumé à l'heure dite ; sinon launchd lance la tâche au
+réveil suivant. La session `firebase-tools` doit être valide (`npx
+firebase-tools login`).
