@@ -4,17 +4,18 @@
 // les dates (app ou scripts, qui réécrivent la période en entier) ne doit pas
 // pouvoir rouvrir la saisie. getPeriodeSaisie le rend avec la période.
 //
-// Le mock de firebase/firestore est hoisté par Jest au-dessus des imports.
+// Le mock de firebase/firestore est hoisté par Vitest au-dessus des imports.
 
 import { getPeriodeSaisie, setPeriodeSaisie, setSaisieFermee } from '../planningService';
+import { Timestamp } from 'firebase/firestore';
 
 const mockDocs = {};
-const mockSetDoc = jest.fn();
+const mockSetDoc = vi.fn();
 const SERVEUR = { horodatageServeur: true };
 
-jest.mock('../../firebase', () => ({ db: {}, auth: { currentUser: { uid: 'admin-1' } } }));
+vi.mock('../../firebase', () => ({ db: {}, auth: { currentUser: { uid: 'admin-1' } } }));
 
-jest.mock('firebase/firestore', () => {
+vi.mock('firebase/firestore', () => {
   // Timestamp doit être une CLASSE : planningService fait `instanceof Timestamp`.
   class Timestamp {
     constructor(date) { this.__date = date; }
@@ -22,11 +23,9 @@ jest.mock('firebase/firestore', () => {
     static now() { return new Timestamp(new Date()); }
     toDate() { return this.__date; }
   }
-  // Fonctions simples et non jest.fn(impl) : la config Jest de CRA
-  // (resetMocks) efface les implémentations avant chaque test.
   return {
     Timestamp,
-    collection: jest.fn(),
+    collection: vi.fn(),
     doc: (_db, coll, id) => `${coll}/${id}`,
     getDoc: (chemin) => Promise.resolve({
       exists: () => chemin in mockDocs,
@@ -34,20 +33,19 @@ jest.mock('firebase/firestore', () => {
     }),
     setDoc: (...a) => mockSetDoc(...a),
     serverTimestamp: () => SERVEUR,
-    addDoc: jest.fn(),
-    updateDoc: jest.fn(),
-    deleteDoc: jest.fn(),
-    getDocs: jest.fn(),
-    query: jest.fn(),
-    where: jest.fn(),
-    orderBy: jest.fn(),
-    limit: jest.fn(),
-    writeBatch: jest.fn(),
-    deleteField: jest.fn(),
+    addDoc: vi.fn(),
+    updateDoc: vi.fn(),
+    deleteDoc: vi.fn(),
+    getDocs: vi.fn(),
+    query: vi.fn(),
+    where: vi.fn(),
+    orderBy: vi.fn(),
+    limit: vi.fn(),
+    writeBatch: vi.fn(),
+    deleteField: vi.fn(),
   };
 });
 
-const { Timestamp } = jest.requireMock('firebase/firestore');
 const PERIODE_NDJ = {
   startDate: Timestamp.fromDate(new Date('2026-11-01T00:00:00Z')),
   endDate: Timestamp.fromDate(new Date('2027-01-31T00:00:00Z')),

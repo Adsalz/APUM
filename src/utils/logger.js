@@ -3,13 +3,9 @@
  * Les logs ne s'affichent qu'en développement
  */
 
-let isDevelopment = true;
-try {
-  isDevelopment = process.env.NODE_ENV === 'development';
-} catch (error) {
-  // Fallback si process n'est pas défini
-  isDevelopment = true;
-}
+// Même sens que l'ancien NODE_ENV : 'development' sous `npm start`,
+// 'production' au build, 'test' sous Vitest.
+const isDevelopment = import.meta.env.MODE === 'development';
 
 export const logger = {
   log: (...args) => {
@@ -45,12 +41,7 @@ export const logger = {
   },
 
   debug: (...args) => {
-    let debugMode = false;
-    try {
-      debugMode = process.env.REACT_APP_DEBUG === 'true';
-    } catch (error) {
-      debugMode = false;
-    }
+    const debugMode = import.meta.env.REACT_APP_DEBUG === 'true';
 
     if (isDevelopment && debugMode) {
       // eslint-disable-next-line no-console

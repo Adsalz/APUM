@@ -2,18 +2,19 @@
 // (demande de l'APUM, 08/10/2026) : posés à chaque enregistrement, rendus en
 // ISO à la lecture.
 //
-// Le mock de firebase/firestore est hoisté par Jest au-dessus des imports.
+// Le mock de firebase/firestore est hoisté par Vitest au-dessus des imports.
 
 import { addDesiderata, updateDesiderata, getDesiderataForPeriod } from '../planningService';
+import { Timestamp } from 'firebase/firestore';
 
-const mockAddDoc = jest.fn();
-const mockUpdateDoc = jest.fn();
+const mockAddDoc = vi.fn();
+const mockUpdateDoc = vi.fn();
 const mockFiches = [];
 const SERVEUR = { horodatageServeur: true };
 
-jest.mock('../../firebase', () => ({ db: {}, auth: { currentUser: { uid: 'admin-1' } } }));
+vi.mock('../../firebase', () => ({ db: {}, auth: { currentUser: { uid: 'admin-1' } } }));
 
-jest.mock('firebase/firestore', () => {
+vi.mock('firebase/firestore', () => {
   // Timestamp doit être une CLASSE : planningService fait `instanceof Timestamp`.
   class Timestamp {
     constructor(date) { this.__date = date; }
@@ -21,8 +22,6 @@ jest.mock('firebase/firestore', () => {
     static now() { return new Timestamp(new Date()); }
     toDate() { return this.__date; }
   }
-  // Fonctions simples et non jest.fn(impl) : la config Jest de CRA
-  // (resetMocks) efface les implémentations avant chaque test.
   return {
     Timestamp,
     collection: () => 'desiderata',
@@ -33,19 +32,18 @@ jest.mock('firebase/firestore', () => {
       docs: mockFiches.map((f) => ({ id: f.id, data: () => f })),
     }),
     serverTimestamp: () => SERVEUR,
-    getDoc: jest.fn(),
-    setDoc: jest.fn(),
-    deleteDoc: jest.fn(),
+    getDoc: vi.fn(),
+    setDoc: vi.fn(),
+    deleteDoc: vi.fn(),
     query: () => ({}),
     where: () => ({}),
-    orderBy: jest.fn(),
-    limit: jest.fn(),
-    writeBatch: jest.fn(),
-    deleteField: jest.fn(),
+    orderBy: vi.fn(),
+    limit: vi.fn(),
+    writeBatch: vi.fn(),
+    deleteField: vi.fn(),
   };
 });
 
-const { Timestamp } = jest.requireMock('firebase/firestore');
 const FICHE = {
   startDate: '2026-11-01T00:00:00.000Z',
   endDate: '2027-01-31T00:00:00.000Z',

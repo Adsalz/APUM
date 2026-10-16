@@ -1,10 +1,10 @@
 // Tests de la logique de labels de l'annuaire (désambiguïsation des homonymes).
-// computeAnnuaireLabels est une fonction pure. Le jest.mock ci-dessous est
-// hoisté par Jest au-dessus de l'import : il évite l'initialisation réelle de
+// computeAnnuaireLabels est une fonction pure. Le vi.mock ci-dessous est
+// hoisté par Vitest au-dessus de l'import : il évite l'initialisation réelle de
 // Firebase (../../firebase) déclenchée à l'import d'annuaireService.
 import { computeAnnuaireLabels } from '../annuaireService';
 
-jest.mock('../../firebase', () => ({ db: {}, auth: {} }));
+vi.mock('../../firebase', () => ({ db: {}, auth: {} }));
 
 describe('computeAnnuaireLabels', () => {
   it('utilise « Prénom N. » quand il n\'y a pas de collision', () => {

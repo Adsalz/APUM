@@ -25,7 +25,8 @@ git restore --source=main -- .env
 #    REACT_APP_EMAIL_FROM=<adresse Gmail configurée dans l'extension Trigger Email>
 #    REACT_APP_PUBLIC_URL=https://apum-8cfa4.web.app
 
-# 4. Réinstaller les dépendances (react-scripts a changé de version majeure)
+# 4. Réinstaller les dépendances (le build est passé de Create React App
+#    à Vite le 16/10/2026 ; Vite exige Node 20.19+ ou 22.12+ : `node -v`)
 npm install
 
 # 5. Construire

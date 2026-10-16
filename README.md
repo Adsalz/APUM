@@ -15,7 +15,7 @@ les administrateurs génèrent, ajustent et publient les **plannings**.
 | Emails | Extension Firebase « Trigger Email » (collection `email_queue`) |
 | Exports | ExcelJS (Excel) · jsPDF (PDF) · ics (calendrier) |
 | Hébergement | Firebase Hosting |
-| Build | react-scripts 5 (Create React App) |
+| Build | Vite 8 · tests Vitest · lint ESLint 10 (Node 20.19+ ou 22.12+) |
 
 ## Démarrage
 
@@ -27,8 +27,11 @@ npm install
 cp .env.example .env
 # puis renseigner les clés Firebase et les variables email
 
-# 3. Lancer en développement
+# 3. Lancer en développement (http://localhost:3000)
 npm start
+
+# Tests (Vitest)
+npm test
 
 # 4. Construire pour la production
 npm run build

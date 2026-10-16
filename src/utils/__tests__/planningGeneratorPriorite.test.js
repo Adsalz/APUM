@@ -5,11 +5,11 @@
 // services : on les neutralise par des mocks factory.
 import { diviserPeriode } from '../planningGeneratorPriorite';
 
-jest.mock('../../services/planningService', () => ({
-  getDesiderataForPeriod: jest.fn()
+vi.mock('../../services/planningService', () => ({
+  getDesiderataForPeriod: vi.fn()
 }));
-jest.mock('../../services/userService', () => ({
-  getAllUsers: jest.fn()
+vi.mock('../../services/userService', () => ({
+  getAllUsers: vi.fn()
 }));
 
 // Calculs de dates déterministes quel que soit le fuseau de la machine.

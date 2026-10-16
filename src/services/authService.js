@@ -42,7 +42,7 @@ const mapFirebaseSignUpError = (data) => {
 // loginMedecin (« premier code = le sien »).
 export const registerUser = async (email) => {
   try {
-    const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${process.env.REACT_APP_FIREBASE_API_KEY}`, {
+    const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${import.meta.env.REACT_APP_FIREBASE_API_KEY}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'

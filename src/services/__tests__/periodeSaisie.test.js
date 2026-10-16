@@ -6,33 +6,33 @@
 // CONSERVER les anciennes périodes est un choix métier : ce test empêche qu'une
 // réintroduction de la cascade passe inaperçue.
 //
-// Le mock de firebase/firestore est hoisté par Jest au-dessus des imports.
+// Le mock de firebase/firestore est hoisté par Vitest au-dessus des imports.
 
 import { setPeriodeSaisie } from '../planningService';
 
-const mockSetDoc = jest.fn(() => Promise.resolve());
-const mockGetDocs = jest.fn(() => Promise.resolve({ docs: [] }));
-const mockDeleteDoc = jest.fn(() => Promise.resolve());
-const mockBatchDelete = jest.fn();
-const mockBatchCommit = jest.fn(() => Promise.resolve());
+const mockSetDoc = vi.fn(() => Promise.resolve());
+const mockGetDocs = vi.fn(() => Promise.resolve({ docs: [] }));
+const mockDeleteDoc = vi.fn(() => Promise.resolve());
+const mockBatchDelete = vi.fn();
+const mockBatchCommit = vi.fn(() => Promise.resolve());
 
-jest.mock('../../firebase', () => ({ db: {}, auth: { currentUser: { uid: 'admin-1' } } }));
+vi.mock('../../firebase', () => ({ db: {}, auth: { currentUser: { uid: 'admin-1' } } }));
 
-jest.mock('firebase/firestore', () => ({
-  collection: jest.fn((_db, name) => ({ name })),
-  doc: jest.fn((_db, coll, id) => ({ coll, id })),
-  addDoc: jest.fn(() => Promise.resolve({ id: 'nouveau' })),
-  updateDoc: jest.fn(() => Promise.resolve()),
+vi.mock('firebase/firestore', () => ({
+  collection: vi.fn((_db, name) => ({ name })),
+  doc: vi.fn((_db, coll, id) => ({ coll, id })),
+  addDoc: vi.fn(() => Promise.resolve({ id: 'nouveau' })),
+  updateDoc: vi.fn(() => Promise.resolve()),
   deleteDoc: (...a) => mockDeleteDoc(...a),
-  getDoc: jest.fn(() => Promise.resolve({ exists: () => false })),
+  getDoc: vi.fn(() => Promise.resolve({ exists: () => false })),
   getDocs: (...a) => mockGetDocs(...a),
   setDoc: (...a) => mockSetDoc(...a),
-  query: jest.fn((...a) => a),
-  where: jest.fn(),
-  orderBy: jest.fn(),
-  limit: jest.fn(),
-  writeBatch: jest.fn(() => ({ delete: mockBatchDelete, set: jest.fn(), commit: mockBatchCommit })),
-  deleteField: jest.fn(),
+  query: vi.fn((...a) => a),
+  where: vi.fn(),
+  orderBy: vi.fn(),
+  limit: vi.fn(),
+  writeBatch: vi.fn(() => ({ delete: mockBatchDelete, set: vi.fn(), commit: mockBatchCommit })),
+  deleteField: vi.fn(),
   // Timestamp doit être une CLASSE : planningService fait `instanceof Timestamp`.
   Timestamp: class Timestamp {
     constructor(date) { this.__date = date; }
@@ -43,7 +43,7 @@ jest.mock('firebase/firestore', () => ({
 }));
 
 describe('setPeriodeSaisie — aucune suppression en cascade', () => {
-  beforeEach(() => { jest.clearAllMocks(); });
+  beforeEach(() => { vi.clearAllMocks(); });
 
   it('écrit la période sans supprimer le moindre desiderata', async () => {
     await setPeriodeSaisie('2026-11-01', '2027-01-31');

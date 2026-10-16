@@ -33,7 +33,7 @@ const DesiderataIndividuels = lazy(() => import('./components/DesiderataIndividu
 
 // Harnais de développement (jamais monté en production) : rejoue l'écran
 // d'édition du planning sur des données fictives, sans Firebase ni auth.
-const isDev = process.env.NODE_ENV === 'development';
+const isDev = import.meta.env.MODE === 'development';
 const PlanningEditPreview = isDev
   ? lazy(() => import('./devtools/PlanningEditPreview'))
   : null;

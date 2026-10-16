@@ -18,7 +18,9 @@ export default function runPlanningWorker(payload) {
 
     let worker;
     try {
-      worker = new Worker(new URL('../workers/planning.worker.js', import.meta.url));
+      // Worker « module » : en dev, Vite le sert tel quel, avec ses imports ES,
+      // qu'un worker classique refuse (seul le build l'empaquette).
+      worker = new Worker(new URL('../workers/planning.worker.js', import.meta.url), { type: 'module' });
     } catch (e) {
       computeSync(payload).then(resolve, reject);
       return;

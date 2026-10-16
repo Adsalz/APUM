@@ -7,8 +7,8 @@ import { trierMedecinsParNom } from '../utils/medecins';
 const EMAIL_QUEUE_COLLECTION = 'email_queue';
 
 // Configuration externalisée (plus d'adresse personnelle ni d'URL en dur dans le code)
-export const EMAIL_FROM = process.env.REACT_APP_EMAIL_FROM || 'noreply@apum.fr';
-export const APP_URL = process.env.REACT_APP_PUBLIC_URL || 'https://apum-8cfa4.web.app';
+export const EMAIL_FROM = import.meta.env.REACT_APP_EMAIL_FROM || 'noreply@apum.fr';
+export const APP_URL = import.meta.env.REACT_APP_PUBLIC_URL || 'https://apum-8cfa4.web.app';
 
 /**
  * Envoie une relance par email à un médecin

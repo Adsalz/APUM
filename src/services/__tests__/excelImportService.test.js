@@ -7,7 +7,6 @@ import { exportMedecinDesiderataToExcel, exportFicheViergeToExcel } from '../exc
 import { importDesiderataFromExcel } from '../excelImportService';
 
 // L'export déclenche un téléchargement navigateur : on capture le Blob produit.
-// Fonctions SIMPLES (pas jest.fn) : CRA active `resetMocks`.
 let dernierBlob = null;
 beforeAll(() => {
   window.URL.createObjectURL = (blob) => {

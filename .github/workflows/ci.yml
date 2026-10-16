@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      # Valeurs factices : le build CRA a besoin des variables REACT_APP_*
+      # Valeurs factices : le build Vite a besoin des variables REACT_APP_*
       # au moment de la compilation, mais aucun secret réel n'est requis en CI.
       CI: true
       REACT_APP_FIREBASE_API_KEY: test
@@ -45,7 +45,7 @@ jobs:
         run: npm run lint
 
       - name: Test
-        run: npm test -- --watchAll=false --passWithNoTests
+        run: npm test
 
       - name: Build
         run: npm run build

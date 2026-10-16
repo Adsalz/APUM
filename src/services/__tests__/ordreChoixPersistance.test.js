@@ -12,34 +12,34 @@ import {
   saveOrdreChoixPeriode,
 } from '../ordreChoixService';
 import { genererProchainOrdreChoix } from '../../utils/ordreChoix';
+import * as firestore from 'firebase/firestore';
 
-const mockSetDoc = jest.fn(() => Promise.resolve());
-const mockGetDoc = jest.fn(() => Promise.resolve({ exists: () => false }));
-const mockGetDocs = jest.fn(() => Promise.resolve({ empty: true, docs: [] }));
+const mockSetDoc = vi.fn(() => Promise.resolve());
+const mockGetDoc = vi.fn(() => Promise.resolve({ exists: () => false }));
+const mockGetDocs = vi.fn(() => Promise.resolve({ empty: true, docs: [] }));
 
-jest.mock('../../firebase', () => ({ db: {}, auth: { currentUser: { uid: 'admin-1' } } }));
+vi.mock('../../firebase', () => ({ db: {}, auth: { currentUser: { uid: 'admin-1' } } }));
 
-jest.mock('firebase/firestore', () => ({
-  collection: jest.fn((_db, name) => ({ name })),
-  doc: jest.fn((_db, coll, id) => ({ coll, id })),
+vi.mock('firebase/firestore', () => ({
+  collection: vi.fn((_db, name) => ({ name })),
+  doc: vi.fn((_db, coll, id) => ({ coll, id })),
   getDoc: (...a) => mockGetDoc(...a),
   getDocs: (...a) => mockGetDocs(...a),
   setDoc: (...a) => mockSetDoc(...a),
-  query: jest.fn((...a) => a),
-  orderBy: jest.fn(() => ({ type: 'orderBy' })),
-  documentId: jest.fn(() => '__name__'),
-  startAt: jest.fn((v) => ({ type: 'startAt', v })),
-  endAt: jest.fn((v) => ({ type: 'endAt', v })),
-  endBefore: jest.fn((v) => ({ type: 'endBefore', v })),
+  query: vi.fn((...a) => a),
+  orderBy: vi.fn(() => ({ type: 'orderBy' })),
+  documentId: vi.fn(() => '__name__'),
+  startAt: vi.fn((v) => ({ type: 'startAt', v })),
+  endAt: vi.fn((v) => ({ type: 'endAt', v })),
+  endBefore: vi.fn((v) => ({ type: 'endBefore', v })),
   Timestamp: class Timestamp {
     static now() { return new Timestamp(); }
   },
 }));
 
-const firestore = require('firebase/firestore');
 
 beforeEach(() => {
-  jest.clearAllMocks();
+  vi.clearAllMocks();
   mockGetDoc.mockResolvedValue({ exists: () => false });
   mockGetDocs.mockResolvedValue({ empty: true, docs: [] });
 });
@@ -83,7 +83,8 @@ describe('recherche du trimestre précédent', () => {
   });
 
   it('n’utilise pas limitToLast : le tri __name__ descendant réclame un index composite absent', () => {
-    expect(firestore.limitToLast).toBeUndefined();
+    // Vitest refuse de lire un export absent du mock : on teste sa présence.
+    expect('limitToLast' in firestore).toBe(false);
   });
 
   it('retient le DERNIER document du range ascendant', async () => {

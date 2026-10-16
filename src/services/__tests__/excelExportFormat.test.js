@@ -23,9 +23,7 @@ const GRIS_CLAIR = 'FFF2F2F2';
 const ARGENT = 'FFC0C0C0';
 
 // L'export déclenche un téléchargement navigateur : on capture le Blob produit
-// au lieu de naviguer, puis on le relit comme un classeur. Fonctions SIMPLES
-// (pas jest.fn) : CRA active `resetMocks`, qui viderait leur implémentation
-// entre les tests.
+// au lieu de naviguer, puis on le relit comme un classeur.
 let dernierBlob = null;
 beforeAll(() => {
   window.URL.createObjectURL = (blob) => {
