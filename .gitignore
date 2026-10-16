@@ -30,6 +30,10 @@ Desideratas papiers/
 # Aucun classeur/données ne doit être versionné (exports générés, données médicales)
 *.xlsx
 *.xls
+# Photos de plannings ou de fiches papier : elles portent les noms des médecins
+*.jpg
+*.jpeg
+*.heic
 
 # Scripts d'administration : dépendances + clés de compte de service (JAMAIS versionnées)
 scripts/node_modules/
